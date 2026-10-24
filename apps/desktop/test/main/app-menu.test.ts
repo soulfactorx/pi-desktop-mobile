@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { appMenuTemplate, menuCommandIds } from "../../src/main/app-menu";
+import { webMenuCommandIds, WEB_MENU } from "../../src/renderer/web-menu";
 
 const noop = { command: () => {}, openUrl: () => {}, about: () => {} };
 
@@ -57,5 +58,22 @@ describe("appMenuTemplate", () => {
     const view = tpl[2]!.submenu as Array<{ id?: string; click?: () => void }>;
     view.find((i) => i.id === "palette")!.click!();
     expect(sent).toEqual(["palette"]);
+  });
+});
+
+describe("웹 메뉴 (WEB_MENU)", () => {
+  it("명령은 모두 데스크톱 메뉴바에 있는 명령이다 (같은 처리를 탄다)", () => {
+    const desktop = new Set(menuCommandIds(appMenuTemplate("linux", noop)));
+    for (const id of webMenuCommandIds()) expect(desktop.has(id), id).toBe(true);
+  });
+
+  it("웹에서 쓸 수 없는 앱 업데이트 말고는 데스크톱 메뉴의 명령을 모두 담는다", () => {
+    const web = new Set(webMenuCommandIds());
+    const missing = menuCommandIds(appMenuTemplate("linux", noop)).filter((id) => !web.has(id));
+    expect(missing).toEqual(["app-update"]);
+  });
+
+  it("묶음마다 항목이 있다", () => {
+    for (const group of WEB_MENU) expect(group.items.length, group.label).toBeGreaterThan(0);
   });
 });
