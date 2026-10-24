@@ -105,6 +105,8 @@ export function TerminalView({
   };
   const writeRef = useRef(writeWithModifiers);
   writeRef.current = writeWithModifiers;
+  /** 메뉴의 붙여넣기처럼 이벤트 없이 xterm으로 보내는 글을 "바로 입력"이 버리지 않게 한다 */
+  const allowXtermTextRef = useRef<() => void>(() => {});
   // 입력 진단을 켰으면 기록이 바뀔 때마다 다시 그린다
   const [, setDebugTick] = useState(0);
   useEffect(() => onInputSettingsChange(() => setDebugTick((n) => n + 1)), []);
@@ -181,8 +183,10 @@ export function TerminalView({
     });
     // 화면 키보드 입력 (터치 기기): 입력 칸의 값이 바뀔 때마다 지난 값과 비교해 바로 보낸다 (terminal-touch.ts의 InputMirror).
     // 이벤트는 xterm보다 먼저 받도록 바깥 요소에서 capture로 듣고, xterm의 처리는 막지 않는다.
-    // xterm이 입력 칸에서 온 글자를 (조합 확정 등으로) 한 번 더 보내면 버린다. 입력 칸을 거치지 않는 키(Enter·방향키,
-    // 블루투스 키보드의 글자)는 그대로 둔다.
+    // 입력 칸의 글은 모두 여기서 보내므로, xterm이 보내는 글자는 입력 칸을 거치지 않는 진짜 키(블루투스 키보드처럼
+    // keyCode가 229가 아닌 키, 붙여넣기)에서 온 것만 통과시킨다. xterm은 입력 칸에서 온 글을 조합 확정·insertText 뒤에
+    // 잠깐 지나서(비동기로) 보내기도 해서, "언제 왔나"로는 가려낼 수 없다 (길게 눌러 넣는 기호가 두 번 들어가던 원인).
+    // Enter·방향키 같은 제어 입력은 늘 그대로 둔다.
     /** 켜 둔 Ctrl·Alt를 붙이지 않고 그대로 보낸다 */
     const writeRaw = (data: string) => {
       if (!id || !data) return;
@@ -194,11 +198,15 @@ export function TerminalView({
     const mirror = new InputMirror();
     const textarea = term.textarea;
     let composing = false;
-    /** 입력 칸의 input 이벤트를 처리하는 중 (xterm이 이 사이에 보내는 글자는 입력 칸에서 온 것이라 이미 보냈다) */
-    let inInputEvent = false;
-    /** 조합이 끝난 뒤 xterm이 따로 보낼 확정 글 (이미 보냈다) */
-    let commitEcho: string | undefined;
-    let commitEchoTimer: ReturnType<typeof setTimeout> | undefined;
+    /** 지금 xterm이 보내는 글자가 진짜 키(입력 칸을 거치지 않음)에서 온 것인지. 그 이벤트를 처리하는 동안만 켠다 */
+    let realKey = false;
+    let realKeyTimer: ReturnType<typeof setTimeout> | undefined;
+    const allowXtermText = () => {
+      realKey = true;
+      if (realKeyTimer) clearTimeout(realKeyTimer);
+      realKeyTimer = setTimeout(() => (realKey = false), 0);
+    };
+    allowXtermTextRef.current = allowXtermText;
     /** 지금 누른 키로 xterm이 이미 보낸 글자. 곧 입력 칸에도 들어오면 다시 보내지 않는다 (Shift 글자, 길게 눌러 넣는 기호 등). 키마다 새로 시작한다 */
     let keySent = "";
     let keySentConsumed = false;
@@ -208,9 +216,6 @@ export function TerminalView({
       const ie = e as InputEvent;
       debugLog(`input ${ie.inputType} data=${shown(ie.data ?? "")} value=${shown(textarea.value)}`);
       if (!live()) return;
-      inInputEvent = true;
-      // xterm이 이 이벤트의 전달을 멈추면(stopPropagation) 버블 단계의 onInputDone이 불리지 않는다. 그래도 반드시 끈다.
-      setTimeout(() => (inInputEvent = false), 0);
       const { deletes, add: added } = mirror.update(textarea.value);
       writeRaw("\x7f".repeat(deletes));
       let add = added;
@@ -241,23 +246,17 @@ export function TerminalView({
       composing = true;
     };
     const onCompositionUpdate = (e: CompositionEvent) => debugLog(`compositionupdate ${shown(e.data ?? "")}`);
-    // xterm의 입력 칸 처리가 끝난 뒤 (버블 단계)
-    const onInputDone = () => {
-      inInputEvent = false;
-    };
     const onCompositionEnd = (e: CompositionEvent) => {
       debugLog(`compositionend ${shown(e.data ?? "")}`);
       composing = false;
-      // xterm은 조합이 끝나면 곧바로(setTimeout 0) 확정 글을 보낸다. 이미 보냈으므로 같은 글이 오면 한 번 버린다.
-      commitEcho = e.data || undefined;
-      if (commitEchoTimer) clearTimeout(commitEchoTimer);
-      commitEchoTimer = setTimeout(() => (commitEcho = undefined), 100);
     };
     // xterm은 Enter·Ctrl+C 키와 포커스를 잃을 때 입력 칸을 비운다 (input 이벤트 없이). 따라서 비운다.
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target !== textarea) return;
       debugLog(`keydown key=${shown(e.key)} code=${e.keyCode}${e.ctrlKey ? " ctrl" : ""}${e.shiftKey ? " shift" : ""}`);
       keySent = "";
+      // 화면 키보드는 keyCode 229(조합 중)를 보낸다. 그 밖의 키는 입력 칸을 거치지 않고 xterm이 바로 보낸다.
+      if (e.keyCode !== 229 && e.key !== "Unidentified") allowXtermText();
       if (e.key === "Enter" || (e.ctrlKey && (e.key === "c" || e.key === "C"))) {
         setTimeout(() => {
           if (textarea && textarea.value === "") mirror.reset();
@@ -265,9 +264,15 @@ export function TerminalView({
       }
     };
     const onFocusOut = () => mirror.reset();
+    // keypress로 처리되는 글자(Shift 글자 등)와 붙여넣기도 xterm이 바로 보낸다
+    const onKeyPress = (e: Event) => {
+      if (e.target === textarea) allowXtermText();
+    };
+    const onPaste = () => allowXtermText();
     if (TOUCH) {
       el.addEventListener("input", onInput, true);
-      el.addEventListener("input", onInputDone);
+      el.addEventListener("keypress", onKeyPress, true);
+      el.addEventListener("paste", onPaste, true);
       el.addEventListener("compositionstart", onCompositionStart, true);
       el.addEventListener("compositionupdate", onCompositionUpdate, true);
       el.addEventListener("compositionend", onCompositionEnd, true);
@@ -276,17 +281,8 @@ export function TerminalView({
       // "바로 입력"은 입력한 글자를 셸이 바로 화면에 찍으므로 xterm의 조합 미리보기를 보이지 않게 한다. "단어 단위"는 미리보기가 있어야 한다.
       el.classList.toggle("live-input", live());
     }
-    // 입력 칸에서 와서 이미 보낸 글자인지. 키 이벤트로 바로 들어온 글자(숫자·특수문자 키, 블루투스 키보드)는 아니다.
-    const isEcho = (data: string) => {
-      if (!live() || !isPrintable(data)) return false;
-      if (inInputEvent) return true;
-      if (commitEcho !== undefined && data === commitEcho) {
-        commitEcho = undefined;
-        return true;
-      }
-      // 조합 중에 다른 키를 누르면 xterm이 그 자리에서 조합 글을 확정해 보낸다
-      return composing && !!textarea?.value.endsWith(data);
-    };
+    // 입력 칸에서 와서 이미 보낸 글자인지 (진짜 키·붙여넣기에서 온 것이 아니면 모두 그렇다)
+    const isEcho = (data: string) => live() && isPrintable(data) && !realKey;
     const offSettings = onInputSettingsChange(() => el.classList.toggle("live-input", live()));
     const input = term.onData((data) => {
       if (isEcho(data)) {
@@ -390,8 +386,9 @@ export function TerminalView({
       el.removeEventListener("touchcancel", onTouchEnd);
       offSettings();
       el.removeEventListener("input", onInput, true);
-      el.removeEventListener("input", onInputDone);
-      if (commitEchoTimer) clearTimeout(commitEchoTimer);
+      el.removeEventListener("keypress", onKeyPress, true);
+      el.removeEventListener("paste", onPaste, true);
+      if (realKeyTimer) clearTimeout(realKeyTimer);
       if (keySentTimer) clearTimeout(keySentTimer);
       el.removeEventListener("compositionstart", onCompositionStart, true);
       el.removeEventListener("compositionupdate", onCompositionUpdate, true);
@@ -448,7 +445,7 @@ export function TerminalView({
     const term = termRef.current;
     if (!term) return;
     if (action === "copy") copySelection(term);
-    else if (action === "paste") void pasteClipboard(term);
+    else if (action === "paste") void pasteClipboard(term, allowXtermTextRef.current);
     else term.selectAll();
     term.focus();
   };
@@ -518,10 +515,13 @@ function copySelection(term: Terminal): void {
   if (text) void navigator.clipboard.writeText(text).catch(() => {});
 }
 
-async function pasteClipboard(term: Terminal): Promise<void> {
+async function pasteClipboard(term: Terminal, beforePaste: () => void): Promise<void> {
   try {
     const text = await navigator.clipboard.readText();
-    if (text) term.paste(text);
+    if (text) {
+      beforePaste();
+      term.paste(text);
+    }
   } catch {
     // 클립보드를 읽지 못하면 붙여넣지 않는다 (단축키는 브라우저 붙여넣기라 영향이 없다).
   }
