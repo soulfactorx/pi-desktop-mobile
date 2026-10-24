@@ -1,4 +1,4 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["electron.vite.config.ts", "src/main", "src/preload", "src/shared", "scripts/*.d.ts", "test/main"]
+  "include": ["electron.vite.config.ts", "vite.web.config.ts", "src/main", "src/preload", "src/server", "src/shared", "scripts/*.d.ts", "test/main", "test/server"]
 }
