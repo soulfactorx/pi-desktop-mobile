@@ -6,10 +6,11 @@
 // 4. electron-vite dev를 실행한다
 //
 // --demo-ext: Pi 패키지에 들어 있는 rpc-demo 확장을 함께 불러온다 (확장 UI 다이얼로그 확인용).
+// --web: 앱 대신 웹 서버(pi-web)를 묶어서 띄운다. 브라우저로 출력된 주소를 연다 (데이터는 .dev/pi-web).
 //
 // 앱을 껐다 켜도 같은 데몬·세션에 다시 붙는지 확인할 수 있도록 경로와 포트를 고정한다.
 // mock-llm.ts는 Node 22.18+/24의 TypeScript 타입 제거 기능으로 바로 import한다.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +19,7 @@ const repo = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 const devDir = join(repo, ".dev");
 const piAgentDir = join(devDir, "pi-agent");
 const port = Number(process.env.MOCK_LLM_PORT ?? 18911);
+const web = process.argv.includes("--web");
 const demoExtension = process.argv.includes("--demo-ext")
   ? join(repo, "node_modules", "@earendil-works", "pi-coding-agent", "examples", "extensions", "rpc-demo.ts")
   : undefined;
@@ -84,12 +86,14 @@ if (demoExtension) {
   console.log("[dev-mock] rpc-demo 확장 사용: /rpc-input, /rpc-editor, /rpc-prefill, \"bash:rm -rf ./x\"(위험 명령 확인)");
 }
 
-const child = spawn("npm", ["run", "dev"], {
-  cwd: fileURLToPath(new URL("..", import.meta.url)),
-  env,
-  stdio: "inherit",
-  shell: process.platform === "win32",
-});
+const appDir = fileURLToPath(new URL("..", import.meta.url));
+if (web) {
+  const built = spawnSync("npm", ["run", "build:web"], { cwd: appDir, stdio: "inherit", shell: process.platform === "win32" });
+  if (built.status !== 0) process.exit(built.status ?? 1);
+}
+const child = web
+  ? spawn(process.execPath, [join(appDir, "out", "web", "server.mjs"), "--home", join(devDir, "pi-web")], { env, stdio: "inherit" })
+  : spawn("npm", ["run", "dev"], { cwd: appDir, env, stdio: "inherit", shell: process.platform === "win32" });
 child.on("exit", async (code) => {
   await llm.close();
   process.exit(code ?? 0);

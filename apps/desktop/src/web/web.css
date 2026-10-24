@@ -1,0 +1,44 @@
+/* 웹(pi-web)에만 있는 화면: 토큰 입력과 서버 연결 띠. 색은 renderer/styles.css의 변수를 쓴다 */
+.web-token {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.web-token h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.web-token p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.web-token .web-token-message {
+  color: var(--warn);
+}
+
+.web-token input {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.web-link {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 4px 12px;
+  padding-top: max(4px, env(safe-area-inset-top));
+  background: var(--warn);
+  color: #1d1f27;
+  font-size: 13px;
+  text-align: center;
+}

@@ -1,5 +1,7 @@
 import { ErrorCodes, JsonRpcError } from "@pi-desktop/host-protocol";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 /**
  * Agent 번들의 빌드 식별자: 파일 SHA-256의 앞 12자리.
@@ -43,4 +45,16 @@ export function staleAgentError(error: unknown): JsonRpcError | undefined {
     `Host Agent가 앱보다 이전 버전이라 이 기능을 처리하지 못했을 수 있습니다. 상단 바의 "Agent 업데이트 대기" → "지금 바꾸기"로 Agent를 바꾼 뒤 다시 해 보세요(실행 중인 세션은 끝나며 기록에서 다시 열 수 있습니다). 원래 오류: ${error.message}`,
     error.data,
   );
+}
+
+/** Agent 번들의 package.json에서 버전을 읽는다 (원격 배포 파일 이름에 쓰임). 설치본은 같은 폴더, 개발은 한 단계 위 */
+export function agentVersion(script: string): string {
+  for (const candidate of [join(dirname(script), "package.json"), join(dirname(script), "..", "package.json")]) {
+    try {
+      return String(JSON.parse(readFileSync(candidate, "utf8")).version ?? "0.0.0");
+    } catch {
+      // 다음 후보
+    }
+  }
+  return "0.0.0";
 }

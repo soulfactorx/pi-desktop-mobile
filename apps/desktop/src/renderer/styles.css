@@ -3221,3 +3221,130 @@ details > summary.settings-section {
   padding: 2px 6px;
   font-size: 12px;
 }
+
+/* ── 좁은 화면 (휴대폰 브라우저로 연 웹 버전 pi-web, 설계 §5.10) ─────────────────── */
+.drawer-toggle,
+.drawer-backdrop {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .topbar,
+  .toolbar {
+    flex-wrap: wrap;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .drawer-toggle {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 16px;
+  }
+
+  /* 로고 글자와 세션 경로는 자리가 없어 감춘다 (탭 제목에 세션 이름이 나온다) */
+  .brand {
+    font-size: 0;
+  }
+
+  .host-select {
+    max-width: 46vw;
+  }
+
+  .session-meta {
+    display: none;
+  }
+
+  .toolbar-label {
+    display: none;
+  }
+
+  /* 새 세션 폴더 줄은 세션을 보는 동안 서랍과 함께 연다 */
+  .app.has-session:not(.drawer-open) .toolbar {
+    display: none;
+  }
+
+  .topbar button:not(.drawer-toggle),
+  .session-bar button {
+    font-size: 13px;
+    padding: 3px 8px;
+  }
+
+  .session-bar {
+    gap: 6px 10px;
+    padding: 4px 8px;
+  }
+
+  .toolbar .cwd {
+    flex-basis: 100%;
+  }
+
+  .toolbar button {
+    flex: 1;
+    padding: 6px 8px;
+  }
+
+  /* 사이드바는 왼쪽에서 밀려 나오는 서랍 */
+  .workspace {
+    position: relative;
+  }
+
+  .workspace .sidebar {
+    display: none;
+  }
+
+  .workspace.drawer-open .sidebar {
+    display: block;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    width: min(85vw, 320px);
+    box-shadow: 4px 0 20px rgb(0 0 0 / 30%);
+  }
+
+  .workspace.drawer-open .drawer-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 19;
+    background: rgb(0 0 0 / 35%);
+  }
+
+  /* 파일 트리 등 오른쪽 패널은 본문 위에 겹쳐 띄운다 */
+  .tree-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    z-index: 20;
+    width: min(92vw, 360px);
+    box-shadow: -4px 0 20px rgb(0 0 0 / 30%);
+  }
+
+  .chat {
+    padding: 10px 8px;
+  }
+
+  .composer {
+    flex-wrap: wrap;
+    padding: 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .composer-input {
+    flex-basis: 100%;
+  }
+
+  .composer textarea {
+    min-height: 44px;
+    resize: none;
+  }
+
+  .composer .actions {
+    flex-direction: row;
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}

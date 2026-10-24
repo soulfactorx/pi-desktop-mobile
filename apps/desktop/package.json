@@ -13,10 +13,13 @@
     "predev": "npm run build -w @pi-desktop/host-agent",
     "dev": "electron-vite dev",
     "dev:mock": "node scripts/dev-mock.mjs",
+    "dev:web": "node scripts/dev-mock.mjs --web",
     "build": "electron-vite build",
+    "build:web": "npm run build -w @pi-desktop/host-agent && node scripts/build-web.mjs",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
     "test": "vitest run",
-    "dist": "npm run build -w @pi-desktop/host-agent && electron-vite build && electron-builder --config electron-builder.yml --publish never"
+    "dist": "npm run build -w @pi-desktop/host-agent && electron-vite build && electron-builder --config electron-builder.yml --publish never",
+    "dist:web": "npm run build -w @pi-desktop/host-agent && node scripts/build-web.mjs --pack"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
@@ -26,6 +29,7 @@
     "@pi-desktop/host-protocol": "*",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^6.1.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
@@ -37,6 +41,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.5.0",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "ws": "^8.22.0"
   }
 }

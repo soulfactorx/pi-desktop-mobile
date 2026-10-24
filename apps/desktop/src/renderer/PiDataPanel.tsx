@@ -83,9 +83,11 @@ export function PiDataPanel({ hostId, status, onChanged }: { hostId: string; sta
           <span className="probe-ok">
             백업했습니다 ({formatBytes(backup.bytes)}): {backup.path}
           </span>
-          <button type="button" className="small" onClick={() => void window.piDesktop.revealFile(hostId, "", backup.path)}>
-            위치 열기
-          </button>
+          {window.piDesktop.shell === "electron" && (
+            <button type="button" className="small" onClick={() => void window.piDesktop.revealFile(hostId, "", backup.path)}>
+              위치 열기
+            </button>
+          )}
         </div>
       )}
       {deleting && (

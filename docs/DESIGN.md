@@ -1,4 +1,4 @@
-# Pi Desktop — 설계 문서 (v0.66)
+# Pi Desktop — 설계 문서 (v0.67)
 
 > 목표: **Pi를 포크하지 않고**, 사용자가 설치한 `pi` 그대로(업데이트 계속 받으며) 위에 GUI를 얹는다.
 > 기준 버전: `@earendil-works/pi-coding-agent` 1.3.0 (2026-10). ※ 구 패키지명 `@mariozechner/pi-coding-agent`는 0.73.1에서 멈춰 있음.
@@ -942,7 +942,7 @@ Pi는 세션 파일 잠금을 문서화하지 않았다. 그래서 **같은 세�
     - `~/.ssh/config` 호스트 자동 가져오기
     - 비밀번호·암호 걸린 키 입력 (ssh-agent에 올린 키는 됨)
     - 휴대폰에서 LLM으로 실제 대화(자격 증명 없음)
-    - Android가 백그라운드의 Termux를 멈추는 경우의 대응(Termux wake lock)
+    - Android가 백그라운드의 Termux를 멈추는 경우의 대응(Termux wake lock) — 웹 서버 pi-web(§5.10)은 켤 때 wake lock을 건다
 
 ### 5.7 ConfigService — 안전한 파일 편집
 - 모든 쓰기는 Host Agent의 원자적 쓰기를 쓴다. JSON은 jsonc-parser로 부분 수정해서 원본 포맷과 주석을 보존한다. 저장 전 스키마 검증, `.bak` 1개 유지.
@@ -1151,6 +1151,43 @@ Pi는 세션 파일 잠금을 문서화하지 않았다. 그래서 **같은 세�
   - 모델: 대상에 프로바이더가 없으면 거부되었다. 프로바이더째 옮긴 뒤 모델 하나 넣기와 바꾸기가 되었다.
   - 덧씌우기: 프로젝트 `.pi/settings.json`에만 `-SKILL.md`가 적혔고, 스킬 탭에 "꺼짐 · 신뢰해야 불러옴"이 나왔다. "덧씌우기 지우기"로 항목이 지워졌다.
   - 시험 뒤 양쪽의 시험 파일·백업·설정과 기록 파일은 지웠다.
+
+### 5.10 웹 서버 pi-web — 휴대폰 브라우저로 쓰기 (v0.67)
+
+**목표**: Android 휴대폰(예: 갤럭시 S25) 하나로 Pi와 GUI를 모두 쓴다. Electron은 Android에서 돌지 않으므로, main 프로세스 자리를 Node 웹 서버가 맡고 화면은 휴대폰 브라우저로 연다. VS Code의 code-server와 같은 방식이다.
+
+```
+[휴대폰 브라우저] ──HTTP(화면 파일)·WebSocket(API)──▶ [pi-web 서버 (Termux의 Node)]
+   renderer 그대로                                     main의 처리기 그대로 (ipc-handlers.ts)
+   window.piDesktop = WsTransport                         │ stdio
+                                                    [host-agent connect] ─▶ [데몬 agentd] ─▶ pi --mode rpc
+```
+
+- **같은 코드를 쓴다**
+  - 처리기: `main/ipc-handlers.ts`의 `registerHandlers(router, deps)`. Electron은 ipcMain을, 웹 서버는 `server/web-router.ts`를 Router로 넘긴다. OS 대화상자·탐색기 보이기만 deps로 다르게 준다(웹은 없음).
+  - 화면 API: `shared/api-client.ts`의 `createPiDesktopApi(transport, shell)`. preload는 ipcRenderer를, 웹은 `web/ws-transport.ts`를 넘긴다.
+  - 화면은 `window.piDesktop.shell`이 `"web"`이면 로컬 호스트도 앱의 폴더 탐색 창을 쓰고, "탐색기에서 보기"를 감춘다.
+- **메시지** (`shared/web-protocol.ts`): JSON 한 개씩. `invoke`(id로 응답 짝짓기)·`send`·`event`. JSON은 배열 속 undefined를 null로 바꾸므로 undefined였던 인자 자리를 `u`에 적어 되살린다(settingsWrite의 baseMtime처럼 null이 다른 뜻인 인자가 있다). 오류 문구는 Electron과 같은 접두사("Error invoking remote method …")로 돌려줘 화면의 기존 처리를 그대로 쓴다.
+- **보안** (`server/auth.ts`): 서버는 main 프로세스와 같은 힘(명령 실행·파일 쓰기)을 가진다.
+  - 기본으로 127.0.0.1에만 연다. 휴대폰의 다른 앱도 localhost에 붙을 수 있으므로 **토큰이 꼭 필요**하다. 토큰은 처음 실행할 때 만들어 데이터 폴더에 0600으로 둔다.
+  - 서버가 알려 주는 주소는 `http://127.0.0.1:8787/#token=…`. `#` 뒤는 서버로 가지 않는다. 화면이 읽어 localStorage에 두고 주소창에서 지운다. WebSocket은 `?token=`, 확인용 `/api/auth`는 Bearer로 받는다. 비교는 해시끼리 timingSafeEqual.
+  - localhost에만 열었으면 Host가 localhost·127.0.0.1·[::1]이 아닌 요청을 막는다(DNS rebinding). Origin이 있으면 Host와 같아야 한다(다른 웹사이트가 브라우저를 시켜 붙는 것).
+  - 화면 파일(public/)은 비밀이 없어 토큰 없이 내준다. 경로는 public 밖으로 나가지 못한다.
+- **연결 끊김**: 휴대폰 브라우저는 백그라운드 탭의 WebSocket을 끊는다. WsTransport가 지수 백오프로 다시 붙고, 화면이 다시 보이거나 네트워크가 돌아오면 바로 붙는다. 다시 붙으면 화면이 연결했던 호스트마다 connectionChanged를 다시 알린다. 화면은 "connected"를 받으면 보던 세션에 마지막 순번부터 다시 붙으므로(§3.4) 끊긴 동안의 이벤트를 잃지 않는다. 끊긴 동안 기다리던 응답은 실패로 끝낸다(서버가 받았는지 모름). 서버는 30초마다 ping으로 죽은 연결을 정리한다.
+  - 확인함: 서버를 껐다 켜도 열린 페이지가 다시 붙고, 데몬 아래의 Pi 세션이 그대로 이어진다.
+- **내장 터미널**: node-pty는 네이티브 모듈이고 Android용 미리 빌드된 파일이 없다. 터미널은 처음 열 때 node-pty를 불러오고, 없으면 그 터미널만 안내 오류로 실패한다(다른 기능은 그대로). 설치 스크립트를 `--terminal`로 실행하면 Termux에서 빌드한다(python·make·clang, node-gyp의 `android_ndk_path` 문제는 `~/.gyp/include.gypi`로 피한다).
+- **좁은 화면**(`max-width: 720px`): 사이드바는 ☰ 버튼으로 여는 서랍, 세션을 보는 동안 "새 세션 폴더" 줄은 서랍과 함께 연다. 파일 트리는 본문 위에 겹쳐 띄운다. 입력창은 한 줄 전체, 버튼은 그 아래.
+- **묶음과 설치** (`scripts/build-web.mjs`, `scripts/web/`):
+  - `pi-web.tar.gz`: `server.mjs`(ws까지 esbuild 한 파일, node-pty만 밖), `public/`(vite.web.config.ts), `host-agent/`, `bin/pi-web`, `package.json`. 플랫폼과 상관없는 JS라 Linux 한 곳에서 만든다(1.6MB 정도).
+  - `install-termux.sh`: `pkg install nodejs-lts curl tar` → Pi가 없으면 `npm install -g` → 릴리스에서 묶음을 받아 `~/.pi-web/app`에 바꿔 넣기(데이터·토큰·빌드한 node-pty는 남긴다, 켜져 있었으면 다시 켠다) → `$PREFIX/bin/pi-web` → 켜고 브라우저 열기(`termux-open-url`). 릴리스 저장소는 빌드할 때 넣는다(GITHUB_REPOSITORY 또는 git origin). `latest/download/` 주소가 되도록 파일 이름에 버전을 넣지 않는다.
+  - `pi-web`: start(백그라운드, `termux-wake-lock`)·run·stop·restart·status·url·open·log·update·uninstall. 서버를 꺼도 데몬과 Pi 세션은 계속 돈다.
+  - 데이터: `~/.pi-web/data`(토큰, ssh-hosts.json, imports.json, copies.json, activity-log.jsonl, server.log). 데스크톱 앱의 userData에 해당한다. 데몬 홈(`~/.pi-desktop`)은 데스크톱과 같다.
+- 앱 자동 업데이트는 웹에서 끈다(`status: "disabled"`). 웹 묶음은 `pi-web update`로 바꾼다.
+- 개발: `npm run dev:web -w @pi-desktop/desktop`(mock LLM + 웹 서버, 데이터는 `.dev/pi-web`).
+- 아직 하지 않은 것
+  - 실제 Android 기기에서의 확인 (Linux에서 360×780 화면, 서버 재시작·재연결, 설치 스크립트를 `--file`로 확인했다)
+  - 화면 복사·붙여넣기 외의 파일 올리기, PWA 오프라인(서비스 워커)
+  - HTTPS (같은 기기 localhost는 브라우저가 안전한 출처로 본다. 다른 기기에서 쓰려면 Tailscale 등 VPN 뒤에 두기를 권한다)
 
 ## 6. 기술 스택
 

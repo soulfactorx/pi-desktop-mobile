@@ -1,0 +1,10 @@
+{
+  "name": "Pi Web",
+  "short_name": "Pi",
+  "description": "Pi coding agent를 휴대폰 브라우저로 쓰는 화면",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#16171d",
+  "theme_color": "#16171d",
+  "icons": [{ "src": "./icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }]
+}
