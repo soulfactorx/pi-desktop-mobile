@@ -3347,4 +3347,37 @@ details > summary.settings-section {
     flex-basis: 100%;
     justify-content: flex-end;
   }
+
+  /* 대화상자(Pi 관리 등)는 화면을 거의 다 쓴다 */
+  .modal,
+  .pi-manager {
+    width: calc(100vw - 16px);
+    max-width: none;
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+  }
+
+  .settings-copy-head {
+    flex-wrap: wrap;
+  }
+
+  .settings-copy-head button {
+    white-space: nowrap;
+  }
+
+  /* 설정 폼: 이름·설명을 위에, 값을 그 아래 한 줄 전체에 둔다 (이름이 잘리지 않게) */
+  .settings-field {
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 4px;
+  }
+
+  .settings-field-label code {
+    word-break: break-all;
+  }
+
+  .settings-field-control {
+    flex: none;
+    width: 100%;
+  }
 }
