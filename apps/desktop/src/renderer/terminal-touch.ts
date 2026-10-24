@@ -107,3 +107,35 @@ export function dragToLines(carry: number, previousY: number, currentY: number, 
   const lines = lineHeight > 0 ? Math.trunc(total / lineHeight) : 0;
   return { lines, carry: total - lines * lineHeight };
 }
+
+/**
+ * 마우스 휠 한 칸을 SGR 마우스 보고(ESC [ < 64/65 ; 열 ; 행 M)로 만든다. 열·행은 1부터.
+ * 마우스 신호를 받겠다고 켠 프로그램(Pi의 전체 화면 TUI 등)은 ↑·↓ 키 대신 이것으로 스크롤한다.
+ * 요즘 프로그램은 거의 SGR 형식(1006)을 켜므로 이 형식만 쓴다.
+ */
+export function sgrWheel(direction: "up" | "down", col: number, row: number): string {
+  return `\x1b[<${direction === "up" ? 64 : 65};${Math.max(1, col)};${Math.max(1, row)}M`;
+}
+
+/**
+ * 화면 키보드의 단어 조합 중 바로 보낼 글을 정한다.
+ *
+ * 삼성·Gboard 키보드는 영어도 단어 단위로 조합하다가 스페이스·엔터에서 확정하고, xterm은 확정될 때만 입력을 보낸다.
+ * 그래서 조합 중인 글이 출력 가능한 ASCII뿐이면 바뀐 만큼을 바로 보낸다(지운 글자는 DEL). 한글처럼 ASCII가 아니면
+ * 자모를 조합해야 하므로 바로 보내지 않고(eager: false) 확정을 기다린다.
+ */
+export function compositionStep(sent: string, composing: string): { send: string; sent: string; eager: boolean } {
+  if (!/^[\x20-\x7e]*$/.test(composing)) return { send: "", sent, eager: false };
+  let common = 0;
+  while (common < sent.length && common < composing.length && sent[common] === composing[common]) common++;
+  return { send: "\x7f".repeat(sent.length - common) + composing.slice(common), sent: composing, eager: true };
+}
+
+/**
+ * 조합이 끝나 xterm이 확정된 글을 보낼 때, 이미 바로 보낸 부분(sent)을 빼고 보낼 글.
+ * 키보드가 확정하며 단어를 고쳤으면(자동 수정) 보낸 만큼 지우고 확정된 글을 다시 보낸다.
+ */
+export function committedRemainder(sent: string, committed: string): string {
+  if (committed.startsWith(sent)) return committed.slice(sent.length);
+  return "\x7f".repeat(sent.length) + committed;
+}

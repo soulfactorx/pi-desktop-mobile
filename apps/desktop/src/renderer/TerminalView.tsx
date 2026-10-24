@@ -4,7 +4,18 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import type { TerminalOpenRequest } from "../shared/api";
 import { clipboardKeyAction } from "./terminal-keys";
-import { applyModifiers, dragToLines, DRAG_THRESHOLD_PX, keySequence, TOUCH_KEYS, type Modifier, type SendKey } from "./terminal-touch";
+import {
+  applyModifiers,
+  committedRemainder,
+  compositionStep,
+  dragToLines,
+  DRAG_THRESHOLD_PX,
+  keySequence,
+  sgrWheel,
+  TOUCH_KEYS,
+  type Modifier,
+  type SendKey,
+} from "./terminal-touch";
 
 /** 첫 입력은 Pi 화면이 다 그려지고 출력이 이만큼 잠잠해진 뒤 보낸다 */
 const INITIAL_INPUT_QUIET_MS = 1200;
@@ -151,9 +162,54 @@ export function TerminalView({
       term.write(`\r\n\x1b[2m[종료됨 (코드 ${exitCode})]\x1b[0m\r\n`);
       callbacks.current.onExit?.(exitCode);
     });
-    const input = term.onData((data) => writeRef.current(data));
+    // 화면 키보드의 단어 조합(삼성·Gboard)은 확정될 때까지 xterm에 오지 않는다. 조합 중인 글이 ASCII면 바뀐 만큼 바로 보내고,
+    // 조합이 끝나 xterm이 확정된 글을 보내면 이미 보낸 부분을 뺀다 (terminal-touch.ts의 compositionStep·committedRemainder).
+    // 이벤트는 xterm의 입력 칸보다 먼저 받도록 바깥 요소에서 capture로 듣고, xterm의 처리는 막지 않는다.
+    let composeSent = "";
+    let composeEager = false;
+    /** 조합이 끝난 뒤 xterm이 보낼 확정 글에서 뺄, 이미 보낸 부분 */
+    let pendingCommit: string | undefined;
+    let pendingTimer: ReturnType<typeof setTimeout> | undefined;
+    const onCompositionStart = () => {
+      composeSent = "";
+      composeEager = true;
+    };
+    const onCompositionUpdate = (e: CompositionEvent) => {
+      if (!composeEager) return;
+      const step = compositionStep(composeSent, e.data ?? "");
+      composeEager = step.eager;
+      composeSent = step.sent;
+      // 바로 보낸 글은 셸이 화면에 찍으므로 xterm의 조합 미리보기는 감춘다 (한글 조합은 미리보기를 둔다)
+      el.classList.toggle("eager-compose", composeEager);
+      if (step.send) writeRef.current(step.send);
+    };
+    const onCompositionEnd = () => {
+      pendingCommit = composeSent ? composeSent : undefined;
+      composeSent = "";
+      composeEager = false;
+      el.classList.remove("eager-compose");
+      // xterm은 조합이 끝나면 곧바로(setTimeout 0) 확정 글을 보낸다. 보내지 않았으면(조합 취소) 다음 입력에 섞이지 않게 비운다.
+      if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(() => (pendingCommit = undefined), 100);
+    };
+    if (TOUCH) {
+      el.addEventListener("compositionstart", onCompositionStart, true);
+      el.addEventListener("compositionupdate", onCompositionUpdate, true);
+      el.addEventListener("compositionend", onCompositionEnd, true);
+    }
+    const input = term.onData((data) => {
+      if (pendingCommit !== undefined) {
+        const sent = pendingCommit;
+        pendingCommit = undefined;
+        const rest = committedRemainder(sent, data);
+        if (rest) writeRef.current(rest);
+        return;
+      }
+      writeRef.current(data);
+    });
 
-    // 손가락 끌기 → 스크롤 (terminal-touch.ts). 일반 화면은 지난 출력을, 전체 화면 프로그램(pi TUI·less 등)은 ↑·↓ 키로 넘긴다.
+    // 손가락 끌기 → 스크롤 (terminal-touch.ts). 일반 화면은 지난 출력을 스크롤한다. 마우스 신호를 받는 프로그램(Pi의 전체 화면 TUI 등)에는
+    // 휠 신호를, 그 밖의 전체 화면 프로그램(less 등)에는 ↑·↓ 키를 보낸다.
     let touchY: number | undefined;
     let dragging = false;
     let startY = 0;
@@ -176,8 +232,15 @@ export function TerminalView({
       touchY = y;
       carry = step.carry;
       if (!step.lines) return;
-      if (term.buffer.active.type === "alternate") {
-        if (id) window.piDesktop.terminalWrite(id, keySequence(step.lines > 0 ? "down" : "up", term.modes.applicationCursorKeysMode).repeat(Math.abs(step.lines)));
+      const count = Math.abs(step.lines);
+      if (term.modes.mouseTrackingMode !== "none") {
+        // 손가락이 있는 칸에 휠을 굴린다 (Pi는 휠 아래의 영역을 스크롤한다)
+        const rect = (screen ?? el).getBoundingClientRect();
+        const col = Math.floor(((e.touches[0]!.clientX - rect.left) / rect.width) * term.cols) + 1;
+        const row = Math.floor((y - rect.top) / lineHeight) + 1;
+        if (id) window.piDesktop.terminalWrite(id, sgrWheel(step.lines > 0 ? "down" : "up", col, row).repeat(count));
+      } else if (term.buffer.active.type === "alternate") {
+        if (id) window.piDesktop.terminalWrite(id, keySequence(step.lines > 0 ? "down" : "up", term.modes.applicationCursorKeysMode).repeat(count));
       } else {
         term.scrollLines(step.lines);
       }
@@ -222,6 +285,7 @@ export function TerminalView({
 
     return () => {
       disposed = true;
+      if (pendingTimer) clearTimeout(pendingTimer);
       if (initialTimer) clearTimeout(initialTimer);
       observer.disconnect();
       el.removeEventListener("contextmenu", onContextMenu);
@@ -229,6 +293,9 @@ export function TerminalView({
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
+      el.removeEventListener("compositionstart", onCompositionStart, true);
+      el.removeEventListener("compositionupdate", onCompositionUpdate, true);
+      el.removeEventListener("compositionend", onCompositionEnd, true);
       offData();
       offExit();
       input.dispose();
