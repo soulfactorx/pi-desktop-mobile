@@ -2225,6 +2225,11 @@ button.toggled {
   touch-action: manipulation;
 }
 
+/* 화면 키보드의 영문 조합을 바로 보내는 동안에는 xterm의 조합 미리보기를 감춘다 (글자가 두 번 보이지 않게) */
+.terminal-screen.eager-compose .composition-view {
+  display: none !important;
+}
+
 .terminal-keys button.on {
   background: var(--accent);
   border-color: var(--accent);
