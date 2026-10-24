@@ -4,10 +4,14 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import type { TerminalOpenRequest } from "../shared/api";
 import { clipboardKeyAction } from "./terminal-keys";
+import { applyModifiers, dragToLines, DRAG_THRESHOLD_PX, keySequence, TOUCH_KEYS, type Modifier, type SendKey } from "./terminal-touch";
 
 /** 첫 입력은 Pi 화면이 다 그려지고 출력이 이만큼 잠잠해진 뒤 보낸다 */
 const INITIAL_INPUT_QUIET_MS = 1200;
 const MAC = /Mac/.test(navigator.platform);
+/** 손가락으로 쓰는 기기(휴대폰·태블릿)면 기능키 줄을 보이고 끌기로 스크롤한다 (terminal-touch.ts) */
+const TOUCH = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+const NO_MODIFIERS = { ctrl: false, alt: false };
 /**
  * 기본 고정폭 글꼴(예전과 같다) 뒤에 흔한 Nerd Font를 둔다. 기본 글꼴에 없는 글자(eza·starship 등의 아이콘, 사설 영역)는
  * 설치된 Nerd Font로 그린다. 하나도 없으면 예전처럼 네모로 보인다.
@@ -34,6 +38,7 @@ export interface TerminalSpec extends Omit<TerminalOpenRequest, "cols" | "rows">
 /**
  * xterm.js로 그리는 터미널 하나 (설계 §4.12). 프로세스는 main이 node-pty로 띄운다.
  * 화면에서 빠지면 프로세스도 끝낸다. 복사·붙여넣기는 단축키(terminal-keys.ts)와 오른쪽 클릭 메뉴로 한다.
+ * 터치 기기에서는 아래에 기능키 줄을 두고, 손가락 끌기를 휠 스크롤로 바꾼다 (terminal-touch.ts).
  */
 export function TerminalView({
   spec,
@@ -53,6 +58,28 @@ export function TerminalView({
   const [menu, setMenu] = useState<{ x: number; y: number; hasSelection: boolean } | undefined>();
   const callbacks = useRef({ onOpened, onExit });
   callbacks.current = { onOpened, onExit };
+  const idRef = useRef<string | undefined>(undefined);
+  /** 켜 둔 Ctrl·Alt. 다음 입력 하나에 붙고 꺼진다 */
+  const [modifiers, setModifiers] = useState(NO_MODIFIERS);
+  const modifiersRef = useRef(NO_MODIFIERS);
+  const setMods = (next: typeof NO_MODIFIERS) => {
+    modifiersRef.current = next;
+    setModifiers(next);
+  };
+  /** 켜 둔 Ctrl·Alt를 붙여 보내고 끈다 */
+  const writeWithModifiers = (data: string) => {
+    const id = idRef.current;
+    if (!id) return;
+    const mods = modifiersRef.current;
+    if (mods.ctrl || mods.alt) {
+      window.piDesktop.terminalWrite(id, applyModifiers(data, mods));
+      setMods(NO_MODIFIERS);
+    } else {
+      window.piDesktop.terminalWrite(id, data);
+    }
+  };
+  const writeRef = useRef(writeWithModifiers);
+  writeRef.current = writeWithModifiers;
 
   useEffect(() => {
     const el = host.current;
@@ -124,15 +151,53 @@ export function TerminalView({
       term.write(`\r\n\x1b[2m[종료됨 (코드 ${exitCode})]\x1b[0m\r\n`);
       callbacks.current.onExit?.(exitCode);
     });
-    const input = term.onData((data) => {
-      if (id) window.piDesktop.terminalWrite(id, data);
-    });
+    const input = term.onData((data) => writeRef.current(data));
+
+    // 손가락 끌기 → 스크롤 (terminal-touch.ts). 일반 화면은 지난 출력을, 전체 화면 프로그램(pi TUI·less 등)은 ↑·↓ 키로 넘긴다.
+    let touchY: number | undefined;
+    let dragging = false;
+    let startY = 0;
+    let carry = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return void (touchY = undefined);
+      touchY = startY = e.touches[0]!.clientY;
+      dragging = false;
+      carry = 0;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchY === undefined || e.touches.length !== 1) return;
+      const y = e.touches[0]!.clientY;
+      if (!dragging && Math.abs(y - startY) < DRAG_THRESHOLD_PX) return;
+      dragging = true;
+      e.preventDefault();
+      const screen = el.querySelector<HTMLElement>(".xterm-screen");
+      const lineHeight = screen && term.rows ? screen.clientHeight / term.rows : 17;
+      const step = dragToLines(carry, touchY, y, lineHeight);
+      touchY = y;
+      carry = step.carry;
+      if (!step.lines) return;
+      if (term.buffer.active.type === "alternate") {
+        if (id) window.piDesktop.terminalWrite(id, keySequence(step.lines > 0 ? "down" : "up", term.modes.applicationCursorKeysMode).repeat(Math.abs(step.lines)));
+      } else {
+        term.scrollLines(step.lines);
+      }
+    };
+    const onTouchEnd = () => {
+      touchY = undefined;
+    };
+    if (TOUCH) {
+      el.addEventListener("touchstart", onTouchStart, { passive: true });
+      el.addEventListener("touchmove", onTouchMove, { passive: false });
+      el.addEventListener("touchend", onTouchEnd);
+      el.addEventListener("touchcancel", onTouchEnd);
+    }
 
     void window.piDesktop
       .terminalOpen({ ...spec, cols: term.cols, rows: term.rows })
       .then((opened) => {
         if (disposed) return void window.piDesktop.terminalClose(opened.id);
         id = opened.id;
+        idRef.current = id;
         for (const [tid, data] of early.splice(0)) if (tid === id) term.write(data);
         scheduleInitial();
         callbacks.current.onOpened?.(opened.title);
@@ -160,6 +225,10 @@ export function TerminalView({
       if (initialTimer) clearTimeout(initialTimer);
       observer.disconnect();
       el.removeEventListener("contextmenu", onContextMenu);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
       offData();
       offExit();
       input.dispose();
@@ -199,6 +268,12 @@ export function TerminalView({
     };
   }, [menu]);
 
+  const sendKey = (key: SendKey) => {
+    const term = termRef.current;
+    writeWithModifiers(keySequence(key, term?.modes.applicationCursorKeysMode ?? false));
+  };
+  const toggleModifier = (modifier: Modifier) => setMods({ ...modifiersRef.current, [modifier]: !modifiersRef.current[modifier] });
+
   const runMenu = (action: "copy" | "paste" | "selectAll") => {
     setMenu(undefined);
     const term = termRef.current;
@@ -212,6 +287,29 @@ export function TerminalView({
   return (
     <div className="terminal-view" hidden={!visible}>
       <div className="terminal-screen" ref={host} />
+      {TOUCH && (
+        // 버튼을 눌러도 터미널의 입력 칸이 포커스를 잃지 않게(화면 키보드가 닫히지 않게) mousedown을 막는다.
+        <div className="terminal-keys" role="toolbar" aria-label="터미널 기능키" onMouseDown={(e) => e.preventDefault()}>
+          {TOUCH_KEYS.map((k) =>
+            k.kind === "modifier" ? (
+              <button
+                key={k.label}
+                type="button"
+                className={modifiers[k.modifier] ? "on" : undefined}
+                aria-pressed={modifiers[k.modifier]}
+                title={`${k.label}: 다음에 누르는 키 하나에 붙습니다`}
+                onClick={() => toggleModifier(k.modifier)}
+              >
+                {k.label}
+              </button>
+            ) : (
+              <button key={k.label} type="button" title={k.title ?? k.label} onClick={() => sendKey(k.key)}>
+                {k.label}
+              </button>
+            ),
+          )}
+        </div>
+      )}
       {menu && (
         <div className="terminal-menu" role="menu" style={{ left: menu.x, top: menu.y }} onMouseDown={(e) => e.stopPropagation()}>
           <button type="button" role="menuitem" disabled={!menu.hasSelection} onClick={() => runMenu("copy")}>
