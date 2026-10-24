@@ -255,8 +255,10 @@ export function TerminalView({
       if (e.target !== textarea) return;
       debugLog(`keydown key=${shown(e.key)} code=${e.keyCode}${e.ctrlKey ? " ctrl" : ""}${e.shiftKey ? " shift" : ""}`);
       keySent = "";
-      // 화면 키보드는 keyCode 229(조합 중)를 보낸다. 그 밖의 키는 입력 칸을 거치지 않고 xterm이 바로 보낸다.
-      if (e.keyCode !== 229 && e.key !== "Unidentified") allowXtermText();
+      // 화면 키보드는 keyCode 229를 보낸다. 글자 하나를 만드는 진짜 키(블루투스 키보드 등)는 입력 칸을 거치지 않고 xterm이 바로 보낸다.
+      // Enter 같은 키는 넣지 않는다: 조합 중에 Enter를 받으면 xterm이 조합하던 글을 그 자리에서 확정해 한 번 더 보낸다
+      // (/mo 조합 중 Enter → /momo). 조합 중에는 진짜 키로 보지 않는다.
+      if (isCharacterKey(e) && !composing) allowXtermText();
       if (e.key === "Enter" || (e.ctrlKey && (e.key === "c" || e.key === "C"))) {
         setTimeout(() => {
           if (textarea && textarea.value === "") mirror.reset();
@@ -265,8 +267,8 @@ export function TerminalView({
     };
     const onFocusOut = () => mirror.reset();
     // keypress로 처리되는 글자(Shift 글자 등)와 붙여넣기도 xterm이 바로 보낸다
-    const onKeyPress = (e: Event) => {
-      if (e.target === textarea) allowXtermText();
+    const onKeyPress = (e: KeyboardEvent) => {
+      if (e.target === textarea && isCharacterKey(e) && !composing) allowXtermText();
     };
     const onPaste = () => allowXtermText();
     if (TOUCH) {
@@ -525,4 +527,9 @@ async function pasteClipboard(term: Terminal, beforePaste: () => void): Promise<
   } catch {
     // 클립보드를 읽지 못하면 붙여넣지 않는다 (단축키는 브라우저 붙여넣기라 영향이 없다).
   }
+}
+
+/** 글자 하나를 만드는 진짜 키인지 (화면 키보드의 229, Enter·Tab·방향키 같은 이름 있는 키, Ctrl·Alt·Meta 조합은 아니다) */
+function isCharacterKey(e: KeyboardEvent): boolean {
+  return e.keyCode !== 229 && Array.from(e.key).length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey;
 }
