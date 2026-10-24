@@ -273,8 +273,8 @@ export function TerminalView({
       el.addEventListener("compositionend", onCompositionEnd, true);
       el.addEventListener("keydown", onKeyDown, true);
       el.addEventListener("focusout", onFocusOut, true);
-      // 입력한 글자는 셸이 바로 화면에 찍으므로 xterm의 조합 미리보기는 감춘다
-      el.classList.add("live-input");
+      // "바로 입력"은 입력한 글자를 셸이 바로 화면에 찍으므로 xterm의 조합 미리보기를 보이지 않게 한다. "단어 단위"는 미리보기가 있어야 한다.
+      el.classList.toggle("live-input", live());
     }
     // 입력 칸에서 와서 이미 보낸 글자인지. 키 이벤트로 바로 들어온 글자(숫자·특수문자 키, 블루투스 키보드)는 아니다.
     const isEcho = (data: string) => {
@@ -287,6 +287,7 @@ export function TerminalView({
       // 조합 중에 다른 키를 누르면 xterm이 그 자리에서 조합 글을 확정해 보낸다
       return composing && !!textarea?.value.endsWith(data);
     };
+    const offSettings = onInputSettingsChange(() => el.classList.toggle("live-input", live()));
     const input = term.onData((data) => {
       if (isEcho(data)) {
         debugLog(`xterm ${shown(data)} → 버림 (이미 보냄)`);
@@ -387,6 +388,7 @@ export function TerminalView({
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
+      offSettings();
       el.removeEventListener("input", onInput, true);
       el.removeEventListener("input", onInputDone);
       if (commitEchoTimer) clearTimeout(commitEchoTimer);

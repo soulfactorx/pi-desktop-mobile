@@ -2225,9 +2225,13 @@ button.toggled {
   touch-action: manipulation;
 }
 
-/* 터치 기기는 입력한 글자를 바로 보내 셸이 찍으므로 xterm의 조합 미리보기를 감춘다 (글자가 두 번 보이지 않게) */
+/*
+ * "바로 입력"은 입력한 글자를 바로 보내 셸이 찍으므로 xterm의 조합 미리보기를 보이지 않게 한다 (글자가 두 번 보이지 않게).
+ * display: none은 쓰면 안 된다: xterm은 조합 중 미리보기의 크기로 숨은 입력 칸의 크기를 정하는데, 크기가 0이 되면
+ * 입력 칸이 1px·줄 높이 0이 되어 안드로이드 키보드가 더 이상 글자를 넣지 않는다 (v0.1.6·v0.1.7에서 입력이 멈춘 원인).
+ */
 .terminal-screen.live-input .composition-view {
-  display: none !important;
+  opacity: 0 !important;
 }
 
 .terminal-keys button.on {
