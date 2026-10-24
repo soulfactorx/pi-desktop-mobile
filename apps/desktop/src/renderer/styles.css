@@ -3512,3 +3512,41 @@ details > summary.settings-section {
     display: none;
   }
 }
+
+/* 입력 진단 (⋮ 메뉴 → 터미널 입력 진단). 터미널 위에 겹쳐 키보드 이벤트와 보낸 글자를 보여 준다 */
+.terminal-debug {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 45%;
+  overflow: auto;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.terminal-debug-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.terminal-debug-head strong {
+  flex: 1;
+}
+
+.terminal-debug pre {
+  margin: 0;
+  padding: 0 6px 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font: 11px/1.35 ui-monospace, Consolas, monospace;
+}
+
+.web-menu-check {
+  color: var(--accent);
+  font-weight: 700;
+}

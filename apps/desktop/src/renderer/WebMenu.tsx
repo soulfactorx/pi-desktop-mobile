@@ -1,5 +1,18 @@
 import { useEffect, useState } from "react";
-import { WEB_MENU } from "./web-menu";
+import { inputDebugEnabled, inputMode, setInputDebug, setInputMode } from "./terminal-input-settings";
+import { WEB_MENU, type WebSetting } from "./web-menu";
+
+function settingOn(id: WebSetting): boolean {
+  if (id === "input-live") return inputMode() === "live";
+  if (id === "input-xterm") return inputMode() === "xterm";
+  return inputDebugEnabled();
+}
+
+function applySetting(id: WebSetting): void {
+  if (id === "input-live") setInputMode("live");
+  else if (id === "input-xterm") setInputMode("xterm");
+  else setInputDebug(!inputDebugEnabled());
+}
 
 /**
  * 웹(pi-web)에서 메뉴바 대신 쓰는 "⋮ 메뉴" 버튼과 펼침 메뉴 (web-menu.ts).
@@ -36,7 +49,21 @@ export function WebMenu({ onCommand }: { onCommand: (id: string) => void }) {
               <section key={group.label} className="web-menu-group">
                 <h3>{group.label}</h3>
                 {group.items.map((item) =>
-                  item.kind === "command" ? (
+                  item.kind === "setting" ? (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={settingOn(item.id)}
+                      onClick={() => {
+                        setOpen(false);
+                        applySetting(item.id);
+                      }}
+                    >
+                      <span>{item.label}</span>
+                      <span className="web-menu-check">{settingOn(item.id) ? "✓" : ""}</span>
+                    </button>
+                  ) : item.kind === "command" ? (
                     <button
                       key={item.id}
                       type="button"
