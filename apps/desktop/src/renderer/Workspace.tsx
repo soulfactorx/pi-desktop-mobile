@@ -125,6 +125,8 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
   const osPicker = isLocal && desktopShell;
   const canReveal = desktopShell && (host?.kind === "local" || host?.kind === "wsl");
   const [cwd, setCwd] = useState("");
+  /** 좁은 화면(휴대폰)에서 세션 목록(사이드바)을 서랍처럼 연다. 넓은 화면은 늘 보인다 (styles.css) */
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraftState] = useState("");
   const [commands, setCommands] = useState<PiCommand[] | undefined>();
   const [busy, setBusy] = useState(false);
@@ -854,8 +856,17 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
   }, [active]);
 
   return (
-    <div className="app" hidden={!active} ref={root}>
+    <div className={`app${session ? " has-session" : ""}${drawerOpen ? " drawer-open" : ""}`} hidden={!active} ref={root}>
       <header className="topbar">
+        <button
+          type="button"
+          className="drawer-toggle"
+          aria-label="세션 목록"
+          aria-expanded={drawerOpen}
+          onClick={() => setDrawerOpen((open) => !open)}
+        >
+          ☰
+        </button>
         <div className="brand">
           <img className="brand-logo" src={logoUrl} alt="" />
           Pi Desktop
@@ -986,21 +997,31 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
           type="button"
           className="primary"
           disabled={!connected || busy || !cwd.trim()}
-          onClick={() => void guard(() => openSession(cwd.trim()))}
+          onClick={() => {
+            setDrawerOpen(false);
+            void guard(() => openSession(cwd.trim()));
+          }}
         >
           새 세션
         </button>
       </section>
 
-      <div className="workspace">
+      <div className={`workspace${drawerOpen ? " drawer-open" : ""}`}>
+        {drawerOpen && <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
         <Sidebar
           hostId={hostId}
           connected={connected}
           sessions={sessions}
           current={session}
           disabled={!connected || busy}
-          onSelect={(target) => void guard(() => switchTo(target))}
-          onOpenStored={(stored) => void guard(() => openStored(stored))}
+          onSelect={(target) => {
+            setDrawerOpen(false);
+            void guard(() => switchTo(target));
+          }}
+          onOpenStored={(stored) => {
+            setDrawerOpen(false);
+            void guard(() => openStored(stored));
+          }}
           onClose={(target) => void guard(() => closeSession(target))}
           {...(piState.status ? { piMissing: !piState.status.pi } : piState.error ? { piMissing: false } : {})}
           onInstallPi={() => {
