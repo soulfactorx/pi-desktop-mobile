@@ -121,21 +121,47 @@ export function sgrWheel(direction: "up" | "down", col: number, row: number): st
  * 화면 키보드의 단어 조합 중 바로 보낼 글을 정한다.
  *
  * 삼성·Gboard 키보드는 영어도 단어 단위로 조합하다가 스페이스·엔터에서 확정하고, xterm은 확정될 때만 입력을 보낸다.
- * 그래서 조합 중인 글이 출력 가능한 ASCII뿐이면 바뀐 만큼을 바로 보낸다(지운 글자는 DEL). 한글처럼 ASCII가 아니면
- * 자모를 조합해야 하므로 바로 보내지 않고(eager: false) 확정을 기다린다.
+ * 그래서 조합 중인 글이 출력 가능한 ASCII뿐이면 바뀐 만큼을 바로 보낸다: 지운 글자 수(deletes, DEL로 보낸다)와 새 글(add).
+ * 한글처럼 ASCII가 아니면 자모를 조합해야 하므로 바로 보내지 않고(eager: false) 확정을 기다린다.
+ *
+ * floor: 조합 글 앞쪽에서 이미 셸에 맡긴 부분의 길이. Ctrl·Alt를 붙여 보낸 글자는 셸에 제어 문자로 갔으므로
+ * 키보드가 그 글자를 지우거나 고쳐도 셸에 DEL을 보내면 안 된다 (엉뚱한 앞 글자가 지워진다). 그 아래로는 지우지 않는다.
  */
-export function compositionStep(sent: string, composing: string): { send: string; sent: string; eager: boolean } {
-  if (!/^[\x20-\x7e]*$/.test(composing)) return { send: "", sent, eager: false };
+export interface CompositionStep {
+  deletes: number;
+  add: string;
+  /** 키보드가 들고 있는 지금 조합 글 */
+  sent: string;
+  floor: number;
+  eager: boolean;
+}
+
+export function compositionStep(sent: string, composing: string, floor = 0): CompositionStep {
+  if (!/^[\x20-\x7e]*$/.test(composing)) return { deletes: 0, add: "", sent, floor, eager: false };
   let common = 0;
   while (common < sent.length && common < composing.length && sent[common] === composing[common]) common++;
-  return { send: "\x7f".repeat(sent.length - common) + composing.slice(common), sent: composing, eager: true };
+  const keep = Math.max(common, floor);
+  return {
+    deletes: Math.max(0, sent.length - keep),
+    add: composing.slice(keep),
+    sent: composing,
+    floor: Math.min(floor, composing.length),
+    eager: true,
+  };
 }
 
 /**
  * 조합이 끝나 xterm이 확정된 글을 보낼 때, 이미 바로 보낸 부분(sent)을 빼고 보낼 글.
- * 키보드가 확정하며 단어를 고쳤으면(자동 수정) 보낸 만큼 지우고 확정된 글을 다시 보낸다.
+ * 키보드가 확정하며 단어를 고쳤으면(자동 수정) 달라진 곳부터 지우고 다시 보낸다. floor 아래는 건드리지 않는다.
  */
-export function committedRemainder(sent: string, committed: string): string {
-  if (committed.startsWith(sent)) return committed.slice(sent.length);
-  return "\x7f".repeat(sent.length) + committed;
+export function committedRemainder(sent: string, committed: string, floor = 0): string {
+  let common = 0;
+  while (common < sent.length && common < committed.length && sent[common] === committed[common]) common++;
+  const keep = Math.max(common, floor);
+  return "\x7f".repeat(Math.max(0, sent.length - keep)) + committed.slice(keep);
+}
+
+/** 확정된 조합 글로 볼 수 있는 입력인지. Enter·Tab·방향키 같은 제어 입력은 확정 글보다 먼저 와도 그대로 보낸다 */
+export function looksLikeCommit(data: string): boolean {
+  return data.length > 0 && !/[\x00-\x1f\x7f]/.test(data);
 }

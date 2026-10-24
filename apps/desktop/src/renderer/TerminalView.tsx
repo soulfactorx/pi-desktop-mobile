@@ -9,6 +9,7 @@ import {
   committedRemainder,
   compositionStep,
   dragToLines,
+  looksLikeCommit,
   DRAG_THRESHOLD_PX,
   keySequence,
   sgrWheel,
@@ -165,27 +166,48 @@ export function TerminalView({
     // 화면 키보드의 단어 조합(삼성·Gboard)은 확정될 때까지 xterm에 오지 않는다. 조합 중인 글이 ASCII면 바뀐 만큼 바로 보내고,
     // 조합이 끝나 xterm이 확정된 글을 보내면 이미 보낸 부분을 뺀다 (terminal-touch.ts의 compositionStep·committedRemainder).
     // 이벤트는 xterm의 입력 칸보다 먼저 받도록 바깥 요소에서 capture로 듣고, xterm의 처리는 막지 않는다.
+    /** 켜 둔 Ctrl·Alt를 붙이지 않고 그대로 보낸다 (DEL, 조합 글의 나머지) */
+    const writeRaw = (data: string) => {
+      if (id && data) window.piDesktop.terminalWrite(id, data);
+    };
     let composeSent = "";
+    let composeFloor = 0;
     let composeEager = false;
+    /** 이번 조합의 확정 글을 이미 처리했다 (조합 종료 이벤트보다 먼저 왔을 때) */
+    let committedEarly = false;
     /** 조합이 끝난 뒤 xterm이 보낼 확정 글에서 뺄, 이미 보낸 부분 */
-    let pendingCommit: string | undefined;
+    let pendingCommit: { sent: string; floor: number } | undefined;
     let pendingTimer: ReturnType<typeof setTimeout> | undefined;
     const onCompositionStart = () => {
       composeSent = "";
+      composeFloor = 0;
       composeEager = true;
+      committedEarly = false;
     };
     const onCompositionUpdate = (e: CompositionEvent) => {
       if (!composeEager) return;
-      const step = compositionStep(composeSent, e.data ?? "");
+      const step = compositionStep(composeSent, e.data ?? "", composeFloor);
       composeEager = step.eager;
       composeSent = step.sent;
+      composeFloor = step.floor;
       // 바로 보낸 글은 셸이 화면에 찍으므로 xterm의 조합 미리보기는 감춘다 (한글 조합은 미리보기를 둔다)
       el.classList.toggle("eager-compose", composeEager);
-      if (step.send) writeRef.current(step.send);
+      writeRaw("\x7f".repeat(step.deletes));
+      if (!step.add) return;
+      const mods = modifiersRef.current;
+      if (!mods.ctrl && !mods.alt) return writeRaw(step.add);
+      // 켜 둔 Ctrl·Alt는 새 글의 첫 글자에 붙인다. 그 글자는 셸에 제어 문자로 갔으므로 키보드가 나중에 지우거나 고쳐도
+      // DEL을 보내지 않게 floor를 올리고, 키보드가 그 글자를 단어로 계속 들고 있지 않게 입력 칸을 비워 조합을 끝낸다.
+      writeRef.current(step.add[0]!);
+      writeRaw(step.add.slice(1));
+      composeFloor = composeSent.length;
+      if (term.textarea) term.textarea.value = "";
     };
     const onCompositionEnd = () => {
-      pendingCommit = composeSent ? composeSent : undefined;
+      pendingCommit = composeSent && !committedEarly ? { sent: composeSent, floor: composeFloor } : undefined;
+      committedEarly = false;
       composeSent = "";
+      composeFloor = 0;
       composeEager = false;
       el.classList.remove("eager-compose");
       // xterm은 조합이 끝나면 곧바로(setTimeout 0) 확정 글을 보낸다. 보내지 않았으면(조합 취소) 다음 입력에 섞이지 않게 비운다.
@@ -198,11 +220,19 @@ export function TerminalView({
       el.addEventListener("compositionend", onCompositionEnd, true);
     }
     const input = term.onData((data) => {
-      if (pendingCommit !== undefined) {
-        const sent = pendingCommit;
+      // 조합 중에 키(Enter 등)를 누르면 xterm은 조합 종료 이벤트보다 먼저 확정 글을 보낸다. 조합 중에 오는 글자 입력은 확정 글이다.
+      if (composeSent && looksLikeCommit(data)) {
+        writeRaw(committedRemainder(composeSent, data, composeFloor));
+        composeSent = "";
+        composeFloor = 0;
+        committedEarly = true;
+        return;
+      }
+      // Enter·Tab 같은 제어 입력은 확정 글보다 먼저 올 수 있다. 확정 글로 착각하면 이미 보낸 글자를 지우므로 그대로 보낸다.
+      if (pendingCommit !== undefined && looksLikeCommit(data)) {
+        const { sent, floor } = pendingCommit;
         pendingCommit = undefined;
-        const rest = committedRemainder(sent, data);
-        if (rest) writeRef.current(rest);
+        writeRaw(committedRemainder(sent, data, floor));
         return;
       }
       writeRef.current(data);
