@@ -328,6 +328,11 @@ export interface OpenSessionRequest {
 }
 
 export interface PiDesktopApi {
+  /**
+   * 화면을 띄운 곳. electron: 데스크톱 앱(OS 대화상자·탐색기를 쓸 수 있다),
+   * web: 웹 서버(pi-web)를 브라우저로 연 것(서버의 폴더를 앱의 폴더 탐색 창으로 고른다).
+   */
+  readonly shell: "electron" | "web";
   /** 이 PC에서 쓸 수 있는 호스트 목록 */
   listHosts(): Promise<HostDescriptor[]>;
   listSshHosts(): Promise<SshHostConfig[]>;

@@ -129,6 +129,9 @@ function localLabel(): string {
       return "로컬 (Windows)";
     case "darwin":
       return "로컬 (macOS)";
+    // Termux의 Node는 process.platform을 android로 알린다 (웹 서버 pi-web을 휴대폰에서 돌릴 때)
+    case "android":
+      return "로컬 (Android)";
     default:
       return "로컬 (Linux)";
   }
