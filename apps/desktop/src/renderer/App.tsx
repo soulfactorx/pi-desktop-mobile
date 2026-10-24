@@ -16,6 +16,7 @@ import { sharedEventLog } from "./event-log";
 import { UpdateBadge, useUpdateState } from "./UpdateBadge";
 import { forgetTab, MAIN_TAB, setTabHost, setTabSession } from "./use-session";
 import { MENU_EVENT, Workspace, type WorkspaceStatus } from "./Workspace";
+import { WebMenu } from "./WebMenu";
 
 /**
  * 워크스페이스 탭 (설계 §3.3). 탭마다 호스트와 세션을 따로 가지고, 숨긴 탭도 연결과 상태를 유지한다.
@@ -172,22 +173,20 @@ export function App() {
   // 메뉴바 명령: 앱 수준(탭·업데이트·활동)은 여기서, 나머지는 지금 탭의 Workspace가 처리한다 (MENU_EVENT).
   const appCommandsRef = useRef(appCommands);
   appCommandsRef.current = appCommands;
-  useEffect(
-    () =>
-      window.piDesktop.onMenuCommand((id) => {
-        if (id === "activity") {
-          setActivityOpen((n) => n + 1);
-          return;
-        }
-        const own = appCommandsRef.current.find((c) => c.id === id);
-        if (own) {
-          if (!own.disabled) own.run();
-          return;
-        }
-        window.dispatchEvent(new CustomEvent(MENU_EVENT, { detail: id }));
-      }),
-    [],
-  );
+  // 웹(pi-web)에는 메뉴바가 없어 화면 안의 메뉴(WebMenu)가 같은 처리를 부른다.
+  const runMenuCommand = useCallback((id: string) => {
+    if (id === "activity") {
+      setActivityOpen((n) => n + 1);
+      return;
+    }
+    const own = appCommandsRef.current.find((c) => c.id === id);
+    if (own) {
+      if (!own.disabled) own.run();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent(MENU_EVENT, { detail: id }));
+  }, []);
+  useEffect(() => window.piDesktop.onMenuCommand(runMenuCommand), [runMenuCommand]);
 
   return (
     <div className="app-shell">
@@ -239,6 +238,7 @@ export function App() {
         <div className="tabbar-spacer" />
         <UpdateBadge state={update} />
         <ActivityButton entries={activity} onOpen={openActivity} openSignal={activityOpen} />
+        {window.piDesktop.shell === "web" && <WebMenu onCommand={runMenuCommand} />}
       </nav>
       <div className="workspaces">
         {tabs.ids.map((id) => (

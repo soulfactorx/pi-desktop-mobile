@@ -3347,4 +3347,132 @@ details > summary.settings-section {
     flex-basis: 100%;
     justify-content: flex-end;
   }
+
+  /* 대화상자(Pi 관리 등)는 화면을 거의 다 쓴다 */
+  .modal,
+  .pi-manager {
+    width: calc(100vw - 16px);
+    max-width: none;
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+  }
+
+  .settings-copy-head {
+    flex-wrap: wrap;
+  }
+
+  .settings-copy-head button {
+    white-space: nowrap;
+  }
+
+  /* 설정 폼: 이름·설명을 위에, 값을 그 아래 한 줄 전체에 둔다 (이름이 잘리지 않게) */
+  .settings-field {
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 4px;
+  }
+
+  .settings-field-label code {
+    word-break: break-all;
+  }
+
+  .settings-field-control {
+    flex: none;
+    width: 100%;
+  }
+}
+
+/* ── 웹(pi-web) 메뉴: 메뉴바 대신 탭 줄 오른쪽의 "⋮ 메뉴" (WebMenu.tsx) ─────────────────── */
+.web-menu-button {
+  padding: 2px 10px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.web-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.web-menu {
+  position: absolute;
+  top: 40px;
+  right: 8px;
+  width: 300px;
+  max-height: calc(100dvh - 56px);
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 35%);
+}
+
+.web-menu-group h3 {
+  margin: 8px 8px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.web-menu-group:first-child h3 {
+  margin-top: 2px;
+}
+
+.web-menu-group button,
+.web-menu-group a {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.web-menu-group button:hover,
+.web-menu-group a:hover,
+.web-menu-group button:focus-visible,
+.web-menu-group a:focus-visible {
+  background: var(--panel-2);
+}
+
+.web-menu-group kbd {
+  font: 11px ui-monospace, Consolas, monospace;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  /* 휴대폰: 탭 줄 아래로 화면 폭 전체를 쓰는 판. 손가락으로 누르기 쉽게 줄을 높인다 */
+  .web-menu-backdrop {
+    background: rgb(0 0 0 / 35%);
+  }
+
+  .web-menu {
+    top: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 85dvh;
+    border-radius: 0 0 12px 12px;
+    padding: 6px 8px 12px;
+  }
+
+  .web-menu-group button,
+  .web-menu-group a {
+    padding: 11px 12px;
+  }
+
+  /* 단축키는 휴대폰에서 쓸 일이 없다 */
+  .web-menu-group kbd {
+    display: none;
+  }
 }
