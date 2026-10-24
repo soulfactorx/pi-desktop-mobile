@@ -51,7 +51,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Actions 탭에서 "Release"를 손으로 돌리면 만들기만 하고 올리지 않습니다(릴리스 전 미리 확인). 로컬에서 지금 OS용 설치 파일만 만들 때는 `npm run dist -w @pi-desktop/desktop`을 씁니다(결과는 `apps/desktop/release/`).
+Actions 탭에서 "Release"를 손으로 돌릴 때 version을 비우면 만들기만 하고 올리지 않습니다(릴리스 전 미리 확인). version에 `v0.1.0`처럼 넣으면 고른 브랜치의 커밋에 태그를 만들고 릴리스까지 올립니다. 태그를 push할 수 없을 때(휴대폰의 GitHub 앱 등) 이 방법을 씁니다. 로컬에서 지금 OS용 설치 파일만 만들 때는 `npm run dist -w @pi-desktop/desktop`을 씁니다(결과는 `apps/desktop/release/`).
 
 ## Android 휴대폰에서 쓰기 (웹 버전 pi-web)
 
