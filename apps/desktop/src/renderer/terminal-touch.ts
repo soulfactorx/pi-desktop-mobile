@@ -118,50 +118,56 @@ export function sgrWheel(direction: "up" | "down", col: number, row: number): st
 }
 
 /**
- * 화면 키보드의 단어 조합 중 바로 보낼 글을 정한다.
+ * 화면 키보드 입력을 입력 칸(xterm의 textarea)의 값으로 따라간다.
  *
- * 삼성·Gboard 키보드는 영어도 단어 단위로 조합하다가 스페이스·엔터에서 확정하고, xterm은 확정될 때만 입력을 보낸다.
- * 그래서 조합 중인 글이 출력 가능한 ASCII뿐이면 바뀐 만큼을 바로 보낸다: 지운 글자 수(deletes, DEL로 보낸다)와 새 글(add).
- * 한글처럼 ASCII가 아니면 자모를 조합해야 하므로 바로 보내지 않고(eager: false) 확정을 기다린다.
+ * 삼성·Gboard 키보드는 영어도 단어 단위로 조합하고, xterm은 조합이 확정될 때만 입력을 보낸다. 조합 이벤트의 순서와 내용은
+ * 키보드마다 달라 그것에 기대면 꼬인다. 그래서 입력 칸의 실제 값만 본다: 값이 바뀔 때마다 지난 값과 비교해
+ * 지워진 글자는 DEL로, 새 글자는 그대로 바로 보낸다. 한글 조합(ㅎ→하→한)도 바뀔 때마다 지우고 다시 쓴다.
  *
- * floor: 조합 글 앞쪽에서 이미 셸에 맡긴 부분의 길이. Ctrl·Alt를 붙여 보낸 글자는 셸에 제어 문자로 갔으므로
- * 키보드가 그 글자를 지우거나 고쳐도 셸에 DEL을 보내면 안 된다 (엉뚱한 앞 글자가 지워진다). 그 아래로는 지우지 않는다.
+ * Ctrl·Alt를 붙여 보낸 글자는 셸에 제어 문자로 갔으므로 "소비됨"으로 표시해, 키보드가 나중에 그 글자를 지우거나
+ * 고쳐도 DEL을 보내지 않는다 (엉뚱한 앞 글자가 지워지지 않게).
  */
-export interface CompositionStep {
-  deletes: number;
-  add: string;
-  /** 키보드가 들고 있는 지금 조합 글 */
-  sent: string;
-  floor: number;
-  eager: boolean;
+export class InputMirror {
+  private value = "";
+  /** 글자마다 셸에 그대로 보냈는지 (false면 Ctrl·Alt로 소비됨) */
+  private plain: boolean[] = [];
+
+  /** 입력 칸의 새 값. 셸에 보낼 DEL 수와 새 글을 돌려준다 */
+  update(next: string): { deletes: number; add: string } {
+    const chars = Array.from(next);
+    const prev = Array.from(this.value);
+    let common = 0;
+    while (common < prev.length && common < chars.length && prev[common] === chars[common]) common++;
+    const deletes = this.plain.slice(common).filter(Boolean).length;
+    const add = chars.slice(common).join("");
+    this.value = next;
+    this.plain = [...this.plain.slice(0, common), ...chars.slice(common).map(() => true)];
+    return { deletes, add };
+  }
+
+  /** 방금 update의 새 글 중 첫 글자를 Ctrl·Alt로 보냈다 */
+  consumeFirstAdded(addLength: number): void {
+    const index = this.plain.length - addLength;
+    if (addLength > 0 && index >= 0) this.plain[index] = false;
+  }
+
+  /** 입력 칸이 밖에서 비워졌다 (xterm이 Enter·Ctrl+C·포커스를 잃을 때 비운다) */
+  reset(): void {
+    this.value = "";
+    this.plain = [];
+  }
+
+  get current(): string {
+    return this.value;
+  }
 }
 
-export function compositionStep(sent: string, composing: string, floor = 0): CompositionStep {
-  if (!/^[\x20-\x7e]*$/.test(composing)) return { deletes: 0, add: "", sent, floor, eager: false };
-  let common = 0;
-  while (common < sent.length && common < composing.length && sent[common] === composing[common]) common++;
-  const keep = Math.max(common, floor);
-  return {
-    deletes: Math.max(0, sent.length - keep),
-    add: composing.slice(keep),
-    sent: composing,
-    floor: Math.min(floor, composing.length),
-    eager: true,
-  };
+/** 화면 키보드의 줄바꿈은 터미널의 Enter(CR)로 보낸다 */
+export function toTerminalText(text: string): string {
+  return text.replace(/\r?\n/g, "\r");
 }
 
-/**
- * 조합이 끝나 xterm이 확정된 글을 보낼 때, 이미 바로 보낸 부분(sent)을 빼고 보낼 글.
- * 키보드가 확정하며 단어를 고쳤으면(자동 수정) 달라진 곳부터 지우고 다시 보낸다. floor 아래는 건드리지 않는다.
- */
-export function committedRemainder(sent: string, committed: string, floor = 0): string {
-  let common = 0;
-  while (common < sent.length && common < committed.length && sent[common] === committed[common]) common++;
-  const keep = Math.max(common, floor);
-  return "\x7f".repeat(Math.max(0, sent.length - keep)) + committed.slice(keep);
-}
-
-/** 확정된 조합 글로 볼 수 있는 입력인지. Enter·Tab·방향키 같은 제어 입력은 확정 글보다 먼저 와도 그대로 보낸다 */
-export function looksLikeCommit(data: string): boolean {
+/** 글자 입력인지 (제어 문자가 없는지). xterm이 입력 칸에서 온 글자를 한 번 더 보내면 버리는 데 쓴다 */
+export function isPrintable(data: string): boolean {
   return data.length > 0 && !/[\x00-\x1f\x7f]/.test(data);
 }

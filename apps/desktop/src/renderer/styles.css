@@ -2225,8 +2225,8 @@ button.toggled {
   touch-action: manipulation;
 }
 
-/* 화면 키보드의 영문 조합을 바로 보내는 동안에는 xterm의 조합 미리보기를 감춘다 (글자가 두 번 보이지 않게) */
-.terminal-screen.eager-compose .composition-view {
+/* 터치 기기는 입력한 글자를 바로 보내 셸이 찍으므로 xterm의 조합 미리보기를 감춘다 (글자가 두 번 보이지 않게) */
+.terminal-screen.live-input .composition-view {
   display: none !important;
 }
 
