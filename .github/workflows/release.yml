@@ -1,4 +1,6 @@
 # 릴리스: v로 시작하는 태그(예: v0.1.0)를 올리면 Windows·macOS·Linux 설치 파일을 만들어 GitHub Releases에 올린다.
+# 웹(pi-web) 묶음 pi-web.tar.gz와 Android Termux 설치 스크립트 install-termux.sh도 함께 올린다 (설계 §5.10).
+#   curl -fsSL https://github.com/<저장소>/releases/latest/download/install-termux.sh | bash
 # 앱은 이 릴리스의 latest*.yml을 보고 자동 업데이트한다 (apps/desktop/src/main/updater.ts).
 #   git tag v0.1.0 && git push origin v0.1.0
 # Actions 탭에서 손으로 돌리면(workflow_dispatch) 세 OS에서 만들기만 하고 올리지 않는다 (릴리스 전 미리 확인).
@@ -55,9 +57,45 @@ jobs:
             apps/desktop/release/*.blockmap
             apps/desktop/release/latest*.yml
 
+  web:
+    name: 웹(pi-web) 묶음
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # 웹 묶음에는 Electron 실행 파일이 필요 없다
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 앱 버전을 태그에 맞추기
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version -w @pi-desktop/desktop
+
+      # 설치 스크립트에는 이 저장소(GITHUB_REPOSITORY)가 들어간다
+      - name: 묶음과 설치 스크립트 만들기
+        run: npm run dist:web -w @pi-desktop/desktop
+
+      - name: 결과물 넘기기
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-web
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/web/pi-web.tar.gz
+            apps/desktop/release/web/install-termux.sh
+
   publish:
     name: GitHub Releases에 올리기
-    needs: build
+    needs: [build, web]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
