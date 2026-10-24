@@ -7,7 +7,11 @@
 
 export type WebMenuItem =
   | { kind: "command"; id: string; label: string; shortcut?: string }
-  | { kind: "link"; label: string; url: string };
+  | { kind: "link"; label: string; url: string }
+  /** 웹에만 있는 설정 (terminal-input-settings.ts). 메뉴에서 바로 바꾸고 켜짐 표시를 한다 */
+  | { kind: "setting"; id: WebSetting; label: string };
+
+export type WebSetting = "input-live" | "input-xterm" | "input-debug";
 
 export interface WebMenuGroup {
   label: string;
@@ -62,6 +66,14 @@ export const WEB_MENU: WebMenuGroup[] = [
       command("marketplace", "Marketplace"),
       command("terminal-pi", "터미널: pi 열기"),
       command("terminal-shell", "터미널: 셸 열기"),
+    ],
+  },
+  {
+    label: "터미널 입력 (휴대폰)",
+    items: [
+      { kind: "setting", id: "input-live", label: "바로 입력 (글자마다 바로 보냄)" },
+      { kind: "setting", id: "input-xterm", label: "단어 단위 (키보드가 확정할 때 보냄)" },
+      { kind: "setting", id: "input-debug", label: "입력 진단 보기" },
     ],
   },
   {

@@ -17,6 +17,16 @@ import {
   type Modifier,
   type SendKey,
 } from "./terminal-touch";
+import {
+  clearDebugLines,
+  debugLines,
+  debugLog,
+  inputDebugEnabled,
+  inputMode,
+  onInputSettingsChange,
+  setInputDebug,
+  visible as shown,
+} from "./terminal-input-settings";
 
 /** 첫 입력은 Pi 화면이 다 그려지고 출력이 이만큼 잠잠해진 뒤 보낸다 */
 const INITIAL_INPUT_QUIET_MS = 1200;
@@ -84,14 +94,20 @@ export function TerminalView({
     if (!id) return;
     const mods = modifiersRef.current;
     if (mods.ctrl || mods.alt) {
-      window.piDesktop.terminalWrite(id, applyModifiers(data, mods));
+      const out = applyModifiers(data, mods);
+      debugLog(`→ ${shown(out)} (${mods.ctrl ? "Ctrl" : ""}${mods.alt ? "Alt" : ""})`);
+      window.piDesktop.terminalWrite(id, out);
       setMods(NO_MODIFIERS);
     } else {
+      debugLog(`→ ${shown(data)}`);
       window.piDesktop.terminalWrite(id, data);
     }
   };
   const writeRef = useRef(writeWithModifiers);
   writeRef.current = writeWithModifiers;
+  // 입력 진단을 켰으면 기록이 바뀔 때마다 다시 그린다
+  const [, setDebugTick] = useState(0);
+  useEffect(() => onInputSettingsChange(() => setDebugTick((n) => n + 1)), []);
 
   useEffect(() => {
     const el = host.current;
@@ -169,8 +185,12 @@ export function TerminalView({
     // 블루투스 키보드의 글자)는 그대로 둔다.
     /** 켜 둔 Ctrl·Alt를 붙이지 않고 그대로 보낸다 */
     const writeRaw = (data: string) => {
-      if (id && data) window.piDesktop.terminalWrite(id, data);
+      if (!id || !data) return;
+      debugLog(`→ ${shown(data)}`);
+      window.piDesktop.terminalWrite(id, data);
     };
+    /** 바로 입력 방식인지 (⋮ 메뉴에서 바꾸면 열린 터미널에도 바로 적용된다) */
+    const live = () => TOUCH && inputMode() === "live";
     const mirror = new InputMirror();
     const textarea = term.textarea;
     let composing = false;
@@ -185,7 +205,12 @@ export function TerminalView({
     let keySentTimer: ReturnType<typeof setTimeout> | undefined;
     const onInput = (e: Event) => {
       if (e.target !== textarea || !textarea) return;
+      const ie = e as InputEvent;
+      debugLog(`input ${ie.inputType} data=${shown(ie.data ?? "")} value=${shown(textarea.value)}`);
+      if (!live()) return;
       inInputEvent = true;
+      // xterm이 이 이벤트의 전달을 멈추면(stopPropagation) 버블 단계의 onInputDone이 불리지 않는다. 그래도 반드시 끈다.
+      setTimeout(() => (inInputEvent = false), 0);
       const { deletes, add: added } = mirror.update(textarea.value);
       writeRaw("\x7f".repeat(deletes));
       let add = added;
@@ -212,13 +237,16 @@ export function TerminalView({
       }
     };
     const onCompositionStart = () => {
+      debugLog("compositionstart");
       composing = true;
     };
+    const onCompositionUpdate = (e: CompositionEvent) => debugLog(`compositionupdate ${shown(e.data ?? "")}`);
     // xterm의 입력 칸 처리가 끝난 뒤 (버블 단계)
     const onInputDone = () => {
       inInputEvent = false;
     };
     const onCompositionEnd = (e: CompositionEvent) => {
+      debugLog(`compositionend ${shown(e.data ?? "")}`);
       composing = false;
       // xterm은 조합이 끝나면 곧바로(setTimeout 0) 확정 글을 보낸다. 이미 보냈으므로 같은 글이 오면 한 번 버린다.
       commitEcho = e.data || undefined;
@@ -228,6 +256,7 @@ export function TerminalView({
     // xterm은 Enter·Ctrl+C 키와 포커스를 잃을 때 입력 칸을 비운다 (input 이벤트 없이). 따라서 비운다.
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target !== textarea) return;
+      debugLog(`keydown key=${shown(e.key)} code=${e.keyCode}${e.ctrlKey ? " ctrl" : ""}${e.shiftKey ? " shift" : ""}`);
       keySent = "";
       if (e.key === "Enter" || (e.ctrlKey && (e.key === "c" || e.key === "C"))) {
         setTimeout(() => {
@@ -240,6 +269,7 @@ export function TerminalView({
       el.addEventListener("input", onInput, true);
       el.addEventListener("input", onInputDone);
       el.addEventListener("compositionstart", onCompositionStart, true);
+      el.addEventListener("compositionupdate", onCompositionUpdate, true);
       el.addEventListener("compositionend", onCompositionEnd, true);
       el.addEventListener("keydown", onKeyDown, true);
       el.addEventListener("focusout", onFocusOut, true);
@@ -248,7 +278,7 @@ export function TerminalView({
     }
     // 입력 칸에서 와서 이미 보낸 글자인지. 키 이벤트로 바로 들어온 글자(숫자·특수문자 키, 블루투스 키보드)는 아니다.
     const isEcho = (data: string) => {
-      if (!TOUCH || !isPrintable(data)) return false;
+      if (!live() || !isPrintable(data)) return false;
       if (inInputEvent) return true;
       if (commitEcho !== undefined && data === commitEcho) {
         commitEcho = undefined;
@@ -258,8 +288,12 @@ export function TerminalView({
       return composing && !!textarea?.value.endsWith(data);
     };
     const input = term.onData((data) => {
-      if (isEcho(data)) return;
-      if (TOUCH && isPrintable(data)) {
+      if (isEcho(data)) {
+        debugLog(`xterm ${shown(data)} → 버림 (이미 보냄)`);
+        return;
+      }
+      debugLog(`xterm ${shown(data)}`);
+      if (live() && isPrintable(data)) {
         const mods = modifiersRef.current;
         keySent = data;
         keySentConsumed = mods.ctrl || mods.alt;
@@ -358,6 +392,7 @@ export function TerminalView({
       if (commitEchoTimer) clearTimeout(commitEchoTimer);
       if (keySentTimer) clearTimeout(keySentTimer);
       el.removeEventListener("compositionstart", onCompositionStart, true);
+      el.removeEventListener("compositionupdate", onCompositionUpdate, true);
       el.removeEventListener("compositionend", onCompositionEnd, true);
       el.removeEventListener("keydown", onKeyDown, true);
       el.removeEventListener("focusout", onFocusOut, true);
@@ -419,6 +454,23 @@ export function TerminalView({
   return (
     <div className="terminal-view" hidden={!visible}>
       <div className="terminal-screen" ref={host} />
+      {TOUCH && inputDebugEnabled() && (
+        <div className="terminal-debug" onMouseDown={(e) => e.preventDefault()}>
+          <div className="terminal-debug-head">
+            <strong>입력 진단</strong>
+            <button type="button" className="small" onClick={() => void navigator.clipboard.writeText(debugLines().join("\n")).catch(() => {})}>
+              복사
+            </button>
+            <button type="button" className="small" onClick={clearDebugLines}>
+              지우기
+            </button>
+            <button type="button" className="small" onClick={() => setInputDebug(false)}>
+              끄기
+            </button>
+          </div>
+          <pre>{debugLines().slice(-14).join("\n") || "키보드로 몇 글자 입력해 보세요."}</pre>
+        </div>
+      )}
       {TOUCH && (
         // 버튼을 눌러도 터미널의 입력 칸이 포커스를 잃지 않게(화면 키보드가 닫히지 않게) mousedown을 막는다.
         <div className="terminal-keys" role="toolbar" aria-label="터미널 기능키" onMouseDown={(e) => e.preventDefault()}>
