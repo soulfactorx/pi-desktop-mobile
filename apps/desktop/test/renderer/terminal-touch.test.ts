@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyModifiers, committedRemainder, compositionStep, dragToLines, keySequence, looksLikeCommit, sgrWheel, TOUCH_KEYS } from "../../src/renderer/terminal-touch";
+import { applyModifiers, dragToLines, InputMirror, isPrintable, keySequence, sgrWheel, toTerminalText, TOUCH_KEYS } from "../../src/renderer/terminal-touch";
 
 describe("keySequence", () => {
   it("방향키·Home·End는 응용 커서 키 모드면 ESC O, 아니면 ESC [", () => {
@@ -72,54 +72,70 @@ describe("sgrWheel", () => {
   });
 });
 
-describe("compositionStep", () => {
-  it("영문 조합은 늘어난 만큼 바로 보낸다", () => {
-    let state = compositionStep("", "l");
-    expect(state).toEqual({ deletes: 0, add: "l", sent: "l", floor: 0, eager: true });
-    state = compositionStep(state.sent, "ls");
-    expect(state).toEqual({ deletes: 0, add: "s", sent: "ls", floor: 0, eager: true });
+describe("InputMirror", () => {
+  it("입력 칸의 값이 늘면 늘어난 만큼 바로 보낸다 (스페이스·엔터를 기다리지 않는다)", () => {
+    const m = new InputMirror();
+    expect(m.update("l")).toEqual({ deletes: 0, add: "l" });
+    expect(m.update("ls")).toEqual({ deletes: 0, add: "s" });
+    expect(m.update("ls ")).toEqual({ deletes: 0, add: " " });
   });
 
-  it("조합 중 지운 글자는 DEL 수로, 바뀐 글자는 지우고 다시 보낸다", () => {
-    expect(compositionStep("ls", "l")).toMatchObject({ deletes: 1, add: "" });
-    expect(compositionStep("teh", "the")).toMatchObject({ deletes: 2, add: "he" });
+  it("처음 연 입력 칸의 첫 글자도 바로 보낸다", () => {
+    const m = new InputMirror();
+    expect(m.update("p")).toEqual({ deletes: 0, add: "p" });
   });
 
-  it("한글처럼 ASCII가 아니면 바로 보내지 않는다", () => {
-    expect(compositionStep("", "ㅎ")).toEqual({ deletes: 0, add: "", sent: "", floor: 0, eager: false });
-    expect(compositionStep("a", "a한")).toMatchObject({ deletes: 0, add: "", sent: "a", eager: false });
+  it("지운 글자는 DEL 수로, 키보드가 고친 단어는 달라진 곳부터 지우고 다시 보낸다", () => {
+    const m = new InputMirror();
+    m.update("teh");
+    expect(m.update("te")).toEqual({ deletes: 1, add: "" });
+    expect(m.update("the")).toEqual({ deletes: 1, add: "he" });
   });
 
-  it("Ctrl·Alt로 보낸 글자(floor 아래)는 키보드가 지우거나 고쳐도 DEL을 보내지 않는다", () => {
-    // Ctrl을 켜고 c → 셸에는 ^C가 갔고 키보드는 "c"를 들고 있다 (floor 1)
-    expect(compositionStep("c", "", 1)).toEqual({ deletes: 0, add: "", sent: "", floor: 0, eager: true });
-    expect(compositionStep("c", "cl", 1)).toMatchObject({ deletes: 0, add: "l", floor: 1 });
-    // 자동 수정이 floor 아래를 바꿔도 위쪽만 다시 보낸다
-    expect(compositionStep("cls", "Cls", 1)).toMatchObject({ deletes: 2, add: "ls", floor: 1 });
+  it("한글 조합은 바뀔 때마다 지우고 다시 쓴다", () => {
+    const m = new InputMirror();
+    expect(m.update("ㅎ")).toEqual({ deletes: 0, add: "ㅎ" });
+    expect(m.update("하")).toEqual({ deletes: 1, add: "하" });
+    expect(m.update("한")).toEqual({ deletes: 1, add: "한" });
+    expect(m.update("한ㄱ")).toEqual({ deletes: 0, add: "ㄱ" });
+  });
+
+  it("Ctrl·Alt로 보낸 글자는 지워져도 DEL을 보내지 않는다 (두 번째, 세 번째도 같다)", () => {
+    const m = new InputMirror();
+    m.update("echo a");
+    // Ctrl + c
+    expect(m.update("echo ac")).toEqual({ deletes: 0, add: "c" });
+    m.consumeFirstAdded(1);
+    // 키보드가 c를 지움 → DEL 없음
+    expect(m.update("echo a")).toEqual({ deletes: 0, add: "" });
+    // 다시 Ctrl + d
+    expect(m.update("echo ad")).toEqual({ deletes: 0, add: "d" });
+    m.consumeFirstAdded(1);
+    // 이어서 보통 글자 x, 그리고 단어 전체를 지움 → 보통 글자(echo a, x)만큼만 DEL
+    expect(m.update("echo adx")).toEqual({ deletes: 0, add: "x" });
+    expect(m.update("")).toEqual({ deletes: 7, add: "" });
+  });
+
+  it("밖에서 비운 뒤(reset)에는 새 값만 보낸다", () => {
+    const m = new InputMirror();
+    m.update("pwd");
+    m.reset();
+    expect(m.update("l")).toEqual({ deletes: 0, add: "l" });
   });
 });
 
-describe("committedRemainder", () => {
-  it("확정된 글에서 이미 보낸 부분을 뺀다", () => {
-    expect(committedRemainder("ls", "ls")).toBe("");
-    expect(committedRemainder("a", "a한")).toBe("한");
+describe("toTerminalText · isPrintable", () => {
+  it("줄바꿈은 CR로", () => {
+    expect(toTerminalText("ls\n")).toBe("ls\r");
+    expect(toTerminalText("a\r\nb")).toBe("a\rb");
   });
 
-  it("키보드가 확정하며 고쳤으면 지우고 다시 보낸다 (floor 아래는 두고)", () => {
-    expect(committedRemainder("teh", "the")).toBe("\x7f\x7fhe");
-    // Ctrl로 c를 보낸 뒤(floor 1) "ls"를 치고 키보드가 "class"로 고침: 셸의 "ls" → "lass"
-    expect(committedRemainder("cls", "class", 1)).toBe("\x7fass");
-    expect(committedRemainder("cxs", "class", 1)).toBe("\x7f\x7flass");
-  });
-});
-
-describe("looksLikeCommit", () => {
-  it("글자만 있으면 확정 글, 제어 입력(Enter·Tab·방향키)은 아니다", () => {
-    expect(looksLikeCommit("ls")).toBe(true);
-    expect(looksLikeCommit("한")).toBe(true);
-    expect(looksLikeCommit("\r")).toBe(false);
-    expect(looksLikeCommit("\t")).toBe(false);
-    expect(looksLikeCommit("\x1b[A")).toBe(false);
-    expect(looksLikeCommit("")).toBe(false);
+  it("글자만 있으면 글자 입력, 제어 입력(Enter·Tab·DEL·ESC)은 아니다", () => {
+    expect(isPrintable("ls")).toBe(true);
+    expect(isPrintable("한")).toBe(true);
+    expect(isPrintable("\r")).toBe(false);
+    expect(isPrintable("\x7f")).toBe(false);
+    expect(isPrintable("\x1b[A")).toBe(false);
+    expect(isPrintable("")).toBe(false);
   });
 });

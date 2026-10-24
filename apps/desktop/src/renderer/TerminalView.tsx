@@ -6,13 +6,13 @@ import type { TerminalOpenRequest } from "../shared/api";
 import { clipboardKeyAction } from "./terminal-keys";
 import {
   applyModifiers,
-  committedRemainder,
-  compositionStep,
   dragToLines,
-  looksLikeCommit,
+  InputMirror,
+  isPrintable,
   DRAG_THRESHOLD_PX,
   keySequence,
   sgrWheel,
+  toTerminalText,
   TOUCH_KEYS,
   type Modifier,
   type SendKey,
@@ -163,77 +163,108 @@ export function TerminalView({
       term.write(`\r\n\x1b[2m[종료됨 (코드 ${exitCode})]\x1b[0m\r\n`);
       callbacks.current.onExit?.(exitCode);
     });
-    // 화면 키보드의 단어 조합(삼성·Gboard)은 확정될 때까지 xterm에 오지 않는다. 조합 중인 글이 ASCII면 바뀐 만큼 바로 보내고,
-    // 조합이 끝나 xterm이 확정된 글을 보내면 이미 보낸 부분을 뺀다 (terminal-touch.ts의 compositionStep·committedRemainder).
-    // 이벤트는 xterm의 입력 칸보다 먼저 받도록 바깥 요소에서 capture로 듣고, xterm의 처리는 막지 않는다.
-    /** 켜 둔 Ctrl·Alt를 붙이지 않고 그대로 보낸다 (DEL, 조합 글의 나머지) */
+    // 화면 키보드 입력 (터치 기기): 입력 칸의 값이 바뀔 때마다 지난 값과 비교해 바로 보낸다 (terminal-touch.ts의 InputMirror).
+    // 이벤트는 xterm보다 먼저 받도록 바깥 요소에서 capture로 듣고, xterm의 처리는 막지 않는다.
+    // xterm이 입력 칸에서 온 글자를 (조합 확정 등으로) 한 번 더 보내면 버린다. 입력 칸을 거치지 않는 키(Enter·방향키,
+    // 블루투스 키보드의 글자)는 그대로 둔다.
+    /** 켜 둔 Ctrl·Alt를 붙이지 않고 그대로 보낸다 */
     const writeRaw = (data: string) => {
       if (id && data) window.piDesktop.terminalWrite(id, data);
     };
-    let composeSent = "";
-    let composeFloor = 0;
-    let composeEager = false;
-    /** 이번 조합의 확정 글을 이미 처리했다 (조합 종료 이벤트보다 먼저 왔을 때) */
-    let committedEarly = false;
-    /** 조합이 끝난 뒤 xterm이 보낼 확정 글에서 뺄, 이미 보낸 부분 */
-    let pendingCommit: { sent: string; floor: number } | undefined;
-    let pendingTimer: ReturnType<typeof setTimeout> | undefined;
-    const onCompositionStart = () => {
-      composeSent = "";
-      composeFloor = 0;
-      composeEager = true;
-      committedEarly = false;
-    };
-    const onCompositionUpdate = (e: CompositionEvent) => {
-      if (!composeEager) return;
-      const step = compositionStep(composeSent, e.data ?? "", composeFloor);
-      composeEager = step.eager;
-      composeSent = step.sent;
-      composeFloor = step.floor;
-      // 바로 보낸 글은 셸이 화면에 찍으므로 xterm의 조합 미리보기는 감춘다 (한글 조합은 미리보기를 둔다)
-      el.classList.toggle("eager-compose", composeEager);
-      writeRaw("\x7f".repeat(step.deletes));
-      if (!step.add) return;
-      const mods = modifiersRef.current;
-      if (!mods.ctrl && !mods.alt) return writeRaw(step.add);
-      // 켜 둔 Ctrl·Alt는 새 글의 첫 글자에 붙인다. 그 글자는 셸에 제어 문자로 갔으므로 키보드가 나중에 지우거나 고쳐도
-      // DEL을 보내지 않게 floor를 올리고, 키보드가 그 글자를 단어로 계속 들고 있지 않게 입력 칸을 비워 조합을 끝낸다.
-      writeRef.current(step.add[0]!);
-      writeRaw(step.add.slice(1));
-      composeFloor = composeSent.length;
-      if (term.textarea) term.textarea.value = "";
-    };
-    const onCompositionEnd = () => {
-      pendingCommit = composeSent && !committedEarly ? { sent: composeSent, floor: composeFloor } : undefined;
-      committedEarly = false;
-      composeSent = "";
-      composeFloor = 0;
-      composeEager = false;
-      el.classList.remove("eager-compose");
-      // xterm은 조합이 끝나면 곧바로(setTimeout 0) 확정 글을 보낸다. 보내지 않았으면(조합 취소) 다음 입력에 섞이지 않게 비운다.
-      if (pendingTimer) clearTimeout(pendingTimer);
-      pendingTimer = setTimeout(() => (pendingCommit = undefined), 100);
-    };
-    if (TOUCH) {
-      el.addEventListener("compositionstart", onCompositionStart, true);
-      el.addEventListener("compositionupdate", onCompositionUpdate, true);
-      el.addEventListener("compositionend", onCompositionEnd, true);
-    }
-    const input = term.onData((data) => {
-      // 조합 중에 키(Enter 등)를 누르면 xterm은 조합 종료 이벤트보다 먼저 확정 글을 보낸다. 조합 중에 오는 글자 입력은 확정 글이다.
-      if (composeSent && looksLikeCommit(data)) {
-        writeRaw(committedRemainder(composeSent, data, composeFloor));
-        composeSent = "";
-        composeFloor = 0;
-        committedEarly = true;
-        return;
+    const mirror = new InputMirror();
+    const textarea = term.textarea;
+    let composing = false;
+    /** 입력 칸의 input 이벤트를 처리하는 중 (xterm이 이 사이에 보내는 글자는 입력 칸에서 온 것이라 이미 보냈다) */
+    let inInputEvent = false;
+    /** 조합이 끝난 뒤 xterm이 따로 보낼 확정 글 (이미 보냈다) */
+    let commitEcho: string | undefined;
+    let commitEchoTimer: ReturnType<typeof setTimeout> | undefined;
+    /** 지금 누른 키로 xterm이 이미 보낸 글자. 곧 입력 칸에도 들어오면 다시 보내지 않는다 (Shift 글자, 길게 눌러 넣는 기호 등). 키마다 새로 시작한다 */
+    let keySent = "";
+    let keySentConsumed = false;
+    let keySentTimer: ReturnType<typeof setTimeout> | undefined;
+    const onInput = (e: Event) => {
+      if (e.target !== textarea || !textarea) return;
+      inInputEvent = true;
+      const { deletes, add: added } = mirror.update(textarea.value);
+      writeRaw("\x7f".repeat(deletes));
+      let add = added;
+      if (keySent && add.startsWith(keySent)) {
+        if (keySentConsumed) mirror.consumeFirstAdded(Array.from(add).length);
+        add = add.slice(keySent.length);
+        keySent = "";
       }
-      // Enter·Tab 같은 제어 입력은 확정 글보다 먼저 올 수 있다. 확정 글로 착각하면 이미 보낸 글자를 지우므로 그대로 보낸다.
-      if (pendingCommit !== undefined && looksLikeCommit(data)) {
-        const { sent, floor } = pendingCommit;
-        pendingCommit = undefined;
-        writeRaw(committedRemainder(sent, data, floor));
-        return;
+      if (!add) return;
+      const text = toTerminalText(add);
+      const mods = modifiersRef.current;
+      if (mods.ctrl || mods.alt) {
+        // 켜 둔 Ctrl·Alt는 새 글의 첫 글자에 붙이고, 그 글자는 나중에 지워도 DEL을 보내지 않게 한다
+        writeRef.current(text[0]!);
+        mirror.consumeFirstAdded(Array.from(add).length);
+        writeRaw(text.slice(1));
+      } else {
+        writeRaw(text);
+      }
+      // 줄바꿈을 보냈으면 입력 칸을 비운다 (xterm이 Enter 키에서 하는 것과 같다)
+      if (text.includes("\r") && !composing) {
+        textarea.value = "";
+        mirror.reset();
+      }
+    };
+    const onCompositionStart = () => {
+      composing = true;
+    };
+    // xterm의 입력 칸 처리가 끝난 뒤 (버블 단계)
+    const onInputDone = () => {
+      inInputEvent = false;
+    };
+    const onCompositionEnd = (e: CompositionEvent) => {
+      composing = false;
+      // xterm은 조합이 끝나면 곧바로(setTimeout 0) 확정 글을 보낸다. 이미 보냈으므로 같은 글이 오면 한 번 버린다.
+      commitEcho = e.data || undefined;
+      if (commitEchoTimer) clearTimeout(commitEchoTimer);
+      commitEchoTimer = setTimeout(() => (commitEcho = undefined), 100);
+    };
+    // xterm은 Enter·Ctrl+C 키와 포커스를 잃을 때 입력 칸을 비운다 (input 이벤트 없이). 따라서 비운다.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target !== textarea) return;
+      keySent = "";
+      if (e.key === "Enter" || (e.ctrlKey && (e.key === "c" || e.key === "C"))) {
+        setTimeout(() => {
+          if (textarea && textarea.value === "") mirror.reset();
+        }, 0);
+      }
+    };
+    const onFocusOut = () => mirror.reset();
+    if (TOUCH) {
+      el.addEventListener("input", onInput, true);
+      el.addEventListener("input", onInputDone);
+      el.addEventListener("compositionstart", onCompositionStart, true);
+      el.addEventListener("compositionend", onCompositionEnd, true);
+      el.addEventListener("keydown", onKeyDown, true);
+      el.addEventListener("focusout", onFocusOut, true);
+      // 입력한 글자는 셸이 바로 화면에 찍으므로 xterm의 조합 미리보기는 감춘다
+      el.classList.add("live-input");
+    }
+    // 입력 칸에서 와서 이미 보낸 글자인지. 키 이벤트로 바로 들어온 글자(숫자·특수문자 키, 블루투스 키보드)는 아니다.
+    const isEcho = (data: string) => {
+      if (!TOUCH || !isPrintable(data)) return false;
+      if (inInputEvent) return true;
+      if (commitEcho !== undefined && data === commitEcho) {
+        commitEcho = undefined;
+        return true;
+      }
+      // 조합 중에 다른 키를 누르면 xterm이 그 자리에서 조합 글을 확정해 보낸다
+      return composing && !!textarea?.value.endsWith(data);
+    };
+    const input = term.onData((data) => {
+      if (isEcho(data)) return;
+      if (TOUCH && isPrintable(data)) {
+        const mods = modifiersRef.current;
+        keySent = data;
+        keySentConsumed = mods.ctrl || mods.alt;
+        if (keySentTimer) clearTimeout(keySentTimer);
+        keySentTimer = setTimeout(() => (keySent = ""), 100);
       }
       writeRef.current(data);
     });
@@ -315,7 +346,6 @@ export function TerminalView({
 
     return () => {
       disposed = true;
-      if (pendingTimer) clearTimeout(pendingTimer);
       if (initialTimer) clearTimeout(initialTimer);
       observer.disconnect();
       el.removeEventListener("contextmenu", onContextMenu);
@@ -323,9 +353,14 @@ export function TerminalView({
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
+      el.removeEventListener("input", onInput, true);
+      el.removeEventListener("input", onInputDone);
+      if (commitEchoTimer) clearTimeout(commitEchoTimer);
+      if (keySentTimer) clearTimeout(keySentTimer);
       el.removeEventListener("compositionstart", onCompositionStart, true);
-      el.removeEventListener("compositionupdate", onCompositionUpdate, true);
       el.removeEventListener("compositionend", onCompositionEnd, true);
+      el.removeEventListener("keydown", onKeyDown, true);
+      el.removeEventListener("focusout", onFocusOut, true);
       offData();
       offExit();
       input.dispose();
