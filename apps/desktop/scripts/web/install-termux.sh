@@ -48,12 +48,18 @@ node_ok() {
 
 # 1. Node.js와 받기 도구
 if [ "$TERMUX" = 1 ]; then
+  # 먼저 설치된 패키지를 모두 올린다. 일부만 올리면 새 curl이 예전 openssl과 맞지 않아
+  # "CANNOT LINK EXECUTABLE curl: cannot locate symbol SSL_…"로 실행되지 않는다 (Termux는 부분 업그레이드를 지원하지 않는다).
+  # 설정 파일을 바꿀지 묻는 창이 뜨면 멈추므로, 사용자가 고친 설정은 그대로 둔다(--force-confold).
+  step "Termux 패키지 업그레이드 (pkg upgrade)"
+  export DEBIAN_FRONTEND=noninteractive
+  pkg upgrade -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef
   step "Termux 패키지 설치 (Node.js LTS, curl, tar)"
   packages="curl tar"
   # 이미 맞는 Node가 있으면(nodejs 패키지 등) 그대로 쓴다. nodejs와 nodejs-lts는 함께 설치할 수 없다.
   node_ok || packages="nodejs-lts $packages"
   # shellcheck disable=SC2086
-  pkg install -y $packages
+  pkg install -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef $packages
 fi
 node_ok || fail "Node.js 22.19 이상이 필요합니다. Termux라면: pkg install nodejs-lts"
 echo "Node $(node --version)"
@@ -107,7 +113,7 @@ echo "$REPO" >"$PI_WEB_HOME/repo"
 if [ "$TERMINAL" = 1 ]; then
   step "내장 터미널 준비 (node-pty 빌드)"
   if [ "$TERMUX" = 1 ]; then
-    pkg install -y python make clang binutils
+    pkg install -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef python make clang binutils
     # Termux의 node-gyp는 android_ndk_path 변수가 없다고 실패한다. 빈 값을 정해 둔다.
     mkdir -p "$HOME/.gyp"
     [ -f "$HOME/.gyp/include.gypi" ] || echo "{'variables':{'android_ndk_path':''}}" >"$HOME/.gyp/include.gypi"
