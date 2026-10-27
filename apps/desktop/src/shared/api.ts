@@ -70,7 +70,17 @@ export type ConnectionState =
        */
       agentUpdate?: { liveSessions: number };
     }
-  | { status: "disconnected"; reason: string };
+  | {
+      status: "disconnected";
+      reason: string;
+      /** 다시 붙기를 시도하는 시각 (ms). 없으면 자동으로 다시 붙지 않는다 */
+      retryAt?: number;
+      /** 연달아 실패한 횟수와 자동으로 다시 붙는 최대 횟수 */
+      failures?: number;
+      maxRetries?: number;
+      /** 연달아 실패해 자동으로 다시 붙기를 멈췄다. "다시 연결"(reconnectHost)로 다시 시작한다 */
+      gaveUp?: boolean;
+    };
 
 /** Pi가 도는 곳 하나. 로컬 PC 또는 WSL 배포판 (SSH는 M3). */
 export interface TerminalOpenRequest {
@@ -341,6 +351,8 @@ export interface PiDesktopApi {
   removeSshHost(name: string): Promise<void>;
   /** 호스트 연결을 시작하고 현재 상태를 돌려준다 (이미 연결 중이면 그대로) */
   connectHost(hostId: string): Promise<ConnectionState>;
+  /** 다시 붙기를 멈췄거나 기다리는 중인 호스트에 지금 다시 연결한다 */
+  reconnectHost(hostId: string): Promise<void>;
   /** 예전 데몬을 지금 끄고 새 번들로 다시 띄운다. 실행 중인 Pi 세션도 끝난다 */
   replaceAgent(hostId: string): Promise<void>;
   locatePi(hostId: string): Promise<PiLocation>;
@@ -483,7 +495,10 @@ export interface PiDesktopApi {
   recordCopy(input: CopyRecordInput): Promise<void>;
   /** 앱 자동 업데이트 상태와 조작 (M5) */
   updateState(): Promise<UpdateState>;
-  checkForUpdates(): Promise<UpdateState>;
+  /** 업데이트를 확인한다. interactive면 결과를 창으로 알리고, 새 버전이 있으면 업데이트할지 묻는다 */
+  checkForUpdates(interactive?: boolean): Promise<UpdateState>;
+  /** 찾은 새 버전을 받을지 묻고, 고르면 내려받는다 (알리기만 하는 곳은 릴리스 페이지를 연다) */
+  confirmUpdate(): Promise<void>;
   /** 내려받은 업데이트를 설치하며 다시 시작한다 */
   installUpdate(): Promise<void>;
   /** 새 버전의 릴리스 페이지를 연다 (알리기만 하는 곳) */
@@ -543,6 +558,7 @@ export interface PiDesktopApi {
 export const IpcChannels = {
   listHosts: "pi:list-hosts",
   connectHost: "pi:connect-host",
+  reconnectHost: "pi:reconnect-host",
   listSshHosts: "pi:list-ssh-hosts",
   saveSshHost: "pi:save-ssh-host",
   removeSshHost: "pi:remove-ssh-host",
@@ -596,6 +612,7 @@ export const IpcChannels = {
   listActionLog: "pi:list-action-log",
   updateState: "pi:update-state",
   checkForUpdates: "pi:check-for-updates",
+  confirmUpdate: "pi:confirm-update",
   installUpdate: "pi:install-update",
   openRelease: "pi:open-release",
   updateStateChanged: "pi:update-state-changed",
