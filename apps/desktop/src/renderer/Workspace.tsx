@@ -38,6 +38,7 @@ import { Sidebar } from "./Sidebar";
 import { TreePanel } from "./TreePanel";
 import { useSessionInfo } from "./use-session-info";
 import { staleProviders } from "./session-refresh";
+import { disconnectedBadgeText } from "./connection-view";
 
 /** 탭 표시와 백그라운드 알림에 쓰는 워크스페이스 상태 */
 export interface WorkspaceStatus {
@@ -893,7 +894,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
           ))}
           <option value={SSH_MANAGE}>SSH 호스트 관리…</option>
         </select>
-        <ConnectionBadge connection={connection} />
+        <ConnectionBadge connection={connection} onReconnect={() => void window.piDesktop.reconnectHost(hostId)} />
         {connection.status === "connected" && connection.agentUpdate && (
           <button
             type="button"
@@ -1006,6 +1007,25 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
         </button>
       </section>
 
+      {connection.status === "disconnected" && connection.gaveUp && (
+        // 연달아 연결하지 못해 자동으로 다시 붙기를 멈췄다. 이유를 보이고, 고친 뒤 다시 연결하게 한다.
+        <div className="banner error connection-failed">
+          <span>
+            {host?.label ?? hostId}에 연결하지 못해 자동으로 다시 붙기를 멈췄습니다.
+            {"\n"}
+            {connection.reason}
+            {host?.kind === "ssh" && "\n주소(IP)가 바뀌었으면 SSH 호스트 관리에서 고친 뒤 다시 연결하세요."}
+          </span>
+          <button type="button" className="primary" onClick={() => void window.piDesktop.reconnectHost(hostId)}>
+            다시 연결
+          </button>
+          {host?.kind === "ssh" && (
+            <button type="button" onClick={() => setSshHostsOpen(true)}>
+              SSH 호스트 관리…
+            </button>
+          )}
+        </div>
+      )}
       <div className={`workspace${drawerOpen ? " drawer-open" : ""}`}>
         {drawerOpen && <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
         <Sidebar
@@ -1042,7 +1062,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
         />
         <div className="main">
 
-      {connection.status === "disconnected" && (
+      {connection.status === "disconnected" && !connection.gaveUp && (
         <div className="banner error">
           {host?.label ?? hostId}에 연결하지 못했습니다. 자동으로 다시 시도합니다.
           {"\n"}
@@ -1486,7 +1506,22 @@ function saveDraft(key: string | undefined, text: string): void {
   }
 }
 
-function ConnectionBadge({ connection }: { connection: ReturnType<typeof useSession>["connection"] }) {
+function ConnectionBadge({
+  connection,
+  onReconnect,
+}: {
+  connection: ReturnType<typeof useSession>["connection"];
+  /** 연결이 끊겼을 때 누르면 지금 다시 연결한다 */
+  onReconnect: () => void;
+}) {
+  // 다시 붙을 때까지 남은 초를 보이려고 끊긴 동안 1초마다 다시 그린다.
+  const [now, setNow] = useState(Date.now());
+  const waiting = connection.status === "disconnected" && connection.retryAt !== undefined;
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [waiting]);
   switch (connection.status) {
     case "connected": {
       const { host } = connection;
@@ -1502,9 +1537,10 @@ function ConnectionBadge({ connection }: { connection: ReturnType<typeof useSess
       return <span className="badge">대기</span>;
     case "disconnected":
       return (
-        <span className="badge bad" title={connection.reason}>
-          연결 끊김 · 재시도 중
-        </span>
+        <button type="button" className="badge bad" title={`${connection.reason}
+누르면 지금 다시 연결합니다.`} onClick={onReconnect}>
+          {disconnectedBadgeText(connection, now)}
+        </button>
       );
   }
 }

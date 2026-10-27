@@ -84,6 +84,7 @@ registerHandlers(router, {
 const noUpdates: UpdateState = { status: "disabled", current: version, mode: "notify" };
 router.handle(IpcChannels.updateState, () => noUpdates);
 router.handle(IpcChannels.checkForUpdates, () => noUpdates);
+router.handle(IpcChannels.confirmUpdate, () => undefined);
 router.handle(IpcChannels.installUpdate, () => undefined);
 router.handle(IpcChannels.openRelease, () => undefined);
 

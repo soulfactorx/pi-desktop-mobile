@@ -185,7 +185,14 @@ export function registerHandlers(router: Router, deps: HandlerDeps): void {
     sshHosts.remove(name);
     manager.forget(`${SSH_PREFIX}${name}`);
   });
-  handle(IpcChannels.connectHost, (_event, hostId: string) => conn(hostId).current);
+  handle(IpcChannels.connectHost, (_event, hostId: string) => {
+    // 연달아 실패해 멈춘 호스트를 사용자가 다시 고르면 한 번 더 붙어 본다.
+    const connection = conn(hostId);
+    const state = connection.current;
+    if (state.status === "disconnected" && state.gaveUp) connection.reconnect();
+    return connection.current;
+  });
+  handle(IpcChannels.reconnectHost, (_event, hostId: string) => conn(hostId).reconnect());
   handle(IpcChannels.replaceAgent, (_event, hostId: string) => conn(hostId).replaceAgent());
   handle(IpcChannels.locatePi, (_event, hostId: string) =>
     conn(hostId).request<PiLocation>(Methods.piLocate, hostId === LOCAL_HOST_ID ? { piCliPath: process.env.PI_DESKTOP_PI_CLI } : {}),

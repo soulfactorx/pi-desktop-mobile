@@ -126,16 +126,29 @@ export function stderrTail(stderr: string): string {
 }
 
 /** 명령을 실행해 표준 출력을 돌려준다. 실패하면 stderr 끝부분을 담은 오류. stdin으로 바이트를 넘길 수 있다. */
-export function runCommand(command: string, args: string[], label: string, input?: Buffer): Promise<string> {
+/** 원격 확인·Agent 올리기 명령 하나를 기다리는 최대 시간. 연결은 됐는데 응답이 멈춘 경우에도 끝나게 한다 */
+const RUN_TIMEOUT_MS = 60_000;
+
+export function runCommand(command: string, args: string[], label: string, input?: Buffer, timeoutMs = RUN_TIMEOUT_MS): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
     let stdout = "";
     let stderr = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
-    child.on("error", reject);
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
     child.on("exit", (code) => {
-      if (code === 0) resolve(stdout);
+      clearTimeout(timer);
+      if (timedOut) reject(new Error(`${label} 응답이 ${timeoutMs / 1000}초 안에 오지 않았습니다 (timed out)`));
+      else if (code === 0) resolve(stdout);
       else {
         const detail = stderrTail(stderr);
         reject(new Error(`${label} 명령 실패 (code ${code})${detail ? `: ${detail}` : ""}`));

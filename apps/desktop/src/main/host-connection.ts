@@ -19,6 +19,7 @@ import {
 } from "@pi-desktop/host-protocol";
 import type { ConnectionState } from "../shared/api";
 import { checkAgent, staleAgentError } from "./agent-build";
+import { MAX_AUTO_RETRIES, PREPARE_TIMEOUT_MS, REQUEST_WAIT_MS, retryDelay } from "./reconnect-policy";
 
 /** 연결기(`host-agent connect`)를 띄우는 명령. 호스트 종류(로컬·WSL·SSH)마다 다르다. */
 export interface LaunchSpec {
@@ -48,8 +49,6 @@ export interface HostConnectionOptions {
   onPiUpdateOutput: (notification: PiUpdateOutputNotification) => void;
 }
 
-const RECONNECT_MIN_MS = 500;
-const RECONNECT_MAX_MS = 10_000;
 /** 예전 데몬을 쓰는 동안 세션이 모두 끝났는지 다시 보는 간격 */
 const STALE_CHECK_MS = 30_000;
 
@@ -58,7 +57,8 @@ const STALE_CHECK_MS = 30_000;
  *
  * 연결기를 자식 프로세스로 띄워 stdio로 JSON-RPC를 주고받는다. 로컬이면 node를 직접,
  * WSL이면 wsl.exe를 거쳐 띄운다. 연결기는 앱과 함께 죽지만 데몬과 Pi 세션은 남는다.
- * 연결기가 끊기면 지수 백오프로 다시 붙는다.
+ * 연결기가 끊기면 점점 길게 기다리며 다시 붙고, 연달아 여러 번 실패하면 멈춰 사용자에게 "다시 연결"을 맡긴다
+ * (reconnect-policy.ts). 연결되지 않은 동안의 요청은 잠시만 기다리고, 멈춘 뒤에는 이유와 함께 바로 실패한다.
  */
 /** 신원을 확인하지 못한 데몬에 끄기를 요청하고 기다리는 시간 */
 const UNVERIFIED_SHUTDOWN_MS = 5000;
@@ -67,11 +67,13 @@ export class HostConnection {
   private child: ChildProcessWithoutNullStreams | undefined;
   private peer: JsonRpcPeer | undefined;
   private state: ConnectionState = { status: "connecting" };
-  private retryDelay = RECONNECT_MIN_MS;
+  /** 연달아 실패한 횟수 (연결되면 0) */
+  private failures = 0;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
   private started = false;
-  private readyWaiters: Array<() => void> = [];
+  /** 연결을 기다리는 요청들. 연결되면 resolve, 다시 붙기를 멈추면 reject */
+  private readyWaiters: Array<{ resolve: () => void; reject: (error: Error) => void }> = [];
   /** 예전 데몬을 끄는 중. 연결기가 끝나도 오류로 알리지 않고 바로 다시 붙는다 */
   private replacing = false;
   /** 교체를 시도한 번들의 빌드 식별자 (되풀이 방지) */
@@ -98,13 +100,14 @@ export class HostConnection {
     return this.state;
   }
 
-  /** 연결될 때까지 기다린 뒤 요청한다. */
-  /** @param timeoutMs 응답 제한 시간. 생략하면 기본값(2분), 0이면 제한 없음 */
+  /**
+   * 연결될 때까지 기다린 뒤 요청한다. 연결을 기다리는 것은 REQUEST_WAIT_MS까지이고,
+   * 다시 붙기를 멈춘 상태면 기다리지 않고 바로 실패한다(화면의 주기적 요청이 끝없이 쌓이지 않게).
+   * @param timeoutMs 응답 제한 시간. 생략하면 기본값(2분), 0이면 제한 없음
+   */
   async request<T>(method: string, params?: unknown, timeoutMs?: number): Promise<T> {
     this.start();
-    if (this.state.status !== "connected" || !this.peer) {
-      await new Promise<void>((resolve) => this.readyWaiters.push(resolve));
-    }
+    if (this.state.status !== "connected" || !this.peer) await this.waitForConnection();
     try {
       return await this.peer!.request<T>(method, params, timeoutMs);
     } catch (error) {
@@ -112,6 +115,40 @@ export class HostConnection {
       const hinted = this.state.status === "connected" && this.state.agentUpdate ? staleAgentError(error) : undefined;
       throw hinted ?? error;
     }
+  }
+
+  private waitForConnection(): Promise<void> {
+    const state = this.state;
+    if (state.status === "disconnected" && state.gaveUp) {
+      return Promise.reject(new Error(`Host Agent에 연결되어 있지 않습니다: ${state.reason}`));
+    }
+    return new Promise<void>((resolve, reject) => {
+      const waiter = {
+        resolve: () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        reject: (error: Error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      };
+      const timer = setTimeout(() => {
+        this.readyWaiters = this.readyWaiters.filter((w) => w !== waiter);
+        const now = this.state;
+        reject(new Error(`Host Agent 연결을 기다리다 시간이 지났습니다${now.status === "disconnected" ? `: ${now.reason}` : ""}`));
+      }, REQUEST_WAIT_MS);
+      this.readyWaiters.push(waiter);
+    });
+  }
+
+  /** 사용자가 "다시 연결"을 눌렀다: 실패 횟수를 비우고 곧바로 다시 붙는다 */
+  reconnect(): void {
+    if (this.disposed || this.state.status === "connected" || this.state.status === "connecting") return;
+    this.failures = 0;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.started = true;
+    void this.connect();
   }
 
   /** 앱 종료 시 호출. 연결기만 끝내고 데몬·세션은 그대로 둔다 (설계 §3.4). */
@@ -139,10 +176,13 @@ export class HostConnection {
 
     let spec: LaunchSpec;
     try {
-      spec = await this.options.prepare();
+      spec = await withTimeout(
+        this.options.prepare(),
+        PREPARE_TIMEOUT_MS,
+        `연결 준비가 ${PREPARE_TIMEOUT_MS / 1000}초 안에 끝나지 않았습니다. 서버가 응답하는지 확인하세요.`,
+      );
     } catch (error) {
-      this.setState({ status: "disconnected", reason: error instanceof Error ? error.message : String(error) });
-      this.scheduleReconnect();
+      this.fail(error instanceof Error ? error.message : String(error));
       return;
     }
     if (this.disposed) return;
@@ -191,15 +231,14 @@ export class HostConnection {
       if (this.replacing) {
         // 예전 데몬을 일부러 껐다. 연결기가 새 번들로 데몬을 띄우도록 곧바로 다시 붙는다.
         this.replacing = false;
-        this.retryDelay = RECONNECT_MIN_MS;
+        this.failures = 0;
         this.setState({ status: "connecting" });
-        this.scheduleReconnect();
+        this.retryTimer = setTimeout(() => void this.connect(), 500);
         return;
       }
       const reason = this.blockedReason ?? (lastLines(stderr) || `연결기 종료 (code ${code})`);
       this.blockedReason = undefined;
-      this.setState({ status: "disconnected", reason });
-      this.scheduleReconnect();
+      this.fail(reason);
     });
 
     peer
@@ -209,12 +248,12 @@ export class HostConnection {
         this.unverifiedShutdownTried = false;
         const agentUpdate = await this.checkAgent(peer, spec.agentBuild, host);
         if (agentUpdate === "replacing") return;
-        this.retryDelay = RECONNECT_MIN_MS;
+        this.failures = 0;
         this.setState({ status: "connected", host, ...(agentUpdate ? { agentUpdate } : {}) });
         if (agentUpdate) this.startStaleCheck(peer, spec.agentBuild);
         const waiters = this.readyWaiters;
         this.readyWaiters = [];
-        for (const resolve of waiters) resolve();
+        for (const waiter of waiters) waiter.resolve();
       })
       .catch(() => child.kill());
   }
@@ -283,16 +322,47 @@ export class HostConnection {
     this.staleTimer = undefined;
   }
 
-  private scheduleReconnect(): void {
+  /**
+   * 연결 시도가 실패했다: 정책에 따라 잠시 뒤 다시 붙거나, 연달아 실패했으면 멈춘다.
+   * 멈추면 연결을 기다리던 요청도 이유와 함께 끝낸다.
+   */
+  private fail(reason: string): void {
+    if (this.disposed) return;
+    this.failures += 1;
+    const delay = retryDelay(this.failures);
     if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.retryTimer = setTimeout(() => void this.connect(), this.retryDelay);
-    this.retryDelay = Math.min(this.retryDelay * 2, RECONNECT_MAX_MS);
+    if (delay === undefined) {
+      this.setState({ status: "disconnected", reason, failures: this.failures, maxRetries: MAX_AUTO_RETRIES, gaveUp: true });
+      const waiters = this.readyWaiters;
+      this.readyWaiters = [];
+      for (const waiter of waiters) waiter.reject(new Error(`Host Agent에 연결하지 못했습니다: ${reason}`));
+      return;
+    }
+    this.setState({ status: "disconnected", reason, retryAt: Date.now() + delay, failures: this.failures, maxRetries: MAX_AUTO_RETRIES });
+    this.retryTimer = setTimeout(() => void this.connect(), delay);
   }
 
   private setState(state: ConnectionState): void {
     this.state = state;
     this.options.onState(state);
   }
+}
+
+/** 약속이 시간 안에 끝나지 않으면 message로 실패한다 */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** 오류 표시용으로 stderr 마지막 몇 줄만 남긴다. WSL의 경로 변환 경고처럼 의미 없는 줄은 뺀다. */

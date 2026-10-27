@@ -12,12 +12,43 @@ export type Attention = "done" | "input";
 
 export const TABS_KEY = "pi-desktop.tabs";
 
+/**
+ * 앱을 다시 열 때 되살릴 탭. 첫 탭은 늘 두고, 다른 탭은 보던 세션이 기억된 것만 둔다.
+ * 세션 없이 열어 둔 빈 "새 탭"까지 되살리면, 한 번 연 빈 탭이 실행할 때마다 따라 나온다.
+ */
+export function restorableTabIds(ids: readonly string[], mainTab: string, hasSession: (id: string) => boolean): string[] {
+  return ids.filter((id) => id === mainTab || hasSession(id));
+}
+
+/** 그 탭에 기억된 세션이 있는지 (use-session.ts의 저장 키: pi-desktop.tab.<탭>.lastSession.<호스트>, 닫으면 null) */
+function tabHasSession(id: string): boolean {
+  const prefix = `pi-desktop.tab.${id}.lastSession.`;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(prefix)) continue;
+    const value = localStorage.getItem(key);
+    if (value && value !== "null") return true;
+  }
+  return false;
+}
+
+/** 되살리지 않는 탭의 저장값을 지운다 (use-session.ts forgetTab과 같은 키) */
+function forgetTabKeys(id: string): void {
+  const prefix = `pi-desktop.tab.${id}.`;
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(prefix)) localStorage.removeItem(key);
+  }
+}
+
 export function loadTabs(mainTab: string): TabsState {
   try {
     const raw = localStorage.getItem(TABS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<TabsState>;
-      const ids = Array.isArray(parsed.ids) ? parsed.ids.filter((id): id is string => typeof id === "string") : [];
+      const saved = Array.isArray(parsed.ids) ? parsed.ids.filter((id): id is string => typeof id === "string") : [];
+      const ids = restorableTabIds(saved, mainTab, tabHasSession);
+      for (const id of saved) if (!ids.includes(id)) forgetTabKeys(id);
       if (ids.length > 0) return { ids, active: ids.includes(String(parsed.active)) ? String(parsed.active) : ids[0]! };
     }
   } catch {

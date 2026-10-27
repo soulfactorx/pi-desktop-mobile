@@ -141,9 +141,10 @@ app.whenReady().then(() => {
   createWindow();
 
   // 자동 업데이트 (설치한 앱에서만 확인한다)
-  const updater = new Updater((state) => sendToRenderer(IpcChannels.updateStateChanged, state));
+  const updater = new Updater((state) => sendToRenderer(IpcChannels.updateStateChanged, state), () => mainWindow);
   ipcMain.handle(IpcChannels.updateState, () => updater.current);
-  ipcMain.handle(IpcChannels.checkForUpdates, () => updater.check());
+  ipcMain.handle(IpcChannels.checkForUpdates, (_event, interactive?: boolean) => updater.check(interactive === true));
+  ipcMain.handle(IpcChannels.confirmUpdate, () => updater.confirmUpdate());
   ipcMain.handle(IpcChannels.installUpdate, () => updater.install());
   ipcMain.handle(IpcChannels.openRelease, () => updater.openRelease());
   updater.start();

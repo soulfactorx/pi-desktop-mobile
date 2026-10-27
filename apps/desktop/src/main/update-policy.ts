@@ -30,6 +30,61 @@ export function releaseUrl(owner: string, repo: string, version: string): string
   return `https://github.com/${owner}/${repo}/releases/tag/v${version.replace(/^v/, "")}`;
 }
 
+/** 사용자에게 묻거나 알리는 창의 내용 (main의 dialog.showMessageBox에 그대로 넘긴다) */
+export interface UpdatePrompt {
+  type: "info" | "question" | "warning" | "error";
+  message: string;
+  detail: string;
+  /** 첫 버튼이 기본(확인) 동작이다. 버튼이 하나면 알리기만 한다 */
+  buttons: string[];
+}
+
+/** 새 버전을 찾았을 때 받을지 묻는 창. auto면 내려받아 설치하고, notify면 릴리스 페이지를 연다 */
+export function availablePrompt(mode: UpdateMode, current: string, version: string): UpdatePrompt {
+  return mode === "auto"
+    ? {
+        type: "question",
+        message: `새 버전 ${version}이(가) 있습니다. 업데이트할까요?`,
+        detail: `지금 버전은 ${current}입니다. 업데이트를 누르면 내려받은 뒤, 다시 시작해 설치할지 한 번 더 묻습니다.`,
+        buttons: ["업데이트", "나중에"],
+      }
+    : {
+        type: "question",
+        message: `새 버전 ${version}이(가) 있습니다.`,
+        detail: `지금 버전은 ${current}입니다. 이 OS에서는 자동 설치가 되지 않아 릴리스 페이지에서 내려받습니다.`,
+        buttons: ["릴리스 페이지 열기", "나중에"],
+      };
+}
+
+/** 내려받기를 마쳤을 때 지금 다시 시작해 설치할지 묻는 창 */
+export function restartPrompt(version: string): UpdatePrompt {
+  return {
+    type: "question",
+    message: `${version} 업데이트를 내려받았습니다. 지금 다시 시작해 설치할까요?`,
+    detail: "나중에를 고르면 앱을 끌 때 설치합니다. 열린 Pi 세션은 Host Agent에서 계속 돕니다.",
+    buttons: ["지금 다시 시작해 설치", "나중에"],
+  };
+}
+
+/** 사용자가 직접 확인했는데 받을 업데이트가 없거나 확인할 수 없을 때 알리는 창 */
+export function resultPrompt(status: "none" | "error" | "disabled" | "downloading", current: string, error?: string): UpdatePrompt {
+  switch (status) {
+    case "none":
+      return { type: "info", message: "최신 버전입니다.", detail: `지금 버전 ${current}이(가) 가장 새 버전입니다.`, buttons: ["확인"] };
+    case "downloading":
+      return { type: "info", message: "업데이트를 내려받는 중입니다.", detail: "다 받으면 다시 시작해 설치할지 묻습니다.", buttons: ["확인"] };
+    case "disabled":
+      return { type: "info", message: "업데이트를 확인하지 않는 실행입니다.", detail: error ?? "", buttons: ["확인"] };
+    case "error":
+      return {
+        type: "error",
+        message: "업데이트를 확인하지 못했습니다.",
+        detail: `${error ?? "알 수 없는 오류"}\n인터넷 연결(VPN·프록시)을 확인한 뒤 다시 시도하세요.`,
+        buttons: ["확인"],
+      };
+  }
+}
+
 /** 시작한 뒤 처음 확인까지와 그 뒤 확인 간격 */
 export const FIRST_CHECK_MS = 15_000;
 export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;

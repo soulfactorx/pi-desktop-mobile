@@ -137,16 +137,13 @@ export function App() {
         update?.status === "downloaded"
           ? `다시 시작해 ${update.version} 설치`
           : update?.status === "available"
-            ? `새 버전 ${update.version} 내려받기 페이지 열기`
+            ? `새 버전 ${update.version} 업데이트…`
             : "업데이트 확인",
       hint: update ? `지금 ${update.current}` : "",
       keywords: "update upgrade version release 업데이트 버전",
       disabled: !update || update.status === "disabled",
-      run: () => {
-        if (update?.status === "downloaded") void window.piDesktop.installUpdate();
-        else if (update?.status === "available") void window.piDesktop.openRelease();
-        else void window.piDesktop.checkForUpdates();
-      },
+      // 직접 확인하면 결과를 알리고, 새 버전이 있으면 업데이트할지 묻는다 (내려받았으면 다시 시작할지 묻는다).
+      run: () => void window.piDesktop.checkForUpdates(true),
     });
     return list;
   }, [tabs, statuses, newTab, close, activate, update]);

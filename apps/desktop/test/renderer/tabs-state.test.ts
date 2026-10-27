@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTab, attentionFor, closeTab, cycleTab } from "../../src/renderer/tabs-state";
+import { addTab, attentionFor, closeTab, cycleTab, restorableTabIds } from "../../src/renderer/tabs-state";
 
 describe("탭 목록", () => {
   it("새 탭은 지금 탭 오른쪽에 열리고 활성화된다", () => {
@@ -39,5 +39,13 @@ describe("attentionFor", () => {
     expect(attentionFor({ running: false, needsInput: false }, { running: false, needsInput: false })).toBeUndefined();
     expect(attentionFor(undefined, { running: false, needsInput: false })).toBeUndefined();
     expect(attentionFor({ running: false, needsInput: true }, { running: false, needsInput: true })).toBeUndefined();
+  });
+});
+
+describe("restorableTabIds", () => {
+  it("다시 열 때 첫 탭과 세션이 기억된 탭만 되살린다 (빈 새 탭은 빼서 실행할 때마다 따라 나오지 않게)", () => {
+    const withSession = new Set(["t2"]);
+    expect(restorableTabIds(["main", "t1", "t2"], "main", (id) => withSession.has(id))).toEqual(["main", "t2"]);
+    expect(restorableTabIds(["main"], "main", () => false)).toEqual(["main"]);
   });
 });
