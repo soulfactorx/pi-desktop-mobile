@@ -1,0 +1,17 @@
+{
+  "name": "@pi-desktop/agent-web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pi Desktop Agent를 휴대폰 브라우저로 쓰는 웹 버전 (apps/agent를 고치지 않고 web-shell로 감싼다)",
+  "scripts": {
+    "build:web": "npm run build -w @pi-desktop/host-agent && node scripts/build.mjs",
+    "dev:web": "node scripts/dev-mock.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@pi-desktop/agent": "*",
+    "@pi-desktop/web-shell": "*"
+  }
+}

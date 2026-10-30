@@ -1,0 +1,164 @@
+/*
+ * Agent 웹 화면 (설계 DESIGN.md §5.11). Agent의 화면 CSS(apps/agent/src/renderer)는 그대로 두고 여기서 덮는다.
+ * - 웹 껍데기의 색을 Agent 색 변수에 맞춘다
+ * - 좁은 화면(휴대폰): 옆 메뉴(.nav)를 서랍으로, 위쪽 띠 아래로 화면을 내리고, 입력창·머리줄을 세로로 쌓는다
+ */
+:root {
+  --ws-bg: var(--bg);
+  --ws-panel: var(--panel-2);
+  --ws-border: var(--border);
+  --ws-text: var(--text);
+  --ws-muted: var(--muted);
+  --ws-accent: var(--accent);
+  --ws-bar-bg: var(--panel);
+}
+
+/* 넓은 화면: 메뉴바 대신 ⋮ 단추가 오른쪽 위에 뜨므로 머리줄 오른쪽을 비워 둔다 */
+@media (min-width: 721px) {
+  .page-head {
+    padding-right: 56px;
+  }
+}
+
+@media (max-width: 720px) {
+  .agent-shell {
+    height: calc(100dvh - var(--ws-bar));
+    margin-top: var(--ws-bar);
+  }
+
+  /* 옆 메뉴: 화면 밖에 두었다가 ☰로 꺼낸다. 열렸을 때 transform을 없애야 안의 폴더 메뉴(position: fixed)가 화면 기준으로 뜬다 */
+  .nav {
+    position: fixed;
+    top: var(--ws-bar);
+    bottom: 0;
+    left: 0;
+    width: min(300px, 85vw);
+    z-index: 1800;
+    transform: translateX(-105%);
+    transition: transform 0.18s ease-out;
+    box-shadow: 4px 0 16px rgb(0 0 0 / 30%);
+  }
+
+  body.ws-drawer-open .nav {
+    transform: none;
+  }
+
+  .nav-brand {
+    display: none;
+  }
+
+  .nav button,
+  .nav .nav-session {
+    min-height: 40px;
+  }
+
+  .nav-history .link-button {
+    padding: 8px 4px;
+  }
+
+  .main {
+    width: 100%;
+  }
+
+  .page-head {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .chat-folder {
+    max-width: 100%;
+  }
+
+  .model-select {
+    max-width: 100%;
+    flex: 1 1 160px;
+  }
+
+  .page-body {
+    padding: 12px 10px;
+  }
+
+  .welcome {
+    padding: 16px 12px;
+  }
+
+  .examples {
+    grid-template-columns: 1fr;
+  }
+
+  .back-bar {
+    flex-wrap: wrap;
+  }
+
+  /* 입력창: 글 칸을 넓게, 단추는 아래 한 줄 */
+  .composer {
+    flex-direction: column;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .composer textarea {
+    min-height: 56px;
+    font-size: 16px; /* 16px보다 작으면 입력할 때 화면이 확대된다 */
+  }
+
+  .composer .actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .composer .actions button {
+    min-height: 40px;
+  }
+
+  .suggestions {
+    left: 8px;
+    right: 8px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* 대화상자·표가 화면 밖으로 넘치지 않게 */
+  .modal,
+  .dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  th {
+    white-space: nowrap;
+  }
+
+  /* 목록 한 줄(설명 + 입력·단추): 설명은 한 줄을 다 쓰고 입력·단추는 그 아래로 */
+  .list li,
+  .mcp-preset {
+    flex-wrap: wrap;
+  }
+
+  .list li > .grow {
+    flex-basis: 100%;
+  }
+
+  .mcp-key {
+    width: auto;
+    flex: 1 1 140px;
+  }
+
+  .mcp-target {
+    max-width: 100%;
+  }
+
+  .card {
+    padding: 10px;
+  }
+}
