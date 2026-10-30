@@ -1,0 +1,369 @@
+/*
+ * 웹 껍데기의 화면: 토큰 입력, 서버 연결 띠, ⋮ 메뉴, 대화상자, 알림 (설계 DESIGN.md §5.11).
+ * 앱 화면과 섞이지 않게 ws- 접두사를 쓰고 색을 따로 둔다. 앱별 web.css가 --ws-* 변수로 바꿀 수 있다.
+ */
+:root {
+  --ws-bg: #1d1f27;
+  --ws-panel: #262833;
+  --ws-border: #3a3d4a;
+  --ws-text: #e6e7ec;
+  --ws-muted: #9a9db0;
+  --ws-accent: #4f6bed;
+  --ws-warn: #e0b04a;
+  --ws-error: #e06c6c;
+  --ws-menu-top: max(6px, env(safe-area-inset-top));
+  --ws-menu-right: 6px;
+}
+
+.ws-token {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--ws-text);
+  font-family: system-ui, sans-serif;
+}
+
+.ws-token h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.ws-token p {
+  margin: 0;
+  color: var(--ws-muted);
+}
+
+.ws-token .ws-token-message {
+  color: var(--ws-warn);
+}
+
+.ws-token input,
+.ws-dialog input.ws-path {
+  background: var(--ws-panel);
+  color: var(--ws-text);
+  border: 1px solid var(--ws-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 16px; /* 16px보다 작으면 iOS·일부 Android가 확대한다 */
+  min-width: 0;
+}
+
+.ws-token button,
+.ws-dialog button,
+.ws-menu button,
+.ws-toast button {
+  background: var(--ws-panel);
+  color: var(--ws-text);
+  border: 1px solid var(--ws-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.ws-token button,
+.ws-dialog button.primary {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: #fff;
+}
+
+.ws-dialog button:disabled,
+.ws-menu button:disabled {
+  opacity: 0.5;
+}
+
+.ws-link {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3000;
+  padding: 4px 12px;
+  padding-top: max(4px, env(safe-area-inset-top));
+  background: var(--ws-warn);
+  color: #1d1f27;
+  font: 13px system-ui, sans-serif;
+  text-align: center;
+}
+
+.ws-menu-button {
+  position: fixed;
+  top: var(--ws-menu-top);
+  right: var(--ws-menu-right);
+  z-index: 2000;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  border: 1px solid var(--ws-border);
+  background: var(--ws-panel);
+  color: var(--ws-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+}
+
+.ws-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  background: rgb(0 0 0 / 45%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px 12px;
+  overflow-y: auto;
+  font-family: system-ui, sans-serif;
+}
+
+.ws-menu,
+.ws-dialog {
+  width: min(560px, 100%);
+  background: var(--ws-bg);
+  color: var(--ws-text);
+  border: 1px solid var(--ws-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 40%);
+}
+
+.ws-menu {
+  margin-left: auto;
+}
+
+.ws-menu section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ws-menu h3 {
+  margin: 6px 4px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ws-muted);
+}
+
+.ws-menu section button {
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 10px 8px;
+}
+
+.ws-menu section button:hover,
+.ws-menu section button:focus-visible {
+  background: var(--ws-panel);
+}
+
+.ws-menu-check {
+  color: var(--ws-accent);
+}
+
+.ws-dialog h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.ws-dialog p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ws-dialog-detail {
+  color: var(--ws-muted);
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+
+.ws-dialog-message {
+  white-space: pre-wrap;
+}
+
+.ws-dialog-error {
+  color: var(--ws-error);
+  font-size: 14px;
+}
+
+.ws-dialog-error:empty {
+  display: none;
+}
+
+.ws-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ws-path-row {
+  display: flex;
+  gap: 6px;
+}
+
+.ws-path-row .ws-path {
+  flex: 1;
+}
+
+.ws-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid var(--ws-border);
+  border-radius: 6px;
+}
+
+.ws-entries button {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px;
+  overflow-wrap: anywhere;
+}
+
+.ws-entries li + li {
+  border-top: 1px solid var(--ws-border);
+}
+
+.ws-entries li.picked button {
+  background: color-mix(in srgb, var(--ws-accent) 30%, transparent);
+}
+
+.ws-upload {
+  text-align: center;
+  border: 1px dashed var(--ws-accent);
+  border-radius: 6px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.ws-upload input {
+  display: none;
+}
+
+.ws-toasts {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 2800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+}
+
+.ws-toast {
+  pointer-events: auto;
+  width: min(480px, 100%);
+  background: var(--ws-panel);
+  color: var(--ws-text);
+  border: 1px solid var(--ws-border);
+  border-left: 4px solid var(--ws-accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+}
+
+.ws-toast.error {
+  border-left-color: var(--ws-error);
+}
+
+.ws-toast p {
+  grid-column: 1;
+  margin: 0;
+  color: var(--ws-muted);
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ws-toast-close {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  padding: 4px 8px !important;
+  font-size: 13px !important;
+}
+
+/* 좁은 화면의 위쪽 띠와 서랍 (BootOptions.drawer). 서랍이 될 옆 메뉴의 모양은 앱별 web.css가 정한다 */
+.ws-bar,
+.ws-drawer-backdrop {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --ws-bar: calc(44px + env(safe-area-inset-top));
+  }
+
+  body.ws-has-bar {
+    --ws-menu-top: calc(2px + env(safe-area-inset-top));
+    --ws-menu-right: 4px;
+  }
+
+  body.ws-has-bar .ws-menu-button {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .ws-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--ws-bar);
+    padding: env(safe-area-inset-top) 52px 0 4px;
+    z-index: 1900;
+    background: var(--ws-bar-bg, var(--ws-bg));
+    color: var(--ws-bar-text, var(--ws-text));
+    border-bottom: 1px solid var(--ws-bar-border, var(--ws-border));
+    font: 600 16px system-ui, sans-serif;
+  }
+
+  .ws-bar-toggle {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 20px;
+    cursor: pointer;
+  }
+
+  .ws-bar-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.ws-drawer-open .ws-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: var(--ws-bar) 0 0 0;
+    z-index: 1700;
+    background: rgb(0 0 0 / 40%);
+  }
+}
