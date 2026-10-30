@@ -18,7 +18,24 @@ export async function saveTask(dir: string, task: TaskRecord): Promise<void> {
   const path = join(dir, `${task.id}.json`);
   const tmp = `${path}.${process.pid}.tmp`;
   await writeFile(tmp, `${JSON.stringify(task, null, 2)}\n`, "utf8");
-  await rename(tmp, path);
+  await renameRetrying(tmp, path);
+}
+
+/**
+ * Windows는 다른 곳(앱의 작업 목록, 피어 서버)이 대상 파일을 읽는 동안 그 이름으로 바꾸지 못한다 (EPERM·EACCES·EBUSY).
+ * 읽기는 금방 끝나므로 잠깐 기다렸다가 다시 바꾼다.
+ */
+async function renameRetrying(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= 10 || (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+    }
+  }
 }
 
 /** 최근 것부터 */
