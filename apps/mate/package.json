@@ -1,0 +1,44 @@
+{
+  "name": "@pi-desktop/mate",
+  "productName": "Pi Desktop Mate",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "묻기 전에 먼저 살펴보고 제안하는 능동형 코딩 동료 (기능은 @pi-desktop/mate-kit, 실행은 @pi-desktop/mate-runner)",
+  "author": "skax-soulfactor",
+  "homepage": "https://github.com/skax-soulfactor/pi-desktop",
+  "license": "MIT",
+  "main": "out/main/index.js",
+  "scripts": {
+    "predev": "npm run build -w @pi-desktop/mate-runner",
+    "dev": "electron-vite dev",
+    "dev:mock": "node scripts/dev-mock.mjs",
+    "build": "npm run build -w @pi-desktop/mate-runner && electron-vite build",
+    "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder --config electron-builder.yml --publish never",
+    "render-icon": "electron scripts/render-icon.mjs"
+  },
+  "devDependencies": {
+    "@pi-desktop/agent-kit": "*",
+    "@pi-desktop/host-deploy": "*",
+    "@pi-desktop/host-protocol": "*",
+    "@pi-desktop/mate-kit": "*",
+    "@pi-desktop/mate-runner": "*",
+    "@pi-desktop/pi-isolation": "*",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "44.9.1",
+    "electron-vite": "^6.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "vite": "^8.3.4",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}

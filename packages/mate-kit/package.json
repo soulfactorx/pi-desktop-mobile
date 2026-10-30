@@ -1,0 +1,29 @@
+{
+  "name": "@pi-desktop/mate-kit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pi Desktop Mate의 Pi 확장: 권한 단계 강제(mate-guard)와 제안 도구(mate_propose)",
+  "license": "MIT",
+  "keywords": [
+    "pi-package"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./shared": "./src/shared.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/mate-guard/index.ts",
+      "./extensions/mate-propose/index.ts",
+      "./extensions/mate-chat/index.ts"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.3.0"
+  }
+}

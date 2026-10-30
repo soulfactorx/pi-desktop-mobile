@@ -16,6 +16,7 @@
     "test": "npm run build && vitest run"
   },
   "dependencies": {
+    "@pi-desktop/agent-kit": "*",
     "@pi-desktop/host-protocol": "*"
   },
   "devDependencies": {

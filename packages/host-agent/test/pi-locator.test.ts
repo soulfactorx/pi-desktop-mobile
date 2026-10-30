@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ErrorCodes } from "@pi-desktop/host-protocol";
-import { locatePi, PI_PACKAGE_NAME } from "../src/pi-locator";
+import { locatePi, memoizeLookup, PI_PACKAGE_NAME } from "../src/pi-locator";
 
 /** 가짜 Pi 패키지 디렉터리를 만든다. */
 async function fakePi(root: string, version: string): Promise<{ packageDir: string; cliPath: string }> {
@@ -121,5 +121,63 @@ describe("locatePi — 관리형 설치 (공식 설치기)", () => {
     await fakePi(globalRoot, "1.1.0");
     const found = await locatePi({ env: {}, homeDir: home, npmGlobalRoot: async () => join(globalRoot, "node_modules") });
     expect(found.source).toBe("managed");
+  });
+});
+
+describe("memoizeLookup — npm root -g 결과 기억", () => {
+  function counter(values: Array<string | undefined>) {
+    let calls = 0;
+    const query = async () => values[Math.min(calls++, values.length - 1)];
+    return { query, calls: () => calls };
+  }
+
+  it("한 번 찾은 값은 다시 조회하지 않고 바로 돌려준다", async () => {
+    const q = counter(["/npm/a"]);
+    const lookup = memoizeLookup(q.query, 60_000);
+    expect(await lookup.get()).toEqual({ value: "/npm/a", cached: false });
+    expect(await lookup.get()).toEqual({ value: "/npm/a", cached: true });
+    expect(q.calls()).toBe(1);
+  });
+
+  it("동시에 여러 번 물어도 조회는 한 번만 한다", async () => {
+    const q = counter(["/npm/a"]);
+    const lookup = memoizeLookup(q.query, 60_000);
+    const results = await Promise.all([lookup.get(), lookup.get(), lookup.get()]);
+    expect(results.map((r) => r.value)).toEqual(["/npm/a", "/npm/a", "/npm/a"]);
+    expect(q.calls()).toBe(1);
+  });
+
+  it("찾지 못했거나 실패한 결과는 기억하지 않는다", async () => {
+    let calls = 0;
+    const lookup = memoizeLookup(async () => {
+      calls++;
+      if (calls === 1) throw new Error("npm 없음");
+      return calls === 2 ? undefined : "/npm/a";
+    }, 60_000);
+    expect((await lookup.get()).value).toBeUndefined();
+    expect((await lookup.get()).value).toBeUndefined();
+    expect((await lookup.get()).value).toBe("/npm/a");
+    expect(calls).toBe(3);
+  });
+
+  it("오래된 값은 기다리지 않고 쓰면서 뒤에서 새로 조회한다", async () => {
+    let time = 0;
+    const q = counter(["/npm/old", "/npm/new"]);
+    const lookup = memoizeLookup(q.query, 1_000, () => time);
+    await lookup.get();
+    time = 5_000;
+    expect(await lookup.get()).toEqual({ value: "/npm/old", cached: true });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect((await lookup.get()).value).toBe("/npm/new");
+    expect(q.calls()).toBe(2);
+  });
+
+  it("fresh면 기억한 값 대신 새로 조회해 기다린다", async () => {
+    const q = counter(["/npm/old", "/npm/new"]);
+    const lookup = memoizeLookup(q.query, 60_000);
+    await lookup.get();
+    expect(await lookup.get(true)).toEqual({ value: "/npm/new", cached: false });
+    expect((await lookup.get()).value).toBe("/npm/new");
   });
 });

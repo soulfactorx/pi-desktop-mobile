@@ -1,0 +1,29 @@
+{
+  "name": "@pi-desktop/mate-runner",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pi Desktop Mate의 상주 실행기: 임무 시간표를 지키고 실행마다 pi --mode json을 띄운다",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./view-types": "./src/view-types.ts",
+    "./pi-readiness": "./src/pi-readiness-types.ts",
+    "./activity-types": "./src/activity-types.ts"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "npm run build && vitest run"
+  },
+  "dependencies": {
+    "@pi-desktop/agent-kit": "*",
+    "@pi-desktop/host-protocol": "*",
+    "@pi-desktop/mate-kit": "*",
+    "@pi-desktop/pi-isolation": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.3.0"
+  }
+}

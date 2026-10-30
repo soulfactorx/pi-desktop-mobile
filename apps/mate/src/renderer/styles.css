@@ -1,0 +1,643 @@
+/* Pi Desktop과 같은 색 토큰을 쓰되, 앱끼리 파일을 공유하지 않도록 따로 둔다 */
+:root {
+  --bg: #16171d;
+  --panel: #1e2028;
+  --panel-2: #262934;
+  --border: #333746;
+  --text: #e6e7ec;
+  --muted: #9095a6;
+  --accent: #6c8cff;
+  --ok: #3ecf8e;
+  --bad: #f2555a;
+  --warn: #e8b04b;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --panel-2: #f0f1f4;
+    --border: #dcdee5;
+    --text: #1d1f27;
+    --muted: #666b7a;
+    --accent: #3d5ef0;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.55 system-ui, "Segoe UI", "Malgun Gothic", sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+button.danger:hover:not(:disabled) {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+button.small {
+  padding: 3px 10px;
+  font-size: 13px;
+}
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+}
+
+input,
+select,
+textarea {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+textarea {
+  resize: vertical;
+  width: 100%;
+}
+
+.loading {
+  padding: 40px;
+  color: var(--muted);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.brand {
+  font-weight: 600;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+.tabs button {
+  background: none;
+  border-color: transparent;
+}
+.tabs button.active {
+  background: var(--panel-2);
+  border-color: var(--border);
+}
+.badge {
+  margin-left: 6px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+.count {
+  color: var(--muted);
+  font-size: 12px;
+}
+.runner-status {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.chip.ok,
+.chip.status-done {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.chip.bad,
+.chip.status-failed,
+.chip.status-timeout,
+.chip.sev-action {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.chip.warn,
+.chip.sev-warn,
+.chip.status-running {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.chip.sev-info {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.banner {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.banner.bad {
+  color: var(--bad);
+}
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+.content > section {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.segmented {
+  display: flex;
+}
+.segmented button {
+  border-radius: 0;
+}
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.segmented button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.empty {
+  color: var(--muted);
+  padding: 32px 0;
+  text-align: center;
+}
+.empty .row {
+  justify-content: center;
+}
+
+.cards {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.card.disabled {
+  opacity: 0.6;
+}
+.inbox-card.sev-warn {
+  border-left: 3px solid var(--warn);
+}
+.inbox-card.sev-action {
+  border-left: 3px solid var(--bad);
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.card-head .title {
+  font-weight: 600;
+}
+.card-head .right {
+  margin-left: auto;
+}
+.card-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+.muted {
+  color: var(--muted);
+}
+.small-text {
+  font-size: 12px;
+}
+.bad-text {
+  color: var(--bad);
+}
+.path {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.duty-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.markdown p {
+  margin: 4px 0;
+}
+.markdown pre {
+  background: var(--panel-2);
+  padding: 8px;
+  border-radius: 6px;
+  overflow: auto;
+}
+.detail {
+  border-top: 1px dashed var(--border);
+  margin-top: 6px;
+  padding-top: 6px;
+  font-size: 13px;
+}
+
+.run-text {
+  margin-top: 6px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  max-height: 3.2em;
+  overflow: hidden;
+  cursor: pointer;
+}
+.run-text.open {
+  max-height: none;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form h2 {
+  font-size: 16px;
+  margin: 8px 0 0;
+}
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.form label.radio,
+.form label.day {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.form fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.row.end {
+  justify-content: flex-end;
+}
+.grow {
+  flex: 1;
+}
+.kv {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 4px 12px;
+}
+.switch input {
+  margin: 0;
+}
+
+/* 실행 세션 보기 */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 10;
+}
+.session-panel {
+  width: min(760px, 92vw);
+  height: 100%;
+  overflow: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  padding: 14px 18px;
+}
+.transcript {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.transcript pre,
+.transcript .pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+.transcript pre {
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 6px 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+.t-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.t-user {
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+}
+.t-tool summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.t-error summary code {
+  color: var(--bad);
+}
+
+/* Pi 준비 안내 */
+.setup-banner {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.setup-issue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  border-left: 3px solid var(--warn);
+  padding-left: 8px;
+}
+.setup-issue.bad {
+  border-left-color: var(--bad);
+}
+.small-link {
+  color: var(--accent);
+  font-size: 13px;
+}
+code.copy {
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: copy;
+}
+
+/* 활동 관찰 */
+.privacy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.form label.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.form label.inline input {
+  width: 70px;
+}
+.excluded {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.card.activity {
+  padding: 6px 12px;
+}
+
+/* 휴대폰 연결 */
+.phone .steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pairing {
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pairing .code {
+  font: 600 22px/1.2 ui-monospace, Consolas, monospace;
+  letter-spacing: 1px;
+}
+.pairing a,
+.phone .steps a {
+  color: var(--accent);
+}
+
+/* ── 대화 (설계 DESIGN-MATE.md §13) ── */
+.content > section.chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.chat-log {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.chat-empty p {
+  margin: 6px 0;
+}
+.chat-item {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bubble {
+  max-width: 78%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.bubble.user {
+  align-self: flex-end;
+  background: var(--panel-2);
+  white-space: pre-wrap;
+}
+.bubble.mate {
+  align-self: flex-start;
+}
+.bubble.kind-question {
+  border-color: var(--accent);
+}
+.bubble.kind-notice,
+.bubble.kind-result {
+  background: transparent;
+  border-style: dashed;
+}
+.bubble-label {
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.bubble-text p {
+  margin: 4px 0;
+  /* 명령 답처럼 줄바꿈만 있는 글도 줄을 나눠 보인다 */
+  white-space: pre-wrap;
+}
+.bubble-meta {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.chat-divider {
+  align-self: center;
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+  width: 60%;
+  text-align: center;
+}
+.chat-busy {
+  font-size: 13px;
+}
+.chat-input {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.chat-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.chat-row textarea {
+  flex: 1;
+  resize: none;
+  font: inherit;
+  padding: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.chat-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-hints {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  font-size: 13px;
+}
+.chat-answering {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+/* 원격 폴더 고르기 (FolderPicker) */
+.folder-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.folder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  flex: 1;
+}
+.folder-list li {
+  padding: 2px 0;
+}

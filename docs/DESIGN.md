@@ -2,6 +2,7 @@
 
 > 목표: **Pi를 포크하지 않고**, 사용자가 설치한 `pi` 그대로(업데이트 계속 받으며) 위에 GUI를 얹는다.
 > 기준 버전: `@earendil-works/pi-coding-agent` 1.3.0 (2026-10). ※ 구 패키지명 `@mariozechner/pi-coding-agent`는 0.73.1에서 멈춰 있음.
+> 관련 문서: [세 앱의 역할과 데이터 경계](DESIGN-APPS.md), [Pi Desktop Agent 설계](DESIGN-AGENT.md), [Pi Desktop Mate 설계](DESIGN-MATE.md), [개발 방식](CONTRIBUTING.md). 사용법은 [apps/desktop/README.md](../apps/desktop/README.md)
 
 ## 0. 확정된 결정 (v0.2)
 
@@ -128,6 +129,10 @@ Workspace = { id, hostId, cwd, title, pinned, lastSessionFile, layout }
 - 탭 하나 = 렌더러의 `Workspace` 하나. 숨긴 탭도 언마운트하지 않아 호스트 연결·세션 구독·확장 UI 상태를 그대로 유지한다.
 - 탭 목록과 활성 탭, 탭별 호스트·마지막 세션은 렌더러 `localStorage`에 저장한다 (`pi-desktop.tabs`, `pi-desktop.tab.<id>.*`). 첫 탭은 기존 키를 그대로 써서 이전 설정이 이어진다. 탭을 닫으면 그 탭의 키를 지우고, Pi 세션은 데몬에서 계속 돈다.
 - 새 탭은 지금 탭의 호스트로 시작하고 최근 세션을 자동으로 열지 않는다.
+- 단일 인스턴스(v0.70, `single-instance.ts`): 설치본은 `app.requestSingleInstanceLock()`을 잡는다. 못 잡은 두 번째 실행은 창·연결기·업데이트 확인 없이 바로 끝나고, 처음 실행이 `second-instance`를 받아 기존 창을 복원·포커스한다(macOS에서 창을 다 닫았으면 새로 연다).
+  - 잠금은 Electron이 userData 폴더마다 잡는다. 그래서 `--user-data-dir`로 격리한 검증용 설치본은 평소 설치본과 함께 뜬다.
+  - 개발 실행은 잠그지 않는다. 개발 실행의 userData가 설치본과 같은 `Pi Desktop`이라, 잠그면 설치본이 떠 있을 때 개발 실행이 바로 끝나고 여러 worktree의 dev:mock도 함께 못 띄운다.
+  - Mate처럼 개발 실행의 userData를 `(dev)`로 옮기지 않았다. 옮기면 개발 실행이 쓰던 SSH 호스트·가져오기·복사 기록을 잃는다.
 - 숨긴 탭이 실행 중→끝남이 되면 "완료", 확장 다이얼로그·끼어들기·열기 선택이 생기면 "입력 필요"를 탭에 표시하고 OS 알림을 띄운다. 탭을 열면 표시를 지운다.
 - 같은 세션을 두 탭에서 열 수 있다. main 프로세스는 attach 중에도 실시간 이벤트를 모든 탭에 보내고, attach 결과의 재생 이벤트와는 seq로 중복을 거른다.
 
@@ -1242,6 +1247,9 @@ Pi는 세션 파일 잠금을 문서화하지 않았다. 그래서 **같은 세�
 
 ## 7. 폴더 구조 (안)
 
+> 처음에 세운 안이다. 실제로는 `pi-protocol`·`bridge`·`catalog`·`harness`·`templates`를 따로 만들지 않고 `apps/desktop`과 `host-agent` 안에 두었으며,
+> 뒤에 Agent·Mate 앱과 그 패키지가 더해졌다. 지금 구조는 [루트 README의 "구성"](../README.md#구성)을 본다.
+
 ```
 pi-desktop/
 ├ apps/desktop/
@@ -1297,56 +1305,4 @@ pi-desktop/
 
 ## 11. 개발 방식
 
-### 11.1 언어 규칙
-- 소스 주석, 커밋 메시지(제목·본문), PR 설명, 문서는 **모두 한글**로 쓴다.
-- 코드 식별자(변수·함수·타입 이름)와 로그 키는 영어로 쓴다. 사용자에게 보이는 UI 문자열은 i18n 리소스로 분리하고, 기본 언어는 한국어로 한다.
-
-### 11.2 커밋 단위 — 코드 리뷰가 가능한 크기
-- **한 커밋 = 한 가지 관심사.** 리팩터링, 기능 추가, 포맷 변경을 섞지 않는다.
-- 커밋마다 빌드와 테스트가 통과해야 한다. 중간 커밋을 체크아웃해도 동작해야 한다.
-- 크기는 diff 기준 대략 400줄 이하를 목표로 한다. 자동 생성 파일과 lockfile은 별도 커밋으로 분리한다.
-- 새 모듈은 "타입·인터페이스 → 구현 → 테스트 → 연결(wiring)" 순서로 나눠 커밋하면 리뷰하기 쉽다.
-
-### 11.3 커밋 메시지 형식
-[Conventional Commits](https://www.conventionalcommits.org/) 타입 접두어 + 한글 설명:
-
-```
-feat(host-agent): 세션 이벤트 저널과 seq 기반 재연결 추가
-
-- 세션마다 RPC 이벤트에 순번을 붙여 링버퍼와 디스크에 기록
-- attach(sessionId, lastSeq) 호출 시 누락 이벤트를 재생
-- 저널에서 잘린 경우 get_messages 스냅샷으로 복구
-
-관련: docs/DESIGN.md §3.4
-```
-
-| 타입 | 용도 |
-|---|---|
-| `feat` | 기능 추가 |
-| `fix` | 버그 수정 |
-| `refactor` | 동작 변화 없는 구조 변경 |
-| `test` | 테스트만 추가·수정 |
-| `docs` | 문서 |
-| `build` / `ci` | 빌드 설정, CI |
-| `chore` | 그 밖의 잡무 (의존성 갱신 등) |
-
-범위(scope)는 §7의 폴더 이름을 쓴다: `host-agent`, `pi-protocol`, `bridge`, `catalog`, `desktop-main`, `desktop-renderer` 등.
-
-### 11.4 브랜치와 PR
-- `main`은 항상 동작하는 상태를 유지한다. 작업은 `feat/<마일스톤>-<주제>` 브랜치에서 하고 PR로 합친다.
-- PR 하나는 마일스톤 안의 기능 하나 단위로 만든다. 설명에는 변경 요약, 관련 설계 문서 절, 테스트 방법, 스크린샷(UI 변경 시)을 넣는다.
-- 병합은 커밋 이력이 그대로 남도록 rebase merge나 merge commit을 쓴다. squash하면 리뷰 단위로 나눈 커밋이 사라지므로 쓰지 않는다.
-
-### 11.5 main 브랜치 룰셋 ("main 보호")
-GitHub 저장소 룰셋으로 위 규칙을 강제한다.
-
-| 규칙 | 설정 |
-|---|---|
-| 브랜치 삭제 | 금지 |
-| 강제 push | 금지 |
-| 병합 | PR 필수, 허용 방식은 merge commit·rebase (squash 불가), 리뷰 스레드는 모두 해결해야 함 |
-| 필수 승인 수 | 0 (1인 저장소라 본인 PR을 스스로 승인할 수 없기 때문. 협업자가 생기면 1로 올린다) |
-| 필수 상태 검사 | CI 4개 작업: `ubuntu-latest / Node 22·24`, `windows-latest / Node 22·24` |
-| 우회 | 저장소 관리자. 문서 변경을 main에 바로 push하는 용도로만 쓴다 |
-
-CI 작업 이름(`.github/workflows/ci.yml`의 매트릭스)을 바꾸면 룰셋의 필수 상태 검사 이름도 함께 바꿔야 한다. 그렇지 않으면 PR이 영원히 대기 상태가 된다.
+세 앱(Pi Desktop·Agent·Mate)에 함께 적용하도록 [CONTRIBUTING.md](CONTRIBUTING.md)로 옮겼다 (언어 규칙, 커밋 단위·메시지, 브랜치와 PR, main 룰셋, 릴리스 태그).

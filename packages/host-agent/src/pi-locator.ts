@@ -48,16 +48,65 @@ export async function locatePi(options: LocateOptions = {}): Promise<PiLocation>
   const managed = await fromManagedInstall(agentDir, env, home);
   if (managed) return managed;
 
-  const globalRoot = await (options.npmGlobalRoot ?? npmGlobalRoot)();
-  if (globalRoot) {
+  const fromGlobal = async (globalRoot: string | undefined) => {
+    if (!globalRoot) return undefined;
     const packageDir = join(globalRoot, ...PI_PACKAGE_NAME.split("/"));
-    tried.push(packageDir);
-    const found = await fromPackageDir(packageDir, "npm-global");
+    if (!tried.includes(packageDir)) tried.push(packageDir);
+    return fromPackageDir(packageDir, "npm-global");
+  };
+  if (options.npmGlobalRoot) {
+    const found = await fromGlobal(await options.npmGlobalRoot());
+    if (found) return found;
+  } else {
+    const { value: globalRoot, cached } = await cachedNpmGlobalRoot.get();
+    // 기억해 둔 위치에 Pi가 없으면(npm 전역 위치가 바뀌었거나 방금 지웠다) 한 번 새로 묻는다.
+    const found = (await fromGlobal(globalRoot)) ?? (cached ? await fromGlobal((await cachedNpmGlobalRoot.get(true)).value) : undefined);
     if (found) return found;
   }
 
   throw new JsonRpcError(ErrorCodes.PiNotFound, "설치된 Pi를 찾지 못했습니다", { tried });
 }
+
+/** 이 시간이 지난 `npm root -g` 결과는 쓰면서 뒤에서 새로 묻는다 (nvm 등으로 Node를 바꾼 경우를 따라가게) */
+export const NPM_ROOT_REFRESH_MS = 10 * 60_000;
+
+/**
+ * 비싼 위치 조회 결과를 기억한다. 동시에 여러 번 물어도 조회는 한 번만 한다.
+ * - 한 번 찾은 값은 기다리지 않고 바로 돌려준다. refreshMs가 지났으면 뒤에서 새로 조회해 다음부터 쓴다.
+ * - 찾지 못한 결과(undefined)나 실패는 기억하지 않아, 설치 직후 바로 다시 찾을 수 있다.
+ * - fresh: 기억한 값을 쓰지 않고 새로 조회해 기다린다 (기억한 위치가 틀렸을 때).
+ * 돌려주는 cached는 기억해 둔 값인지 (낡았을 수 있다는 뜻)
+ */
+export function memoizeLookup(query: () => Promise<string | undefined>, refreshMs: number, now: () => number = Date.now) {
+  let last: { value: string; at: number } | undefined;
+  let pending: Promise<string | undefined> | undefined;
+  const run = (): Promise<string | undefined> => {
+    if (pending) return pending;
+    const at = now();
+    const next = query()
+      .catch(() => undefined)
+      .then((value) => {
+        if (value !== undefined) last = { value, at };
+        if (pending === next) pending = undefined;
+        return value;
+      });
+    pending = next;
+    return next;
+  };
+  return {
+    async get(fresh = false): Promise<{ value: string | undefined; cached: boolean }> {
+      if (fresh || !last) return { value: await run(), cached: false };
+      if (now() - last.at >= refreshMs) void run();
+      return { value: last.value, cached: true };
+    },
+  };
+}
+
+/**
+ * Windows에서 `npm root -g`는 셸과 npm을 띄우느라 2초 넘게 걸린다. 세션을 열 때마다(신뢰 확인, 세션 열기)
+ * 부르면 그만큼 늦어지므로 데몬 안에서 기억해 둔다.
+ */
+const cachedNpmGlobalRoot = memoizeLookup(npmGlobalRoot, NPM_ROOT_REFRESH_MS);
 
 /** 관리형 설치의 버전 문자열로 허용하는 문자. 설치기의 런처 스크립트와 같은 규칙이다. */
 const MANAGED_VERSION_PATTERN = /^[0-9A-Za-z._+-]+$/;

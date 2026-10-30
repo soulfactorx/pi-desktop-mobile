@@ -3,6 +3,8 @@ import type { ConfiguredPackageInfo, StoredSession } from "@pi-desktop/host-prot
 import type { PendingQueue } from "./chat-state";
 import { ChatView } from "./ChatView";
 import { ChoiceDialog } from "./ChoiceDialog";
+import { SessionBinDialog } from "./SessionBinDialog";
+import { visibleHistory, type BinTab } from "./session-bin";
 import { PiManager, usePiStatus } from "./PiManager";
 import { ResourcesPanel } from "./ResourcesPanel";
 import { MarketplacePanel } from "./MarketplacePanel";
@@ -106,10 +108,13 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
     follow,
     pendingOpen,
     cancelPendingOpen,
+    missingCwdOpen,
+    cancelMissingCwdOpen,
     stopFollow,
     handOffToTui,
     closeSession,
     closeAllSessions,
+    deleteStored,
     restartSession,
     resumeFollowed,
     continueFollowedAsFork,
@@ -118,6 +123,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
     claimWriter,
     trustAsk,
     answerTrust,
+    opening,
     dismissToast,
   } = useSession(tabId);
   const isLocal = host?.kind === "local";
@@ -128,6 +134,12 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
   const [cwd, setCwd] = useState("");
   /** 좁은 화면(휴대폰)에서 세션 목록(사이드바)을 서랍처럼 연다. 넓은 화면은 늘 보인다 (styles.css) */
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // 새 세션 폴더는 지금 보고 있는(따라 보는) 세션의 폴더로 채운다. 세션을 바꾸면 그 세션의 폴더로 바뀐다.
+  // 폴더가 같은 세션 사이를 오가면 그대로 두어, 직접 고쳐 둔 경로를 덮어쓰지 않는다.
+  const activeCwd = session?.cwd ?? follow?.cwd;
+  useEffect(() => {
+    if (activeCwd) setCwd(activeCwd);
+  }, [activeCwd]);
   const [draft, setDraftState] = useState("");
   const [commands, setCommands] = useState<PiCommand[] | undefined>();
   const [busy, setBusy] = useState(false);
@@ -187,6 +199,21 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
   const [palette, setPalette] = useState<{ history: StoredSession[]; query?: string } | undefined>();
   const root = useRef<HTMLDivElement>(null);
   const [handoffAsk, setHandoffAsk] = useState(false);
+  /** 지울지 확인을 묻는 세션 (사이드바 🗑, 폴더가 지워진 세션의 "세션 삭제") */
+  const [deleteAsk, setDeleteAsk] = useState<{ path: string; title: string; running: boolean }>();
+  /** 열려 있는 아카이브·휴지통 화면 */
+  const [binTab, setBinTab] = useState<BinTab>();
+  const confirmDelete = (target: { path: string; title: string; running: boolean }) =>
+    void guard(async () => {
+      setDeleteAsk(undefined);
+      const result = await deleteStored(target.path);
+      setHistoryRefresh((n) => n + 1);
+      setInfo(
+        result.backup
+          ? `"${target.title}" 세션을 휴지통으로 옮겼습니다. 기록 아래 "휴지통"에서 되살릴 수 있습니다.`
+          : `"${target.title}" 세션을 닫았습니다. 아직 저장된 대화가 없어 지울 파일은 없었습니다.`,
+      );
+    });
   const [handoffCommand, setHandoffCommand] = useState<string | undefined>();
 
   const connected = connection.status === "connected";
@@ -356,7 +383,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
 
   // 탭 표시와 백그라운드 알림을 위해 상태를 알린다.
   const statusTitle = ui.title ?? sessionInfo.info.sessionName ?? session?.title ?? follow?.title ?? (session ? baseName(session.cwd) : follow ? baseName(follow.cwd) : "새 탭");
-  const needsInput = ui.dialogs.length > 0 || externalWrite || Boolean(pendingOpen);
+  const needsInput = ui.dialogs.length > 0 || externalWrite || Boolean(pendingOpen) || Boolean(missingCwdOpen);
   const disconnected = connection.status === "disconnected";
   const hostLabel = host?.label ?? hostId;
   useEffect(() => {
@@ -472,7 +499,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
     if (session && !commands) loadCommands();
     if (!connected) return;
     const history = await window.piDesktop.listHistory(hostId, undefined).catch(() => []);
-    setPalette((prev) => (prev ? { ...prev, history: history.slice(0, 15) } : prev));
+    setPalette((prev) => (prev ? { ...prev, history: visibleHistory(history).slice(0, 15) } : prev));
   }
 
   // 팔레트가 닫혀 화면에서 빠진 다음에 포커스를 준다 (같은 순간에 주면 사라지는 입력칸에 밀린다).
@@ -997,13 +1024,20 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
         <button
           type="button"
           className="primary"
-          disabled={!connected || busy || !cwd.trim()}
+          disabled={!connected || busy || Boolean(opening) || !cwd.trim()}
           onClick={() => {
             setDrawerOpen(false);
             void guard(() => openSession(cwd.trim()));
           }}
         >
-          새 세션
+          {opening ? (
+            <>
+              <span className="spinner" aria-hidden="true" />
+              여는 중…
+            </>
+          ) : (
+            "새 세션"
+          )}
         </button>
       </section>
 
@@ -1043,6 +1077,18 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
             void guard(() => openStored(stored));
           }}
           onClose={(target) => void guard(() => closeSession(target))}
+          onDelete={setDeleteAsk}
+          onArchive={(path, title) =>
+            void guard(async () => {
+              await window.piDesktop.setArchived(hostId, path, true);
+              setHistoryRefresh((n) => n + 1);
+              setInfo(`"${title}" 세션을 아카이브했습니다. 기록 아래 "아카이브"에서 되돌릴 수 있습니다.`);
+            })
+          }
+          onOpenBin={(tab) => {
+            setDrawerOpen(false);
+            setBinTab(tab);
+          }}
           {...(piState.status ? { piMissing: !piState.status.pi } : piState.error ? { piMissing: false } : {})}
           onInstallPi={() => {
             setPiManagerTab("status");
@@ -1127,6 +1173,13 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
         </div>
       )}
       {error && <div className="banner error">{error}</div>}
+      {opening && !trustAsk && (
+        // Pi를 띄우는 데 몇 초 걸린다. 눌린 것을 바로 보여 주어 여러 번 누르지 않게 한다.
+        <div className="banner info opening" role="status">
+          <span className="spinner" aria-hidden="true" />
+          <span>{baseName(opening)}에서 세션을 여는 중… Pi를 시작하고 있습니다.</span>
+        </div>
+      )}
       {info && (
         <div className="banner info">
           <span>{info}</span>
@@ -1277,6 +1330,59 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
         >
           이 세션 파일은 {formatRelative(pendingOpen.modified)} 수정되었고, 이 앱이 쓰고 있는 파일이 아닙니다. 터미널의 Pi(TUI)
           등에서 열려 있다면 같은 파일에 함께 쓸 때 기록이 꼬일 수 있습니다.
+        </ChoiceDialog>
+      )}
+      {missingCwdOpen && (
+        <ChoiceDialog
+          title="이 세션의 작업 폴더가 없습니다"
+          onCancel={cancelMissingCwdOpen}
+          choices={[
+            {
+              label: "폴더를 다시 만들고 이어 쓰기",
+              kind: "primary",
+              onSelect: () => void guard(() => openStored(missingCwdOpen, "recreate")),
+            },
+            { label: "홈 폴더에서 분기해 이어 쓰기", onSelect: () => void guard(() => openStored(missingCwdOpen, "fork-home")) },
+            { label: "읽기 전용으로 보기", onSelect: () => void guard(() => openStored(missingCwdOpen, "follow")) },
+            {
+              label: "세션 삭제",
+              kind: "danger",
+              onSelect: () => {
+                setDeleteAsk({ path: missingCwdOpen.path, title: missingCwdOpen.name ?? (missingCwdOpen.firstMessage || "(빈 세션)"), running: false });
+                cancelMissingCwdOpen();
+              },
+            },
+          ]}
+        >
+          <code>{missingCwdOpen.cwd}</code> 폴더가 지워져 Pi가 이 세션을 그대로 열 수 없습니다. WSL을 다시 시작하면 비워지는 /tmp
+          아래에서 만든 세션에서 자주 생깁니다. 대화 기록은 세션 파일에 그대로 있습니다.
+          {"\n"}폴더를 다시 만들면 빈 폴더로 생기므로, 그 안에 있던 파일은 돌아오지 않습니다. 분기하면 원래 파일은 그대로 두고 홈
+          폴더에서 새 세션으로 이어 갑니다.
+        </ChoiceDialog>
+      )}
+      {binTab && (
+        <SessionBinDialog
+          hostId={hostId}
+          initialTab={binTab}
+          onClose={() => setBinTab(undefined)}
+          onChanged={() => setHistoryRefresh((n) => n + 1)}
+          onOpenStored={(stored) => {
+            setBinTab(undefined);
+            void guard(() => openStored(stored));
+          }}
+        />
+      )}
+      {deleteAsk && (
+        <ChoiceDialog
+          title="세션을 삭제할까요?"
+          onCancel={() => setDeleteAsk(undefined)}
+          choices={[{ label: deleteAsk.running ? "닫고 삭제" : "삭제", kind: "danger", onSelect: () => confirmDelete(deleteAsk) }]}
+        >
+          <strong>{deleteAsk.title}</strong>
+          {"\n"}대화 기록 파일을 지웁니다.{deleteAsk.running ? " 실행 중인 Pi를 먼저 닫습니다." : ""} 바로 지우지 않고 이 호스트의
+          휴지통(~/.pi-desktop/session-trash)으로 옮기므로, 기록 아래 "휴지통"에서 되살릴 수 있습니다.
+          {"\n"}
+          <code>{deleteAsk.path}</code>
         </ChoiceDialog>
       )}
       {trustAsk && (

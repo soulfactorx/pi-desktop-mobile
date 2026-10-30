@@ -79,6 +79,18 @@ export const Methods = {
   sessionClaimWriter: "session.claimWriter",
   sessionHistory: "session.history",
   storedInspect: "stored.inspect",
+  /** 저장된 세션 파일을 지운다. 바로 지우지 않고 데몬 홈의 휴지통(session-trash/)으로 옮긴다 */
+  storedDelete: "stored.delete",
+  /** 휴지통의 세션 목록 (예전 삭제가 남긴 session-backups/deleted/도 함께) */
+  trashList: "trash.list",
+  /** 휴지통의 세션을 원래 자리로 되살린다 */
+  trashRestore: "trash.restore",
+  /** 휴지통을 비운다 (고른 것만 또는 전부). 이때 정말 지운다 */
+  trashEmpty: "trash.empty",
+  /** 세션을 아카이브하거나 되돌린다. 파일은 그대로 두고 앱 목록에서만 숨긴다 (archive.json) */
+  archiveSet: "archive.set",
+  /** 에이전트 앱의 데이터 함수(agent-kit app-api)를 이 호스트에서 부른다. 데몬 홈이 Agent 홈이다 (DESIGN-APPS.md §6 D4) */
+  agentCall: "agent.call",
   storedRead: "stored.read",
   storedWatch: "stored.watch",
   storedUnwatch: "stored.unwatch",
@@ -509,6 +521,11 @@ export interface SessionOpenParams {
    * 없으면 Pi가 저장된 결정과 defaultProjectTrust로 정한다. RPC 모드는 묻지 못하므로 "ask"면 건너뛴다
    */
   trust?: "yes" | "no";
+  /**
+   * 작업 폴더가 없으면 만들고 연다 (상위 폴더까지). 세션 파일의 폴더가 지워졌을 때
+   * (예: WSL을 다시 시작해 비워진 /tmp) 같은 파일로 이어 쓰기 위해 쓴다.
+   */
+  createCwd?: boolean;
 }
 
 /**
@@ -664,6 +681,10 @@ export interface StoredSession {
   messageCount: number;
   /** 첫 사용자 메시지 (목록 표시용, 최대 200자) */
   firstMessage: string;
+  /** 작업 폴더(cwd)가 이제 없다. Pi는 이 파일을 그대로 열지 못한다 (폴더를 다시 만들거나 다른 폴더로 분기해야 함) */
+  cwdMissing?: boolean;
+  /** 이 데몬 홈에서 아카이브한 세션 (앱 목록에서 숨기고 아카이브 화면에서 본다) */
+  archived?: boolean;
 }
 
 export interface DaemonStatus {
@@ -924,6 +945,64 @@ export interface StoredInspectResult {
   modified: number;
   /** 이 데몬의 실행 중인 세션이 이 파일을 쓰고 있으면 그 세션 id */
   ownedBy?: string;
+}
+
+/** 세션 파일을 지운 결과. 파일이 아직 없었으면(첫 메시지 전) backup이 없다 */
+export interface StoredDeleteResult {
+  path: string;
+  /** 옮긴 곳 (휴지통 안). 휴지통에서 되살릴 수 있다 */
+  backup?: string;
+  /** 휴지통 항목 id (trash.restore에 넘긴다) */
+  trashId?: string;
+}
+
+/** 휴지통의 세션 하나 */
+export interface TrashItem {
+  /** 휴지통 안 파일 이름. trash.restore·trash.empty에 넘긴다 */
+  id: string;
+  /** 되살릴 자리 */
+  originalPath: string;
+  /** ms */
+  deletedAt: number;
+  sessionId: string;
+  cwd: string;
+  name?: string;
+  /** 첫 사용자 메시지 (최대 200자) */
+  firstMessage: string;
+  size: number;
+  /** 예전 삭제(session-backups/deleted/)가 남긴 것. 원래 자리는 Pi 규칙으로 계산했다 */
+  legacy?: boolean;
+}
+
+export interface TrashRestoreParams {
+  id: string;
+}
+
+export interface TrashRestoreResult {
+  /** 되살린 세션 파일 경로 */
+  path: string;
+}
+
+export interface TrashEmptyParams {
+  /** 지울 항목. 없으면 전부 */
+  ids?: string[];
+}
+
+export interface TrashEmptyResult {
+  removed: number;
+}
+
+export interface AgentCallParams {
+  /** agent-kit app-api의 함수 이름 (예: kbList) */
+  name: string;
+  /** 그 함수의 인자 (JSON) */
+  args?: unknown[];
+}
+
+export interface ArchiveSetParams {
+  /** 세션 파일 경로 */
+  path: string;
+  archived: boolean;
 }
 
 /** 저장된 세션 파일을 읽어 만든 현재 갈래의 대화 (파일은 읽기만 한다) */

@@ -1,0 +1,66 @@
+{
+  "name": "@pi-desktop/agent-kit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pi Desktop Agent의 기능 묶음. Pi 패키지(확장·스킬)라서 터미널 pi에도 설치할 수 있다",
+  "license": "MIT",
+  "keywords": [
+    "pi-package"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
+    "./home": "./src/home.ts",
+    "./app-api": "./src/app-api.ts",
+    "./network-types": "./src/network-types.ts",
+    "./approval": "./src/approval.ts",
+    "./tasks": "./extensions/tasks/store.ts",
+    "./task-types": "./extensions/tasks/types.ts",
+    "./schedules": "./extensions/schedule/store.ts",
+    "./schedule-plan": "./extensions/schedule/plan.ts",
+    "./memory": "./extensions/memory/store.ts",
+    "./memory-types": "./extensions/memory/types.ts",
+    "./memory-recall": "./extensions/memory/recall.ts",
+    "./permissions": "./extensions/permissions/store.ts",
+    "./usage": "./src/usage.ts",
+    "./usage-types": "./src/usage-types.ts",
+    "./elevation": "./extensions/elevation/store.ts",
+    "./peers": "./extensions/peers/store.ts",
+    "./peers-client": "./extensions/peers/client.ts",
+    "./peer-types": "./extensions/peers/types.ts",
+    "./peers-protocol": "./extensions/peers/protocol.ts",
+    "./peer-tasks": "./extensions/peers/tasks.ts",
+    "./card-draft": "./extensions/peers/card-draft.ts",
+    "./skills": "./extensions/skills/store.ts",
+    "./skill-types": "./extensions/skills/types.ts"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/agent-core/index.ts",
+      "./extensions/permissions/index.ts",
+      "./extensions/loop-guard/index.ts",
+      "./extensions/local-model/index.ts",
+      "./extensions/ask-user/index.ts",
+      "./extensions/web/index.ts",
+      "./extensions/memory/index.ts",
+      "./extensions/documents/index.ts",
+      "./extensions/tasks/index.ts",
+      "./extensions/schedule/index.ts",
+      "./extensions/elevation/index.ts",
+      "./extensions/peers/index.ts",
+      "./extensions/skills/index.ts"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pi-desktop/pi-isolation": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.3.0",
+    "@pi-desktop/host-protocol": "*"
+  }
+}

@@ -3,7 +3,10 @@ import {
   Methods,
   type SessionOpenResult,
   type SessionSummary,
+  type StoredDeleteResult,
   type StoredSession,
+  type TrashItem,
+  type TrashRestoreResult,
 } from "@pi-desktop/host-protocol";
 import { isolatedEnv, TestClient } from "./helpers/agent-client";
 import { MOCK_MODEL_ARGS, PI_CLI, setupRealPi, type RealPiFixture } from "./helpers/real-pi";
@@ -92,5 +95,31 @@ describe("세션 기록과 fork (실제 Pi)", () => {
     const child = all.find((s) => s.path === after!.sessionFile);
     expect(child?.parentSessionPath).toBe(original);
     expect(all.some((s) => s.path === original)).toBe(true);
+  });
+
+  it("아카이브는 기록에 표시만 하고, 지우면 휴지통으로 갔다가 되살아난다", async () => {
+    // fork 뒤라 실행 중인 세션은 새 파일을 쓴다. 지울 것은 원래 파일
+    const running = (await client.request<SessionSummary[]>(Methods.sessionList)).find((s) => s.sessionId === session.sessionId)!;
+    const target = (await history()).find((s) => s.path !== running.sessionFile)!;
+    expect(target).toBeDefined();
+    await client.request(Methods.archiveSet, { path: target.path, archived: true });
+    expect((await history()).find((s) => s.path === target.path)?.archived).toBe(true);
+
+    // 실행 중인 세션의 파일은 지우지 않는다
+    await expect(client.request(Methods.storedDelete, { path: running.sessionFile })).rejects.toThrow(/실행 중/);
+
+    const deleted = await client.request<StoredDeleteResult>(Methods.storedDelete, { path: target.path });
+    expect(deleted.trashId).toBeDefined();
+    expect((await history()).some((s) => s.path === target.path)).toBe(false);
+    const trash = await client.request<TrashItem[]>(Methods.trashList);
+    expect(trash.find((t) => t.id === deleted.trashId)).toMatchObject({ originalPath: target.path, firstMessage: "첫 질문" });
+
+    const restored = await client.request<TrashRestoreResult>(Methods.trashRestore, { id: deleted.trashId });
+    expect(restored.path).toBe(target.path);
+    const back = (await history()).find((s) => s.path === target.path);
+    // 지울 때 아카이브에서도 빠졌다
+    expect(back).toBeDefined();
+    expect(back!.archived).toBeUndefined();
+    expect(await client.request<TrashItem[]>(Methods.trashList)).toEqual([]);
   });
 });

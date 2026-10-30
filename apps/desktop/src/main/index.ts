@@ -14,6 +14,7 @@ import { appMenuTemplate } from "./app-menu";
 import { ReplayCollector } from "./replay-collector";
 import { agentVersion } from "./agent-build";
 import { hostEventHandlers, registerHandlers, type Router } from "./ipc-handlers";
+import { revealWindow, usesSingleInstanceLock } from "./single-instance";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
@@ -33,6 +34,11 @@ function agentScriptPath(): string {
 if (process.env.PI_DESKTOP_REMOTE_DEBUG_PORT && !app.isPackaged) {
   app.commandLine.appendSwitch("remote-debugging-port", process.env.PI_DESKTOP_REMOTE_DEBUG_PORT);
 }
+
+// 설치본은 한 번만 뜬다 (single-instance.ts). 잠금을 못 잡은 두 번째 실행은 창·연결기를 만들지 않고 끝나고,
+// 처음 실행이 second-instance를 받아 기존 창을 앞으로 가져온다.
+const isPrimaryInstance = !usesSingleInstanceLock(app.isPackaged) || app.requestSingleInstanceLock();
+if (!isPrimaryInstance) app.quit();
 
 let mainWindow: BrowserWindow | undefined;
 let hosts: HostManager | undefined;
@@ -99,7 +105,13 @@ async function pickDirectory(): Promise<string | undefined> {
   return result.canceled ? undefined : result.filePaths[0];
 }
 
+app.on("second-instance", () => {
+  // macOS는 창을 다 닫아도 앱이 남으므로 창이 없으면 새로 연다 (activate와 같다)
+  if (!revealWindow(mainWindow) && app.isReady()) createWindow();
+});
+
 app.whenReady().then(() => {
+  if (!isPrimaryInstance) return;
   const script = agentScriptPath();
   const sshHosts = new SshHostStore(join(app.getPath("userData"), "ssh-hosts.json"));
   hosts = new HostManager({

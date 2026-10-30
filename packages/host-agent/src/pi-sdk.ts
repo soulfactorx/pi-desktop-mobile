@@ -64,10 +64,29 @@ export async function listStoredSessions(sdk: PiSdk, params: SessionHistoryParam
   const infos = params.cwd
     ? await sdk.SessionManager.list(params.cwd, params.sessionDir)
     : await sdk.SessionManager.listAll(params.sessionDir);
-  return infos
+  const sessions = infos
     .map((info) => toStoredSession(info))
     .sort((a, b) => b.modified - a.modified)
     .slice(0, params.limit ?? DEFAULT_LIMIT);
+  await markMissingCwds(sessions);
+  return sessions;
+}
+
+/**
+ * 작업 폴더가 지워진 세션에 cwdMissing을 붙인다. Pi는 이런 세션을 그대로 열지 못하므로
+ * 화면이 미리 알고 다른 열기 방법을 고르게 한다 (예: WSL을 다시 시작해 비워진 /tmp의 세션).
+ * 같은 폴더의 세션이 많으므로 폴더마다 한 번만 확인한다.
+ */
+async function markMissingCwds(sessions: StoredSession[]): Promise<void> {
+  const cwds = [...new Set(sessions.map((s) => s.cwd).filter(Boolean))];
+  const missing = new Set<string>();
+  await Promise.all(
+    cwds.map(async (cwd) => {
+      const info = await stat(cwd).catch(() => undefined);
+      if (!info?.isDirectory()) missing.add(cwd);
+    }),
+  );
+  for (const session of sessions) if (missing.has(session.cwd)) session.cwdMissing = true;
 }
 
 function toStoredSession(info: PiSessionInfo): StoredSession {

@@ -1,0 +1,83 @@
+# Pi Desktop Mate 설치 파일 만들기 (설계 DESIGN-MATE.md M3).
+# 로컬: npm run dist -w @pi-desktop/mate   (지금 OS용, 올리지 않음)
+# 릴리스: mate-v로 시작하는 태그를 올리면 .github/workflows/mate-release.yml이 세 OS에서 만들어 GitHub Releases에 올린다.
+#   Pi Desktop(v* 태그)의 자동 업데이트와 섞이지 않도록 Mate 릴리스는 "Latest"로 표시하지 않는다.
+appId: dev.pi-desktop.mate
+productName: Pi Desktop Mate
+copyright: Copyright © skax-soulfactor
+
+directories:
+  output: release
+  buildResources: build
+
+# 설치본의 package.json 이름. Electron userData 폴더 이름도 이것을 따른다 (Pi Desktop과 겹치지 않음).
+extraMetadata:
+  name: pi-desktop-mate
+  desktopName: pi-desktop-mate.desktop
+
+files:
+  - out/**
+  - package.json
+
+# 실행기와 Pi 확장은 앱 밖의 node·Pi가 읽는 파일이라 asar에 넣지 않고 리소스로 둔다.
+extraResources:
+  - from: ../../packages/mate-runner/dist/mate-runner.mjs
+    to: mate-runner/mate-runner.mjs
+  - from: ../../packages/mate-kit
+    to: mate-kit
+    filter:
+      - package.json
+      - extensions/**
+      - src/**
+  # pi-isolation: 작업 폴더의 문맥 파일을 Pi와 같은 규칙으로 읽는 확장. mate-kit 옆에 두어야 실행기가 찾는다
+  - from: ../../packages/pi-isolation
+    to: pi-isolation
+    filter:
+      - package.json
+      - extensions/**
+      - src/**
+  # Linux 창 아이콘 (실행 파일에 아이콘이 없어 창에 직접 준다)
+  - from: build/icon.png
+    to: icon.png
+
+npmRebuild: false
+
+# 자동 업데이트(설계 DESIGN-MATE.md §11): latest.yml(Windows)·latest-linux.yml(AppImage)과 blockmap을 만들게 한다.
+# 앱은 릴리스 목록에서 가장 높은 mate-v* 태그를 찾아 그 내려받기 주소를 generic 방식으로 쓴다 (Latest 릴리스를 보지 않음).
+# 이 url은 설치본의 app-update.yml에 들어가는 기본값이고, 실제로는 앱이 확인할 때마다 setFeedURL로 바꾼다.
+publish:
+  provider: generic
+  url: https://github.com/skax-soulfactor/pi-desktop/releases/download/mate-v${version}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: Pi-Desktop-Mate-Setup-${version}.${ext}
+  signAndEditExecutable: true
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  deleteAppDataOnUninstall: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+  artifactName: Pi-Desktop-Mate-${version}-${arch}.${ext}
+  identity: null
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  category: Development
+  maintainer: skax-soulfactor
+  syncDesktopName: true
+  artifactName: Pi-Desktop-Mate-${version}-${arch}.${ext}
