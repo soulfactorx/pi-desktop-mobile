@@ -77,8 +77,12 @@ Electron 앱은 Android에서 돌지 않습니다. 대신 휴대폰의 [Termux](
 | `pi-web stop` / `restart` / `status` / `log` | 끄기·다시 켜기·상태·서버 기록 |
 | `pi-web update` | 최신 릴리스로 업데이트 (토큰·설정은 그대로) |
 | `pi-web uninstall` | 지우기 (데이터 `~/.pi-web/data`는 남깁니다) |
+| `pi-web agent` | **Pi Desktop Agent** 웹 버전을 켜고 엽니다 (포트 8788). 승인·지식베이스·스킬·예약 작업. 기능 화면은 오른쪽 위 ⋮ 메뉴에서 엽니다 |
+| `pi-web mate` | **Pi Desktop Mate** 웹 버전을 켜고 엽니다 (포트 8789). 임무 시간표·인박스·텔레그램. 서버를 꺼도 실행기는 임무를 계속 돌립니다 |
+| `pi-web all` | 세 앱을 모두 켭니다. `stop`·`status`·`url`도 앱 이름 뒤에 씁니다 (예: `pi-web mate stop`, `pi-web all status`) |
 
 - 설치 중 `CANNOT LINK EXECUTABLE "curl": cannot locate symbol …`이 나오면 Termux 패키지가 일부만 업데이트된 것입니다. `pkg upgrade -y` 뒤에 설치 명령을 다시 실행하세요 (v0.1.1부터 설치 스크립트가 먼저 업그레이드합니다).
+- Agent·Mate 웹 버전은 각 앱 화면을 그대로 씁니다 (설계 §5.11). 폴더·파일 고르기는 화면 안의 창으로 휴대폰(Termux) 폴더를 훑고, 파일 첨부는 "휴대폰에서 올리기"로 사진·문서를 올립니다. Pi 로그인·모델은 Pi Desktop(`pi-web`)에서 한 번 하면 함께 씁니다.
 - 서버를 끄거나 브라우저를 닫아도 Pi 작업은 데몬에서 계속 돕니다. 다시 열면 이어서 보여 줍니다. 브라우저가 백그라운드에서 연결을 끊어도 화면으로 돌아오면 다시 붙습니다.
 - 갤럭시가 Termux를 멈추지 않게: 설정 → 애플리케이션 → Termux → 배터리 → **제한 없음**, 개발자 옵션 → **하위 프로세스 제한 사용 중지**(Android 14 이상). `pi-web`은 켤 때 Termux wake lock을 겁니다.
 - 서버는 휴대폰 안(127.0.0.1)에서만 열립니다. 다른 기기(태블릿·PC)에서 휴대폰의 Pi를 쓰려면 `PI_WEB_HOST=0.0.0.0 pi-web restart`로 열 수 있지만, 같은 Wi-Fi의 누구나 접속을 시도할 수 있으니 Tailscale 같은 VPN 안에서만 쓰기를 권합니다.

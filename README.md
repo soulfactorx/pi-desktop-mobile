@@ -66,7 +66,7 @@ Mate ───────── mate-runner → pi --mode json -e mate-kit     
 
 ## Android 휴대폰에서 쓰기 (웹 버전 pi-web)
 
-이 포크(soulfactorx/pi-desktop-mobile)는 Pi Desktop을 휴대폰 브라우저에서 쓰는 웹 버전 **pi-web**을 더합니다. Electron 앱은 Android에서 돌지 않으므로, 휴대폰의 [Termux](https://termux.dev)에서 Pi와 웹 서버를 돌리고 휴대폰 브라우저(Chrome·삼성 인터넷)로 같은 화면을 엽니다. VS Code의 code-server와 같은 방식입니다 (설계 §5.10).
+이 포크(soulfactorx/pi-desktop-mobile)는 세 앱을 휴대폰 브라우저에서 쓰는 웹 버전 **pi-web**을 더합니다 (Pi Desktop은 `pi-web`, Agent는 `pi-web agent`, Mate는 `pi-web mate`). Electron 앱은 Android에서 돌지 않으므로, 휴대폰의 [Termux](https://termux.dev)에서 Pi와 웹 서버를 돌리고 휴대폰 브라우저(Chrome·삼성 인터넷)로 같은 화면을 엽니다. VS Code의 code-server와 같은 방식입니다 (설계 §5.10).
 
 ```bash
 curl -fsSL https://github.com/soulfactorx/pi-desktop-mobile/releases/latest/download/install-termux.sh | bash
