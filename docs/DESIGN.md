@@ -1,4 +1,4 @@
-# Pi Desktop — 설계 문서 (v0.70)
+# Pi Desktop — 설계 문서 (v0.71)
 
 > 목표: **Pi를 포크하지 않고**, 사용자가 설치한 `pi` 그대로(업데이트 계속 받으며) 위에 GUI를 얹는다.
 > 기준 버전: `@earendil-works/pi-coding-agent` 1.3.0 (2026-10). ※ 구 패키지명 `@mariozechner/pi-coding-agent`는 0.73.1에서 멈춰 있음.
@@ -1231,6 +1231,39 @@ Pi는 세션 파일 잠금을 문서화하지 않았다. 그래서 **같은 세�
   - 실제 Android 기기에서의 확인 (Linux에서 360×780 화면, 서버 재시작·재연결, 설치 스크립트를 `--file`로 확인했다)
   - 화면 복사·붙여넣기 외의 파일 올리기, PWA 오프라인(서비스 워커)
   - HTTPS (같은 기기 localhost는 브라우저가 안전한 출처로 본다. 다른 기기에서 쓰려면 Tailscale 등 VPN 뒤에 두기를 권한다)
+
+### 5.11 Agent·Mate 웹 버전 — web-shell로 Electron 앱 감싸기 (v0.71)
+
+**목표**: 원래 저장소에서 더해진 Pi Desktop Agent(apps/agent)와 Pi Desktop Mate(apps/mate)도 휴대폰 브라우저로 쓴다. 두 앱은 원래 저장소가 계속 고치므로, **앱 코드는 한 줄도 고치지 않고** 감싼다. 그래야 원래 저장소를 합칠 때 충돌이 없다(Pi Desktop처럼 처리기를 옮기는 방식(§5.10)은 합칠 때마다 충돌이 난다).
+
+```
+[휴대폰 브라우저]  apps/agent/src/preload + renderer 그대로        [서버 (Termux의 Node)]  apps/agent/src/main 그대로
+  "electron" = web-shell/electron-renderer ──이어지는 WebSocket──▶ "electron" = web-shell/electron-main (IpcHub)
+  (ipcRenderer·contextBridge)                                      (app·ipcMain·BrowserWindow·dialog·shell·Menu·…)
+```
+
+- **묶을 때 바꿔 끼운다** (`packages/web-shell/src/build.ts`): 서버는 esbuild로 앱 main을 한 파일로 묶으면서 `electron`을 대체 모듈로, 웹에서 할 일이 다른 모듈만 웹용 파일로 바꾼다(자동 업데이트 `updater` → `stubs/updater.ts`, Mate의 로그인 항목 `autostart` → `stubs/autostart.ts`). 바꿀 모듈이 없어지면(원래 저장소가 구조를 바꾸면) 묶기가 실패해 CI에서 바로 보인다. 화면은 vite에서 `electron`만 바꾸고 preload와 renderer를 그대로 불러온다.
+- **Electron 대체 모듈** (`electron/main.ts`)
+  - `ipcMain` → `IpcHub`: 브라우저 탭(세션)의 invoke·send를 처리기로 나눠 주고, 오류는 Electron과 같은 접두사로 돌려준다. `webContents.send`는 모든 탭에, `reload`는 탭이 화면을 새로 읽게 한다.
+  - `dialog.showOpenDialog·showSaveDialog·showMessageBox` → 탭에 대화상자를 띄우고 답을 기다린다(요청을 보낸 탭에, 모르면 붙어 있는 탭 모두에 묻고 먼저 답한 것). 열기 창은 서버의 폴더를 훑고, 파일을 고를 때는 "휴대폰에서 올리기"로 휴대폰의 파일을 서버(`<데이터>/uploads`)에 올려 그 경로를 돌려준다.
+  - `Menu.setApplicationMenu` → 탭의 "⋮ 메뉴". 역할(role)만 있는 항목(복사·확대·종료 등)은 뺀다. Agent의 기능 화면은 메뉴바에서 열기 때문에 필요하다.
+  - `shell.openExternal` → 탭이 새 창으로 연다. `openPath`는 "웹에서는 열 수 없다"는 문구를 돌려준다(Electron처럼 throw하지 않는다). `Notification` → 탭의 알림 띠.
+  - `safeStorage`(Mate의 텔레그램 봇 토큰) → OS 키체인 대신 데이터 폴더의 키 파일(0600)로 AES-256-GCM 암호화.
+  - `app.isPackaged`는 true, `process.resourcesPath`는 묶음의 `resources/`. 그래서 앱은 설치본처럼 번들 파일(host-agent·agent-kit·mate-runner·mate-kit·pi-isolation)을 찾는다. `app.getPath("userData")`는 웹 서버의 데이터 폴더.
+- **이어지는 WebSocket** (`protocol.ts`, `server/session.ts`, `client/transport.ts`): Pi Desktop의 웹(§5.10)은 다시 붙으면 화면이 세션에 다시 붙지만, Agent·Mate 화면은 그렇게 만들어져 있지 않다. 그래서 연결 자체가 놓치지 않게 한다.
+  - 양쪽 메시지에 순번(브라우저 n, 서버 s)을 붙이고 받은 쪽이 ack로 알린다. 보낸 쪽은 ack를 받을 때까지 가지고 있다.
+  - 다시 붙을 때 브라우저는 같은 client id와 마지막으로 받은 s를 주고, 서버는 hello로 마지막으로 처리한 n을 알린다. 서로 그 뒤의 것만 다시 보낸다. 기다리던 응답도 다시 온다.
+  - client id는 화면을 읽을 때마다 새로 만든다(새로 읽은 화면이 예전 알림을 받지 않게). 서버는 끊긴 세션을 15분, 64MB까지 가지고 있다. 그보다 오래 끊겼거나 서버를 다시 켰으면 hello가 resumed: false이고 화면을 새로 읽는다.
+- **좁은 화면**: web-shell이 위쪽 띠(☰ 이름 ⋮)와 서랍을 두고, 앱별 `web.css`가 서랍이 될 옆 메뉴와 입력창·목록을 휴대폰 폭에 맞춘다. web.css는 앱 CSS 뒤에 불러 같은 선택자를 덮는다.
+  - Agent: 옆 메뉴(`.nav`)가 서랍. 열렸을 때 transform을 없애야 안의 폴더 메뉴(position: fixed)가 화면 기준으로 뜬다.
+  - Mate: 위쪽 탭 줄을 옆으로 밀어 본다.
+- **Pi 관리**: Agent·Mate는 Pi 설치·로그인을 Pi Desktop에 맡긴다. 웹에서는 "Pi Desktop 열기·설치"가 같은 묶음의 Pi Web(8787) 주소(`~/.pi-web/data/url`)를 새 탭으로 연다.
+- **묶음과 실행**: `pi-web.tar.gz` 안에 `agent/`·`mate/`로 들어간다(apps/desktop/scripts/build-web.mjs가 apps/agent-web·apps/mate-web의 scripts/build.mjs를 부른다. 버전은 Pi Web과 같다).
+  - `pi-web agent`(8788, 데이터 `~/.pi-web/agent`), `pi-web mate`(8789, `~/.pi-web/mate`), `pi-web all`. 명령은 Pi Desktop과 같다(start·stop·status·url·log …).
+  - 앱 홈은 설치본과 같다: Agent `~/.pi-desktop-agent`(데몬 홈), Mate `~/.pi-desktop-mate`(실행기 홈). 서버를 꺼도 Agent의 데몬·예약 세션과 Mate의 실행기(임무 시간표·텔레그램)는 계속 돈다.
+  - 설치 스크립트로 업데이트하면 켜져 있던 서버만 다시 켠다. `pi-web uninstall`은 Mate 실행기도 멈춘다.
+- **확인함** (Linux, 360×780 화면, mock LLM): Agent의 새 대화(웹 폴더 고르기)·채팅·도구·승인 창·⋮ 메뉴의 기능 화면 9개·파일 첨부(휴대폰에서 올리기)·응답 중 연결 끊김 뒤 이어 받기. Mate의 대화·임무 만들기(웹 폴더 고르기)·지금 실행·인박스·실행 기록·탭. 묶음 설치·`pi-web all`·업데이트 중 다시 켜기·지우기.
+- 아직 하지 않은 것: 실제 Android 기기에서의 확인, 텔레그램 실제 연결 확인, Agent 알림(작업 끝남)을 휴대폰 알림으로 보내기(지금은 화면 안의 띠), Mate 실행기를 휴대폰을 켤 때 띄우기(Termux:Boot).
 
 ## 6. 기술 스택
 

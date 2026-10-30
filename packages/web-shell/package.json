@@ -1,0 +1,25 @@
+{
+  "name": "@pi-desktop/web-shell",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Electron 앱(Agent·Mate)을 고치지 않고 브라우저로 쓰게 하는 웹 껍데기: Electron 대체 모듈, 이어지는 WebSocket, 웹 서버",
+  "exports": {
+    "./electron-main": "./src/electron/main.ts",
+    "./electron-renderer": "./src/client/electron-renderer.ts",
+    "./server": "./src/server/web-server.ts",
+    "./client": "./src/client/boot.ts",
+    "./build": "./src/build.ts",
+    "./client.css": "./src/client/shell.css",
+    "./stubs/updater": "./src/stubs/updater.ts",
+    "./stubs/autostart": "./src/stubs/autostart.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2",
+    "ws": "^8.22.0"
+  }
+}

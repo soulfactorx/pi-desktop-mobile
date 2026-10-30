@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pi Web 설치 스크립트 — Android Termux에 Pi와 웹 서버를 한 번에 설치하고 켠다 (설계 §5.10).
+# Pi Web 설치 스크립트 — Android Termux에 Pi와 웹 서버를 한 번에 설치하고 켠다 (설계 §5.10, §5.11).
+# 묶음에는 Pi Desktop(pi-web)과 Agent(pi-web agent)·Mate(pi-web mate) 웹 버전이 함께 들어 있다.
 #
 #   curl -fsSL https://github.com/__PI_WEB_REPO__/releases/latest/download/install-termux.sh | bash
 #
@@ -93,15 +94,27 @@ fi
 tar -xzf "$work/pi-web.tar.gz" -C "$work"
 [ -f "$work/pi-web/server.mjs" ] || fail "묶음 안에 server.mjs가 없습니다"
 
-# 4. 바꿔 넣기: 켜져 있으면 끄고, 전에 빌드한 node-pty(node_modules)는 옮겨 온다
+# 4. 바꿔 넣기: 켜져 있는 서버(Pi Desktop·Agent·Mate)는 끄고 설치 뒤 다시 켠다. 전에 빌드한 node-pty(node_modules)는 옮겨 온다
 step "설치 ($PI_WEB_HOME/app)"
 mkdir -p "$PI_WEB_HOME"
-was_running=0
-pid_file="${PI_WEB_DATA:-$PI_WEB_HOME/data}/server.pid"
-if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
-  was_running=1
-  sh "$PI_WEB_HOME/app/bin/pi-web" stop || true
-fi
+was_running=""
+for app in desktop agent mate; do
+  case "$app" in
+    desktop) pid_file="$PI_WEB_HOME/data/server.pid" ;;
+    *) pid_file="$PI_WEB_HOME/$app/server.pid" ;;
+  esac
+  if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+    was_running="$was_running $app"
+    if [ "$app" = desktop ]; then
+      # 예전 실행 명령(v0.1.12까지)은 앱 이름을 모른다. Pi Desktop은 이름 없이 끈다
+      PI_WEB_HOME="$PI_WEB_HOME" sh "$PI_WEB_HOME/app/bin/pi-web" stop || true
+    elif [ -f "$PI_WEB_HOME/app/bin/pi-web" ]; then
+      PI_WEB_HOME="$PI_WEB_HOME" sh "$PI_WEB_HOME/app/bin/pi-web" "$app" stop || true
+    else
+      kill "$(cat "$pid_file")" 2>/dev/null || true
+    fi
+  fi
+done
 if [ -d "$PI_WEB_HOME/app/node_modules" ]; then mv "$PI_WEB_HOME/app/node_modules" "$work/pi-web/node_modules"; fi
 rm -rf "$PI_WEB_HOME/app.old"
 if [ -d "$PI_WEB_HOME/app" ]; then mv "$PI_WEB_HOME/app" "$PI_WEB_HOME/app.old"; fi
@@ -138,8 +151,11 @@ case ":$PATH:" in *":$bin_dir:"*) ;; *) warn "$bin_dir가 PATH에 없습니다. 
 
 step "완료: Pi Web $(sh "$PI_WEB_HOME/app/bin/pi-web" version)"
 cat <<'EOF'
-  pi-web          서버를 켜고 브라우저를 엽니다 (주소는 pi-web url)
-  pi-web stop     서버를 끕니다 (Pi 세션은 계속 돕니다)
+  pi-web          Pi Desktop을 켜고 브라우저를 엽니다 (주소는 pi-web url)
+  pi-web agent    Pi Desktop Agent를 켭니다 (승인·지식베이스·스킬·예약 작업)
+  pi-web mate     Pi Desktop Mate를 켭니다 (임무 시간표·인박스·텔레그램)
+  pi-web all      세 앱을 모두 켭니다
+  pi-web stop     서버를 끕니다 (Pi 세션은 계속 돕니다. agent·mate·all도 같다: pi-web mate stop)
   pi-web update   최신 버전으로 업데이트합니다
 
 휴대폰이 Termux를 멈추지 않게 하려면 (갤럭시 기준):
@@ -149,6 +165,16 @@ cat <<'EOF'
 LLM 로그인: 화면의 "프로바이더"에서 API 키를 넣습니다. OAuth 로그인(/login)은 --terminal로 설치하면 내장 터미널에서 됩니다.
 EOF
 
-if [ "$START" = 1 ] || [ "$was_running" = 1 ]; then
+if [ -n "$was_running" ]; then
+  # 업데이트: 켜져 있던 것만 다시 켠다 (브라우저는 Pi Desktop이 켜져 있었으면 그것만 연다)
+  for app in $was_running; do
+    # 하나를 켜지 못해도 나머지는 켠다
+    if [ "$app" = desktop ]; then
+      sh "$PI_WEB_HOME/app/bin/pi-web" desktop start || warn "Pi Web을 다시 켜지 못했습니다 (pi-web log)"
+    else
+      PI_WEB_NO_OPEN=1 sh "$PI_WEB_HOME/app/bin/pi-web" "$app" start || warn "pi-web $app을 다시 켜지 못했습니다 (pi-web $app log)"
+    fi
+  done
+elif [ "$START" = 1 ]; then
   sh "$PI_WEB_HOME/app/bin/pi-web" start
 fi

@@ -1,0 +1,118 @@
+/*
+ * Mate 웹 화면 (설계 DESIGN.md §5.11). Mate의 화면 CSS(apps/mate/src/renderer/styles.css)는 그대로 두고 여기서 덮는다.
+ * - 웹 껍데기의 색을 Mate 색 변수에 맞춘다
+ * - 좁은 화면(휴대폰): 위쪽 탭은 옆으로 밀어 보고, 카드·입력창·폼을 세로로 쌓는다
+ */
+:root {
+  --ws-bg: var(--bg);
+  --ws-panel: var(--panel-2);
+  --ws-border: var(--border);
+  --ws-text: var(--text);
+  --ws-muted: var(--muted);
+  --ws-accent: var(--accent);
+}
+
+@media (max-width: 720px) {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  .app {
+    height: 100dvh;
+  }
+
+  /* 머리줄: 이름 · 실행기 상태를 한 줄에, 탭은 그 아래 한 줄로 옆으로 밀어 본다 */
+  .top {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: calc(6px + env(safe-area-inset-top)) 10px 0;
+  }
+
+  .brand {
+    font-size: 15px;
+  }
+
+  .runner-status {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .tabs {
+    order: 3;
+    flex: 1 0 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 6px;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs button {
+    flex-shrink: 0;
+    white-space: nowrap;
+    min-height: 38px;
+  }
+
+  .content {
+    padding: 10px;
+  }
+
+  .section-head {
+    flex-wrap: wrap;
+  }
+
+  .card-head,
+  .card-actions {
+    flex-wrap: wrap;
+  }
+
+  .kv {
+    grid-template-columns: 1fr;
+  }
+
+  .kv > :nth-child(odd) {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  /* 대화 입력: 글 칸을 넓게, 단추는 아래 한 줄 */
+  .chat-row {
+    flex-direction: column;
+  }
+
+  .chat-buttons {
+    flex-direction: row;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .chat-buttons button {
+    min-height: 40px;
+  }
+
+  .chat-input {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* 16px보다 작으면 입력할 때 화면이 확대된다 */
+    max-width: 100%;
+  }
+
+  .session-panel {
+    width: 100vw;
+    padding: 12px;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+}

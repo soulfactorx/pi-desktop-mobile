@@ -1,0 +1,15 @@
+{
+  "name": "@pi-desktop/mate-web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pi Desktop Mate를 휴대폰 브라우저로 쓰는 웹 버전 (apps/mate를 고치지 않고 web-shell로 감싼다)",
+  "scripts": {
+    "build:web": "npm run build -w @pi-desktop/mate-runner && node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@pi-desktop/mate": "*",
+    "@pi-desktop/web-shell": "*"
+  }
+}
