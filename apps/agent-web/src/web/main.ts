@@ -1,5 +1,4 @@
 import { bootWebApp } from "@pi-desktop/web-shell/client";
-import "./web.css";
 
 /**
  * Pi Desktop Agent 웹 화면의 시작점 (설계 DESIGN.md §5.11).
@@ -12,5 +11,7 @@ bootWebApp({
   loadApp: async () => {
     await import("../../../agent/src/preload/index");
     await import("../../../agent/src/renderer/main");
+    // 앱 화면 CSS 뒤에 두어야 같은 선택자를 덮는다
+    await import("./web.css");
   },
 });
