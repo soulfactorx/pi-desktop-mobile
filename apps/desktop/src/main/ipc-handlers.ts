@@ -44,6 +44,10 @@ import {
   type SessionOpenParams,
   type SessionOpenResult,
   type SessionSummary,
+  type StoredDeleteResult,
+  type TrashEmptyResult,
+  type TrashItem,
+  type TrashRestoreResult,
   type StoredInspectResult,
   type StoredReadResult,
   type StoredSession,
@@ -203,6 +207,19 @@ export function registerHandlers(router: Router, deps: HandlerDeps): void {
   handle(IpcChannels.inspectStored, (_event, hostId: string, path: string) =>
     conn(hostId).request<StoredInspectResult>(Methods.storedInspect, { path }),
   );
+  handle(IpcChannels.deleteStored, (_event, hostId: string, path: string) =>
+    conn(hostId).request<StoredDeleteResult>(Methods.storedDelete, { path }),
+  );
+  handle(IpcChannels.listTrash, (_event, hostId: string) => conn(hostId).request<TrashItem[]>(Methods.trashList));
+  handle(IpcChannels.restoreTrash, async (_event, hostId: string, id: string) =>
+    (await conn(hostId).request<TrashRestoreResult>(Methods.trashRestore, { id })).path,
+  );
+  handle(IpcChannels.emptyTrash, async (_event, hostId: string, ids?: string[]) =>
+    (await conn(hostId).request<TrashEmptyResult>(Methods.trashEmpty, ids ? { ids } : {})).removed,
+  );
+  handle(IpcChannels.setArchived, async (_event, hostId: string, path: string, archived: boolean) => {
+    await conn(hostId).request(Methods.archiveSet, { path, archived: archived === true });
+  });
   handle(IpcChannels.readStored, (_event, hostId: string, path: string) =>
     conn(hostId).request<StoredReadResult>(Methods.storedRead, storedParams(hostId, path)),
   );
@@ -246,6 +263,7 @@ export function registerHandlers(router: Router, deps: HandlerDeps): void {
     if (request.sessionFile) params.sessionFile = request.sessionFile;
     if (request.forkFrom) params.forkFrom = request.forkFrom;
     if (request.trust) params.trust = request.trust;
+    if (request.createCwd) params.createCwd = true;
     const result = await conn(hostId).request<SessionOpenResult>(Methods.sessionOpen, params);
     return result.session;
   });

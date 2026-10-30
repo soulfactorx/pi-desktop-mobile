@@ -1,0 +1,1030 @@
+/* 화면 틀: 왼쪽 메뉴 + 오른쪽 화면, 그리고 각 화면(대화·작업·기억·승인·설정)의 공통 모양 */
+.agent-shell {
+  display: flex;
+  height: 100vh;
+}
+
+.nav {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  overflow-y: auto;
+}
+
+.nav-brand {
+  font-weight: 700;
+  padding: 4px 8px 12px;
+}
+
+.nav-session {
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.nav-session:hover {
+  background: var(--panel-2);
+}
+
+.nav-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nav-sessions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-sessions li {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.nav-sessions li.active {
+  background: var(--panel-2);
+}
+
+.nav-session {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.nav-session-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-session > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 8px;
+}
+
+.nav-foot {
+  margin-top: auto;
+  padding: 12px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.page-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.page-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-body h3 {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+.chat-folder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
+}
+
+.model-select {
+  max-width: 280px;
+}
+
+/* 빈 대화: 할 수 있는 일 */
+.welcome {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.welcome h2 {
+  margin: 0;
+}
+
+.examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: inherit;
+  cursor: pointer;
+}
+
+.example:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.example span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 공통 */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small-text {
+  font-size: 12px;
+}
+
+button.small {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.mono {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
+  color: var(--bad);
+  white-space: pre-wrap;
+}
+
+.error-banner span {
+  flex: 1;
+}
+
+/* Host Agent 업데이트 대기 */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+
+.update-banner span {
+  flex: 1;
+}
+
+/* 대화를 여는 중 표시 */
+.opening-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+
+button .spinner {
+  margin-right: 6px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pi 준비 안내 */
+.setup-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  align-items: flex-start;
+}
+
+.setup-issue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-issue.error strong {
+  color: var(--bad);
+}
+
+code.copy {
+  cursor: pointer;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* 목록 화면 (기억·승인) */
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.form-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.list.compact li {
+  padding: 4px 8px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.tag.user,
+.tag.allow {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.tag.lesson {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.tag.deny {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.card h3 {
+  margin: 0;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+/* 대화 머리: 이름(✎로 바꾸기)과 폴더 */
+.chat-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 55%;
+}
+
+.chat-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-folder {
+  max-width: 100%;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rename-input {
+  min-width: 240px;
+}
+
+/* 대화가 아닌 화면 위의 돌아가기 띠 */
+.back-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 폴더 메뉴 (새 대화·폴더 옮기기) */
+.folder-menu {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.folder-menu-list {
+  /* 자리는 FolderMenu가 버튼 위치로 계산한다 (넘침을 자르는 사이드바 밖으로 나가도 보이게) */
+  position: fixed;
+  z-index: 50;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+}
+
+.folder-menu-heading {
+  padding: 4px 8px 6px;
+}
+
+.folder-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.folder-menu-item:hover {
+  background: var(--panel-2);
+}
+
+.folder-menu-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 대화 머리의 폴더: 글자처럼 보이는 버튼 */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.link-button:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+/* 사이드바: 폴더 묶음 */
+.nav-group > ul {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-group-head {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-group > ul > li {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.nav-group > ul > li.active {
+  background: var(--panel-2);
+}
+
+/* 묶음 자체는 세로로 쌓는다 (.nav-sessions li의 가로 배치를 덮어씀) */
+.nav-sessions > li.nav-group {
+  display: block;
+}
+
+/* 체크박스 한 줄 (기억 화면의 자동 기억 등) */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.tag.auto {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+}
+
+/* 사용량: 기간 버튼, 숫자 칸, 막대 차트(한 계열이라 범례 없음, 표가 같은 내용), 표 */
+.usage-ranges {
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.usage-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.usage-tile {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.usage-tile strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.3em;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-chart {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 160px;
+  padding: 8px 0 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.usage-bar-area {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+}
+
+.usage-col:hover .usage-bar-area {
+  background: var(--panel-2);
+}
+
+.usage-bar {
+  width: 100%;
+  max-width: 28px;
+  margin: 0 auto;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+}
+
+.usage-x {
+  height: 18px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.usage-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-table th:first-child,
+.usage-table td:first-child {
+  text-align: left;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 지난 대화 */
+.nav-history {
+  display: flex;
+  gap: 10px;
+  margin: 6px 4px 0;
+}
+
+/* 열린 대화의 아카이브·삭제는 그 줄에 올리거나 고른 대화에서만 보인다 */
+.nav-sessions li .nav-act {
+  visibility: hidden;
+  padding: 2px 4px;
+}
+
+.nav-sessions li:hover .nav-act,
+.nav-sessions li.active .nav-act {
+  visibility: visible;
+}
+
+.nav-close:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.history-list li {
+  padding: 0;
+}
+
+/* 지난 대화 줄: 내용 + 오른쪽 버튼 (아카이브·삭제·되살리기) */
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-row .history-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-item.static {
+  cursor: default;
+}
+
+.history-item.static:hover {
+  background: none;
+}
+
+.history-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  padding-right: 6px;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: var(--panel-2);
+}
+
+.history-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.history-title strong,
+.history-snippet {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 보낼 이미지 미리 보기 */
+.attach-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+
+.attach-chip {
+  position: relative;
+  display: inline-flex;
+}
+
+.attach-chip img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.attach-chip .icon-button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  line-height: 1;
+}
+
+/* 웹 검색·MCP */
+.mcp-preset,
+.list li:has(.mcp-toggle) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-key {
+  width: 220px;
+}
+
+.mcp-toggle {
+  margin: 0;
+}
+
+.mcp-target {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 520px;
+}
+
+.mcp-output {
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.notice-line {
+  padding: 6px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
+.error-text {
+  color: var(--danger, #d33);
+}
+
+/* 네트워크 */
+.network-skills {
+  width: 100%;
+  min-height: 80px;
+  margin: 6px 0;
+  font: inherit;
+}
+
+.network-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px;
+  margin: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.network-limit {
+  width: 56px;
+}
+
+.network-question {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list li:has(.network-question),
+.list li:has(.network-limit) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.network-instruction {
+  margin: 4px 0;
+  padding: 6px 8px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  font: inherit;
+}
+
+.list li.network-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* 지식베이스 */
+.kb-tabs {
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+
+.kb-filters select {
+  max-width: 160px;
+}
+
+.kb-bulk {
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.kb-tag-input {
+  width: 120px;
+}
+
+.kb-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 1100px) {
+  .kb-layout:has(.kb-editor) {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+  }
+}
+
+.list li.kb-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.kb-item.active {
+  border-color: var(--accent);
+}
+
+.kb-item.archived {
+  opacity: 0.6;
+}
+
+.kb-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.kb-row-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.kb-title,
+.kb-row-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.kb-editor {
+  align-self: start;
+}
+
+.kb-content {
+  width: 100%;
+  min-height: 200px;
+  margin: 6px 0;
+  font: inherit;
+}
+
+.list li.kb-review {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kb-preview {
+  max-height: 360px;
+  overflow: auto;
+  padding: 8px;
+  white-space: pre-wrap;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-size: 12px;
+}
+
+.kb-tag-link {
+  margin-right: 6px;
+}
+
+.tag.requirement {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+button.danger {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+/* 스킬 */
+.list li.skill-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-item.active {
+  border-color: var(--accent);
+}

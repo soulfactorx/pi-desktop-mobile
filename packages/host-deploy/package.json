@@ -1,0 +1,16 @@
+{
+  "name": "@pi-desktop/host-deploy",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Agent·Mate가 WSL·SSH 호스트에 번들과 kit을 올리고 그 호스트에서 실행할 명령을 만드는 공용 코드",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

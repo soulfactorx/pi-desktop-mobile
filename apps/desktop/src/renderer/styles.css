@@ -1178,7 +1178,7 @@ button.small {
 .rename-button {
   position: absolute;
   top: 4px;
-  right: 26px;
+  right: 48px;
   padding: 0 6px;
   border: 0;
   background: transparent;
@@ -1189,7 +1189,11 @@ button.small {
 .session-row:hover .rename-button,
 .rename-button:focus-visible,
 .session-row:hover .close-session-button,
-.close-session-button:focus-visible {
+.close-session-button:focus-visible,
+.session-row:hover .delete-session-button,
+.delete-session-button:focus-visible,
+.session-row:hover .archive-session-button,
+.archive-session-button:focus-visible {
   opacity: 1;
 }
 
@@ -1207,6 +1211,107 @@ button.small {
 
 .close-session-button:hover:not(:disabled) {
   color: var(--danger, #c0392b);
+}
+
+/* 세션 삭제 🗑: 실행 중 줄은 ✕ 왼쪽, 기록 줄은 오른쪽 끝 */
+.delete-session-button {
+  position: absolute;
+  top: 4px;
+  right: 26px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0;
+}
+
+.history-row .delete-session-button {
+  right: 4px;
+}
+
+.delete-session-button:hover:not(:disabled) {
+  color: var(--danger, #c0392b);
+}
+
+/* 기록 줄의 아카이브 📦: 🗑 왼쪽 */
+.archive-session-button {
+  position: absolute;
+  top: 4px;
+  right: 26px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0;
+}
+
+/* 기록 아래 아카이브·휴지통 링크 */
+.sidebar-bin-links {
+  display: flex;
+  gap: 12px;
+  padding: 8px 4px 4px;
+  font-size: 12px;
+}
+
+.sidebar-bin-links .link-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.sidebar-bin-links .link-button:hover:not(:disabled) {
+  color: inherit;
+}
+
+/* 아카이브·휴지통 대화상자 */
+.modal.session-bin {
+  width: min(640px, 92vw);
+}
+
+.session-bin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-bin-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 8px 0;
+}
+
+.session-bin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.session-bin-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.session-bin-text .session-name,
+.session-bin-text .session-meta-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-bin-notice {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  word-break: break-all;
 }
 
 .session-item.editing {
@@ -1249,6 +1354,11 @@ button.small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 작업 폴더가 지워진 기록 */
+.session-missing {
+  color: var(--warn);
 }
 
 .session-meta-line {
@@ -1403,6 +1513,32 @@ button.toggled {
 .banner.info span {
   flex: 1;
   word-break: break-all;
+}
+
+/* 세션을 여는 중 표시 */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+
+.banner.info .spinner {
+  flex: none;
+}
+
+button .spinner {
+  margin-right: 6px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 검색할 수 있는 모델 선택기 */

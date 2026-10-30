@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Pi Desktop Mate 아이콘 원본. scripts/render-icon.mjs가 이것으로 build/icon.png(1024)를 만든다.
+       Pi Desktop의 π에 청록 바탕과 "먼저 알려 주는" 알림 점을 더해 구분한다. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f2b33"/>
+      <stop offset="0.55" stop-color="#0f4a4f"/>
+      <stop offset="1" stop-color="#138a72"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.22" r="0.75">
+      <stop offset="0" stop-color="#5fffd2" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#5fffd2" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pi" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d4fff2"/>
+    </linearGradient>
+    <radialGradient id="dot" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="1" stop-color="#ff9f2e"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#04161a" flood-opacity="0.55"/>
+    </filter>
+    <filter id="neon" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="16" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- 바탕: 둥근 사각형 -->
+  <rect x="48" y="48" width="928" height="928" rx="212" fill="url(#bg)"/>
+  <rect x="48" y="48" width="928" height="928" rx="212" fill="url(#glow)"/>
+  <rect x="49.5" y="49.5" width="925" height="925" rx="210.5" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="3"/>
+
+  <!-- π (Pi Desktop과 같은 획) -->
+  <g filter="url(#soft)" fill="none" stroke="url(#pi)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 262 382 C 330 348, 420 340, 520 342 C 610 343, 690 348, 772 338" stroke-width="92"/>
+    <path d="M 418 360 C 414 500, 392 630, 330 754" stroke-width="88"/>
+    <path d="M 628 360 C 622 500, 620 630, 650 718 C 664 758, 700 772, 742 758" stroke-width="88"/>
+  </g>
+
+  <!-- 알림 점: 묻기 전에 먼저 알려 준다 -->
+  <g filter="url(#neon)">
+    <circle cx="812" cy="200" r="70" fill="url(#dot)"/>
+  </g>
+</svg>

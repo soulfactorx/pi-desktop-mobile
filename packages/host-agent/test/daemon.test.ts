@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -115,6 +116,15 @@ describe("Host Agent 데몬 (가짜 Pi)", () => {
       code: -32602,
       message: expect.stringContaining("no-such-dir-for-test"),
     });
+  });
+
+  it("createCwd를 주면 지워진 작업 폴더를 상위 폴더까지 만들고 연다", async () => {
+    const env = await isolatedEnv({ PI_DESKTOP_PI_CLI: FAKE_PI });
+    const client = connect(env);
+    const missing = join(env.PI_DESKTOP_HOME!, "gone", "project");
+    const { session } = await client.request<SessionOpenResult>(Methods.sessionOpen, { cwd: missing, createCwd: true });
+    expect(session.cwd).toBe(missing);
+    expect(statSync(missing).isDirectory()).toBe(true);
   });
 
   it("없는 세션에 명령하면 SessionNotFound", async () => {

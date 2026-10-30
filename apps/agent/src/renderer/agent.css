@@ -1,0 +1,144 @@
+/* 에이전트 앱 전용 스타일. 공통 모양은 Pi Desktop의 styles.css를 쓴다 */
+#root {
+  height: 100vh;
+}
+
+/* 승인 요청 (ApprovalDialog) */
+.approval-risk {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.approval-risk.exec {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
+}
+
+.approval-risk.write {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+}
+
+.approval-target {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 범위를 넓히는 허용: 한 줄에 하나씩, 설명과 패턴을 나눠 보인다 */
+.approval-wider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.approval-scope {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.approval-scope span {
+  flex: none;
+}
+
+.approval-scope code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+/* 거부·이번만 허용: 같은 너비로 오른쪽 아래 */
+.approval-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.approval-actions button {
+  min-width: 112px;
+}
+
+/* 작업·예약 (TasksPanel) */
+.tasks-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tasks-panel h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tasks-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tasks-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tasks-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tasks-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.tasks-origin,
+.tasks-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tasks-result {
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  white-space: pre-wrap;
+  font-size: 12px;
+}
