@@ -9,6 +9,8 @@
 //   host-agent/             Host Agent 번들과 package.json (데스크톱 앱의 extraResources와 같다)
 //   bin/pi-web              실행 명령 (scripts/web/pi-web.sh)
 //   package.json            버전
+//   agent/                  Pi Desktop Agent 웹 버전 (apps/agent-web, 설계 §5.11)
+//   mate/                   Pi Desktop Mate 웹 버전 (apps/mate-web)
 //
 // 설치 스크립트는 릴리스가 올라가는 저장소에서 묶음을 받는다. 저장소는 GITHUB_REPOSITORY(Actions),
 // 없으면 git origin 주소에서 읽는다.
@@ -54,6 +56,13 @@ mkdirSync(join(out, "bin"), { recursive: true });
 copyFileSync(join(app, "scripts", "web", "pi-web.sh"), join(out, "bin", "pi-web"));
 chmodSync(join(out, "bin", "pi-web"), 0o755);
 writeFileSync(join(out, "package.json"), `${JSON.stringify({ name: "pi-web", version, private: true, type: "module" }, null, 2)}\n`);
+
+// Agent·Mate 웹 버전: 각 앱의 묶기 스크립트로 만들어 agent/·mate/로 넣는다. 버전은 Pi Web과 같게 한다
+for (const name of ["agent", "mate"]) {
+  const dir = at(`../../${name}-web`);
+  execFileSync(process.execPath, [join(dir, "scripts", "build.mjs")], { stdio: "inherit", env: { ...process.env, PI_WEB_VERSION: version } });
+  cpSync(join(dir, "out", "web"), join(out, name), { recursive: true });
+}
 
 console.log(`[build-web] ${out} (버전 ${version})`);
 
