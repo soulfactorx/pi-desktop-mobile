@@ -5,7 +5,7 @@ import type { ChatImage, ChatLine, InboxView, Overview } from "../shared/api";
 import type { Act } from "./App";
 import { InboxCard } from "./InboxPanel";
 import { relativeTime } from "./mate-view";
-import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useSharedImages } from "./clipboard-images";
+import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 
 /** 한 번에 보낼 수 있는 이미지 (실행기와 같은 한도) */
@@ -39,6 +39,8 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
   const [answerTo, setAnswerTo] = useState<ChatLine>();
   const [sending, setSending] = useState(false);
   const [images, setImages] = useState<ChatImage[]>([]);
+  // 붙여 둔 이미지를 보관해, 화면이 새로 열려도(휴대폰 공유 등) 남긴다
+  useDraftImages("mate", images, setImages);
   const [imageNote, setImageNote] = useState<string>();
   const bottom = useRef<HTMLDivElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);

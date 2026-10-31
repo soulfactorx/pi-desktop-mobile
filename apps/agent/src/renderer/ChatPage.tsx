@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } 
 import { ChatView } from "../vendor/renderer/ChatView";
 import { StatusLine, Widgets } from "../vendor/renderer/ExtensionUi";
 import { acceptsImages, MAX_IMAGE_BYTES, splitAttachments, withAttachments } from "./attachments";
-import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useSharedImages } from "./clipboard-images";
+import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import type { ImageAttachment } from "../shared/api";
 import { EXAMPLES } from "./examples";
@@ -55,6 +55,8 @@ export function ChatPage({
   const [renaming, setRenaming] = useState<string>();
   /** 메시지와 함께 보낼 이미지 (보내면 비운다) */
   const [images, setImages] = useState<Array<Required<Pick<ImageAttachment, "name" | "mimeType" | "data">>>>([]);
+  // 붙여 둔 이미지를 보관해, 화면이 새로 열려도(휴대폰 공유 등) 남긴다
+  useDraftImages(session ? `agent:${session.sessionId}` : undefined, images, setImages);
   const [attachNote, setAttachNote] = useState<string>();
   const input = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);

@@ -1287,6 +1287,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
       <Widgets ui={ui} placement="aboveEditor" />
       <QueuePanel queue={chat.queue} onClear={() => void guardQuiet(clearQueue)} />
       <Composer
+        draftKey={session ? `desktop:${tabId}:${session.sessionId}` : undefined}
         value={draft}
         onChange={setDraft}
         disabled={!session || !connected || Boolean(lost) || Boolean(follow) || Boolean(externalWrite) || readOnly}
