@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 /**
  * 클립보드·기기에서 이미지를 받는 도우미 (Desktop·Agent·Mate 입력창이 같은 내용을 쓴다).
  * - 붙여넣기(Ctrl+V·길게 눌러 붙여넣기): clipboardData.files, 없으면 items의 파일
@@ -44,4 +46,35 @@ export function readBase64(file: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error("파일을 읽지 못했습니다"));
     reader.readAsDataURL(file);
   });
+}
+
+/** 다른 앱에서 "공유"해 받은 이미지가 왔다는 화면 이벤트 (휴대폰 웹앱의 공유 받기, web-shell client/share.ts) */
+const SHARED_IMAGES_EVENT = "pi-shared-images";
+
+declare global {
+  interface Window {
+    /** 공유받아 아직 입력창이 가져가지 않은 이미지 (웹앱에만 있다) */
+    piSharedImages?: File[];
+  }
+}
+
+/**
+ * 공유받은 이미지(갤럭시 스크린샷 도구의 공유 등)를 이 입력창에 붙인다. 데스크톱 앱에서는 오지 않는다.
+ * enabled가 거짓이면(대화가 없음 등) 남겨 두었다가 켜지면 가져간다. visible이 거짓이면(숨긴 탭) 다른 입력창에 맡긴다.
+ */
+export function useSharedImages(onFiles: (files: File[]) => void, enabled = true, visible: () => boolean = () => true): void {
+  const latest = useRef({ onFiles, visible });
+  latest.current = { onFiles, visible };
+  useEffect(() => {
+    if (!enabled) return;
+    const take = () => {
+      const files = window.piSharedImages;
+      if (!files?.length || !latest.current.visible()) return;
+      window.piSharedImages = [];
+      latest.current.onFiles(files);
+    };
+    take();
+    window.addEventListener(SHARED_IMAGES_EVENT, take);
+    return () => window.removeEventListener(SHARED_IMAGES_EVENT, take);
+  }, [enabled]);
 }

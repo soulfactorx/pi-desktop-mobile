@@ -5,7 +5,7 @@ import type { ChatImage, ChatLine, InboxView, Overview } from "../shared/api";
 import type { Act } from "./App";
 import { InboxCard } from "./InboxPanel";
 import { relativeTime } from "./mate-view";
-import { canReadClipboard, readBase64, readClipboardImages, transferFiles } from "./clipboard-images";
+import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 
 /** 한 번에 보낼 수 있는 이미지 (실행기와 같은 한도) */
@@ -102,6 +102,9 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
     if (added.length > 0) setImages((prev) => [...prev, ...added].slice(0, MAX_IMAGES));
     setImageNote(notes.length > 0 ? [...new Set(notes)].join("\n") : undefined);
   };
+
+  // 휴대폰 웹앱으로 공유한 이미지(스크린샷 등)를 붙인다
+  useSharedImages((files) => void addImageFiles(files));
 
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = transferFiles(e.clipboardData).filter((f) => f.type.startsWith("image/"));
