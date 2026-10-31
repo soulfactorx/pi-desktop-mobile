@@ -8,7 +8,7 @@ import { CHAT_DUTY_ID, type Duty } from "./types";
  * 질문은 앱 대화 탭과 휴대폰에 선택지 버튼으로 뜬다. "허용하고 다시 실행"을 누르면 대화 담당이
  * 임무에 허용 명령을 더하고 다시 실행한다. 답하지 않은 같은 질문은 하루 안에 다시 묻지 않는다.
  */
-export async function askPermission(paths: MatePaths, duty: Duty, runId: string, blockedPath: string, now: number): Promise<boolean> {
+export async function askPermission(paths: MatePaths, duty: Duty, runId: string, blockedPath: string, now: number, retry?: string): Promise<boolean> {
   const blocked = await readBlocked(blockedPath);
   await rm(blockedPath, { force: true });
   const granted = new Set(duty.grants ?? []);
@@ -32,7 +32,14 @@ export async function askPermission(paths: MatePaths, duty: Duty, runId: string,
   if (mcp.length) lines.push("MCP 도구는 Mate가 읽기인지 쓰기인지 알 수 없으니 설명을 보고 정해 주세요. 허용한 도구만 다음부터 써요.");
   return appendChatQuestion(
     paths.chat,
-    { text: lines.join("\n"), options: [...PERMISSION_OPTIONS], dutyId: duty.id, runId, cwd: duty.cwd, permission: { dutyId: duty.id, commands } },
+    {
+      text: lines.join("\n"),
+      options: [...PERMISSION_OPTIONS],
+      dutyId: duty.id,
+      runId,
+      cwd: duty.cwd,
+      permission: { dutyId: duty.id, commands, ...(retry ? { retry } : {}) },
+    },
     now,
   );
 }

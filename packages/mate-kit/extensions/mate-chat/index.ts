@@ -51,14 +51,17 @@ export default function mateChatExtension(pi: ExtensionAPI): void {
         description:
           "사용자가 원하는 일을 Mate 실행기에 맡긴다. 이 대화가 끝난 뒤 실행되고 결과는 대화로 알린다. " +
           "run_duty(임무 실행), ask(폴더를 읽기만 하며 살펴보기), fix(폴더를 별도 작업 공간에서 고치기 — 적용은 사용자가 다시 승인), " +
-          "accept/dismiss(제안 확인함·버리기), delegate(제안의 맡길 일 실행), create_duty(임무 만들기), pause/resume(자동 실행 멈춤·다시). " +
+          "accept/dismiss(제안 확인함·버리기), delegate(제안의 맡길 일 실행), create_duty(임무 만들기), pause/resume(자동 실행 멈춤·다시), " +
+          "enable_web(웹 검색 켜기: 날씨·뉴스·검색처럼 인터넷이 필요한데 웹 검색이 꺼져 있을 때. 사용자가 버튼으로 허용하면 켜고 방금 요청에 다시 답한다). " +
           "사용자가 분명히 원할 때만 쓰고, 애매하면 먼저 물어본다.",
         parameters: Type.Object({
           action: Type.Union(
-            ["run_duty", "ask", "fix", "accept", "dismiss", "delegate", "create_duty", "pause", "resume"].map((a) => Type.Literal(a)),
+            ["run_duty", "ask", "fix", "accept", "dismiss", "delegate", "create_duty", "pause", "resume", "enable_web"].map((a) => Type.Literal(a)),
           ),
           duty: Type.Optional(Type.String({ description: "run_duty: 임무 id 또는 이름" })),
-          folder: Type.Optional(Type.String({ description: "ask·fix·create_duty: 폴더 이름(마지막 폴더명) 또는 경로" })),
+          folder: Type.Optional(
+            Type.String({ description: "ask·fix·create_duty: 폴더 이름(마지막 폴더명) 또는 경로. create_duty에서 폴더와 상관없는 일(날씨·뉴스 등)이면 비운다" }),
+          ),
           prompt: Type.Optional(Type.String({ description: "ask·fix·create_duty: 구체적인 지시" })),
           item: Type.Optional(Type.String({ description: "accept·dismiss·delegate: 인박스 항목 id" })),
           name: Type.Optional(Type.String({ description: "create_duty: 임무 이름" })),
@@ -66,6 +69,7 @@ export default function mateChatExtension(pi: ExtensionAPI): void {
             Type.String({ description: "create_duty: \"manual\", \"daily HH:MM\", \"weekdays HH:MM\", \"every N minutes\", \"on-commit\", \"after-session\"" }),
           ),
           profile: Type.Optional(Type.Union([Type.Literal("observe"), Type.Literal("propose"), Type.Literal("act")], { description: "create_duty: 보고·제안·고치기 (기본 제안)" })),
+          web: Type.Optional(Type.Boolean({ description: "create_duty: 인터넷(웹 검색·페이지 읽기)이 필요한 임무면 true. 처음 실행할 때 사용자에게 허용을 묻는다" })),
         }),
         async execute(_id, params) {
           await appendChatAction(actions, params as Record<string, unknown>);
