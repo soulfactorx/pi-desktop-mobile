@@ -175,15 +175,31 @@ function normalizeTrigger(raw: unknown): Trigger | string {
   }
   if (t.kind === "manual") return { kind: "manual" };
   if (t.kind === "interval" && typeof t.minutes === "number" && Number.isFinite(t.minutes)) {
-    return { kind: "interval", minutes: Math.max(MIN_INTERVAL_MINUTES, Math.round(t.minutes)) };
+    const minutes = Math.max(MIN_INTERVAL_MINUTES, Math.round(t.minutes));
+    const weekdays = weekdaysOf(t.weekdays);
+    const hasWindow = t.from !== undefined || t.to !== undefined;
+    if (hasWindow && !(typeof t.from === "string" && parseTime(t.from) && typeof t.to === "string" && parseTime(t.to) && t.from !== t.to)) {
+      return "시간대는 시작과 끝 시각(HH:MM)이 모두 필요하고 서로 달라야 합니다";
+    }
+    return {
+      kind: "interval",
+      minutes,
+      ...(hasWindow ? { from: (t.from as string).padStart(5, "0"), to: (t.to as string).padStart(5, "0") } : {}),
+      ...(weekdays ? { weekdays } : {}),
+    };
   }
   if (t.kind === "daily" && typeof t.time === "string" && parseTime(t.time)) {
-    const weekdays = Array.isArray(t.weekdays)
-      ? [...new Set(t.weekdays.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))].sort()
-      : [];
-    return weekdays.length > 0 && weekdays.length < 7 ? { kind: "daily", time: t.time, weekdays } : { kind: "daily", time: t.time };
+    const weekdays = weekdaysOf(t.weekdays);
+    return weekdays ? { kind: "daily", time: t.time, weekdays } : { kind: "daily", time: t.time };
   }
   return "실행 시점이 잘못되었습니다";
+}
+
+/** 요일 목록을 정리한다. 없거나 모든 요일이면 undefined (매일) */
+function weekdaysOf(raw: unknown): number[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const days = [...new Set(raw.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+  return days.length > 0 && days.length < 7 ? days : undefined;
 }
 
 /** 파일·화면에서 온 값을 검사해 임무로 만든다. 잘못되면 이유를 돌려준다 */

@@ -144,7 +144,7 @@ function DutyForm({
   const setKind = (kind: DutyDraft["trigger"]["kind"]) => set({ trigger: defaultTrigger(kind) });
   const setTrigger = (patch: Record<string, unknown>) => set({ trigger: { ...t, ...patch } as DutyDraft["trigger"] });
   const toggleDay = (day: number) => {
-    if (t.kind !== "daily") return;
+    if (t.kind !== "daily" && t.kind !== "interval") return;
     const days = new Set(t.weekdays ?? [0, 1, 2, 3, 4, 5, 6]);
     if (days.has(day)) days.delete(day);
     else days.add(day);
@@ -277,14 +277,35 @@ function DutyForm({
           </select>
           {t.kind === "interval" && (
             <>
-              <input
-                type="number"
-                min={15}
-                step={15}
-                value={t.minutes}
-                onChange={(e) => set({ trigger: { kind: "interval", minutes: Number(e.target.value) } })}
-              />
+              <input type="number" min={15} step={15} value={t.minutes} onChange={(e) => setTrigger({ minutes: Number(e.target.value) })} />
               <span className="muted">분마다 (최소 15분)</span>
+              <label className="day" title="정한 시간대에만 돌립니다 (예: 낮 시간에만)">
+                <input
+                  type="checkbox"
+                  checked={Boolean(t.from)}
+                  onChange={(e) =>
+                    set({
+                      trigger: e.target.checked
+                        ? { ...t, from: "08:00", to: "20:00" }
+                        : { kind: "interval", minutes: t.minutes, ...(t.weekdays ? { weekdays: t.weekdays } : {}) },
+                    })
+                  }
+                />
+                시간대
+              </label>
+              {t.from && (
+                <>
+                  <input type="time" value={t.from} onChange={(e) => setTrigger({ from: e.target.value })} />
+                  <span className="muted">~</span>
+                  <input type="time" value={t.to} onChange={(e) => setTrigger({ to: e.target.value })} />
+                </>
+              )}
+              {WEEKDAY_LABELS.map((label, day) => (
+                <label key={day} className="day">
+                  <input type="checkbox" checked={!t.weekdays?.length || t.weekdays.includes(day)} onChange={() => toggleDay(day)} />
+                  {label}
+                </label>
+              ))}
             </>
           )}
           {t.kind === "daily" && (

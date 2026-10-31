@@ -66,7 +66,11 @@ export default function mateChatExtension(pi: ExtensionAPI): void {
           item: Type.Optional(Type.String({ description: "accept·dismiss·delegate: 인박스 항목 id" })),
           name: Type.Optional(Type.String({ description: "create_duty: 임무 이름" })),
           schedule: Type.Optional(
-            Type.String({ description: "create_duty: \"manual\", \"daily HH:MM\", \"weekdays HH:MM\", \"every N minutes\", \"on-commit\", \"after-session\"" }),
+            Type.String({
+              description:
+                "create_duty: \"manual\", \"daily HH:MM\", \"weekdays HH:MM\", \"every N minutes\", \"every N hours\", \"on-commit\", \"after-session\". " +
+                "간격에는 시간대·평일을 붙일 수 있다: \"every 1 hours 08:00-20:00\", \"every 30 minutes 09:00-18:00 weekdays\"",
+            }),
           ),
           profile: Type.Optional(Type.Union([Type.Literal("observe"), Type.Literal("propose"), Type.Literal("act")], { description: "create_duty: 보고·제안·고치기 (기본 제안)" })),
           web: Type.Optional(Type.Boolean({ description: "create_duty: 인터넷(웹 검색·페이지 읽기)이 필요한 임무면 true. 처음 실행할 때 사용자에게 허용을 묻는다" })),

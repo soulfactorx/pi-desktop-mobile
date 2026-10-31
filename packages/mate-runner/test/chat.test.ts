@@ -19,6 +19,10 @@ describe("실행 시점 표현", () => {
     expect(parseSchedulePhrase("daily 9:00")).toEqual({ kind: "daily", time: "09:00" });
     expect(parseSchedulePhrase("weekdays 18:30")).toEqual({ kind: "daily", time: "18:30", weekdays: [1, 2, 3, 4, 5] });
     expect(parseSchedulePhrase("every 30 minutes")).toEqual({ kind: "interval", minutes: 30 });
+    expect(parseSchedulePhrase("every 1 hours 8:00-20:00")).toEqual({ kind: "interval", minutes: 60, from: "08:00", to: "20:00" });
+    expect(parseSchedulePhrase("every 2 hours 09:00 - 18:00 weekdays")).toEqual({ kind: "interval", minutes: 120, from: "09:00", to: "18:00", weekdays: [1, 2, 3, 4, 5] });
+    expect(parseSchedulePhrase("every 1 hours 08:00-08:00")).toBeUndefined();
+    expect(parseSchedulePhrase("every 1 hours 08:00-25:00")).toBeUndefined();
     expect(parseSchedulePhrase("on-commit")).toEqual({ kind: "git" });
     expect(parseSchedulePhrase("after-session")).toEqual({ kind: "session" });
     expect(parseSchedulePhrase("가끔")).toBeUndefined();

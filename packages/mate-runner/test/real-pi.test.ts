@@ -231,7 +231,13 @@ describe("실행기 + 실제 Pi", () => {
       const { stdout: sha } = await git("rev-parse", "--short", "HEAD");
       const changed = await waitForRun((r) => r.dutyId === "repo" && r.status === "done");
       expect(changed).toMatchObject({ reason: "change", cause: `커밋 ${sha.trim()} (main)` });
-      expect((await loadState(paths)).duties.repo?.watch?.pending).toBeUndefined();
+      // 실행기는 실행 기록을 먼저 쓰고 상태(처리한 변화 지우기)를 그 뒤에 저장한다. 느린 CI에서는 그 사이에 읽을 수 있어 잠깐 기다린다
+      let pending = (await loadState(paths)).duties.repo?.watch?.pending;
+      for (const end = Date.now() + 10_000; pending && Date.now() < end; ) {
+        await new Promise((r) => setTimeout(r, 100));
+        pending = (await loadState(paths)).duties.repo?.watch?.pending;
+      }
+      expect(pending).toBeUndefined();
     } finally {
       await stopRunner(runner.pid);
       await rm(repo, { recursive: true, force: true }).catch(() => {});

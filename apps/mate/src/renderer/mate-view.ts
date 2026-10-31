@@ -17,8 +17,11 @@ export function triggerLabel(trigger: Trigger): string {
   switch (trigger.kind) {
     case "manual":
       return "직접 실행";
-    case "interval":
-      return trigger.minutes % 60 === 0 ? `${trigger.minutes / 60}시간마다` : `${trigger.minutes}분마다`;
+    case "interval": {
+      const every = trigger.minutes % 60 === 0 ? `${trigger.minutes / 60}시간마다` : `${trigger.minutes}분마다`;
+      const days = trigger.weekdays?.length ? `${trigger.weekdays.map((d) => WEEKDAY_LABELS[d]).join("·")} ` : "";
+      return trigger.from ? `${days}${trigger.from}~${trigger.to} ${every}` : `${days}${every}`;
+    }
     case "daily": {
       const days = trigger.weekdays?.length ? trigger.weekdays.map((d) => WEEKDAY_LABELS[d]).join("·") : "매일";
       return `${days} ${trigger.time}`;
@@ -47,7 +50,7 @@ export const TRIGGER_KINDS: Array<{ kind: Trigger["kind"]; label: string }> = [
 
 export const TRIGGER_HINTS: Record<Trigger["kind"], string> = {
   manual: "\"지금 실행\"을 누를 때만 돕니다.",
-  interval: "앱을 닫아도 실행기가 돌며 간격을 지킵니다.",
+  interval: "앱을 닫아도 실행기가 돌며 간격을 지킵니다. 시간대를 정하면 그 안에서만 돕니다 (시간대가 열리면 바로 한 번, 그 뒤 간격마다).",
   daily: "앱을 닫아도 실행기가 돌며 시간표를 지킵니다. PC가 꺼져 있던 동안 놓친 실행은 한 번만 따라잡습니다.",
   git: "30초마다 브랜치·커밋을 확인합니다. 임무를 만들 때의 커밋은 기준으로만 삼습니다.",
   files: "작업 폴더의 파일 저장을 지켜봅니다 (.git·node_modules·빌드 결과 제외). 저장이 몰리면 잠잠해진 뒤 한 번 돕니다.",
