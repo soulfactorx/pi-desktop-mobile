@@ -46,6 +46,10 @@ export function SettingsView({
         <input type="checkbox" checked={config.paused} onChange={() => void act(() => window.mate.saveConfig({ paused: !config.paused }))} />
         <strong>일시 정지</strong> <span className="muted">시간표·변화 감지 실행을 멈춥니다. "지금 실행"은 그대로 됩니다.</span>
       </label>
+      <label className="radio">
+        <input type="checkbox" checked={config.desktopNotify} onChange={() => void act(() => window.mate.saveConfig({ desktopNotify: !config.desktopNotify }))} />
+        <strong>PC 알림</strong> <span className="muted">창을 보고 있지 않을 때 대화 답·질문(승인 요청)·임무 결과·새 제안을 OS 알림으로 띄웁니다.</span>
+      </label>
       <label>
         기본 모델
         <ModelSelect

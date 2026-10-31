@@ -46,7 +46,11 @@ describe("store", () => {
       // 대화는 MCP를 쓰지 않는 것이 기본이다
       chatMcpServers: [],
       chatGrants: [],
+      // 창을 보고 있지 않을 때 PC 알림은 켠 것이 기본이다
+      desktopNotify: true,
     });
+    expect((await saveConfig(paths, { desktopNotify: false })).desktopNotify).toBe(false);
+    expect((await saveConfig(paths, { desktopNotify: true })).desktopNotify).toBe(true);
     // 빈 모델은 "Pi 기본 모델 따르기"로 남는다
     expect((await saveConfig(paths, { model: "" })).model).toBe("");
     await saveConfig(paths, { model: "anthropic/claude-haiku-5-5" });

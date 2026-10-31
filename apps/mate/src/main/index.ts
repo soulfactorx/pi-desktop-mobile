@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from "electron";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,7 @@ import {
   unpairTelegram,
 } from "./telegram-setup";
 import { Updater } from "./updater";
+import { newNotes, type NoteState } from "./notifier";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const paths = matePaths(mateHome());
@@ -174,19 +175,61 @@ async function switchHost(hostId: string, stopPrevious: boolean): Promise<void> 
   currentHostId = hostId;
   connection?.dispose();
   lastOverview = undefined;
+  // 다른 호스트의 것은 새로 기준을 잡는다
+  notes = undefined;
   readinessCache = undefined;
   startConnection();
   mainWindow?.webContents.reload();
+}
+
+/**
+ * PC 알림 (notifier.ts). 실행기가 바뀌었다고 알리면 잠깐 모았다가 overview를 견줘 새것만 알린다.
+ * 창을 보고 있으면 화면에 이미 보이므로 띄우지 않는다. 알림을 누르면 창을 앞으로 가져온다.
+ */
+let notes: NoteState | undefined;
+let noteTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleNotes(): void {
+  if (noteTimer) clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => void showNotes(), 500);
+}
+
+async function showNotes(): Promise<void> {
+  let current: Overview;
+  try {
+    current = await call<Overview>("overview");
+  } catch {
+    return;
+  }
+  const { notes: fresh, state } = newNotes(notes, current);
+  notes = state;
+  if (!current.config.desktopNotify || !Notification.isSupported() || mainWindow?.isFocused()) return;
+  for (const note of fresh) {
+    const shown = new Notification({ title: note.title, body: note.body });
+    shown.on("click", () => {
+      if (!mainWindow) createWindow();
+      if (mainWindow?.isMinimized()) mainWindow.restore();
+      mainWindow?.show();
+      mainWindow?.focus();
+    });
+    shown.show();
+  }
 }
 
 function startConnection(): void {
   const hostId = currentHostId;
   connection = new RunnerConnection({
     launch: () => launchFor(hostId),
-    onChanged: () => sendToWindow(IpcChannels.changed),
+    onChanged: () => {
+      sendToWindow(IpcChannels.changed);
+      scheduleNotes();
+    },
     onState: (state: RunnerConnectionState) => {
       runnerError = state.status === "disconnected" ? `실행기에 연결하지 못했습니다: ${state.reason}` : undefined;
-      if (state.status === "connected") void pushTelegramToken().catch(() => undefined);
+      if (state.status === "connected") {
+        void pushTelegramToken().catch(() => undefined);
+        scheduleNotes();
+      }
       sendToWindow(IpcChannels.changed);
     },
   });

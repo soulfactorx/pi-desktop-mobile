@@ -73,6 +73,8 @@ export interface MateConfig {
   chatMcpServers: string[];
   /** Mate 대화에서 허용한 MCP 도구 이름 (mcp__<서버>__<도구>) */
   chatGrants: string[];
+  /** 앱 창을 보고 있지 않을 때 OS 알림을 띄운다 (대화 답·질문·임무 결과·새 제안) */
+  desktopNotify: boolean;
 }
 
 /**
@@ -127,6 +129,7 @@ export const DEFAULT_CONFIG: MateConfig = {
   telegram: { enabled: false, pairEpoch: 0, notify: "action", sendDetail: true, allowFix: false, mirrorApp: false },
   chatMcpServers: [],
   chatGrants: [],
+  desktopNotify: true,
 };
 
 export const DEFAULT_TIMEOUT_SEC = 300;
