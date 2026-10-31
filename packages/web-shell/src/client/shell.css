@@ -367,3 +367,46 @@
     background: rgb(0 0 0 / 40%);
   }
 }
+
+/* 처음 한 번 묻는 휴대폰 알림 켜기 */
+.ws-notify-ask {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 2700;
+  margin: 0 auto;
+  width: min(480px, calc(100% - 16px));
+  background: var(--ws-bg);
+  color: var(--ws-text);
+  border: 1px solid var(--ws-border);
+  border-left: 4px solid var(--ws-accent);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
+  font-family: system-ui, sans-serif;
+}
+
+.ws-notify-ask p {
+  margin: 0;
+  color: var(--ws-muted);
+  font-size: 14px;
+}
+
+.ws-notify-ask button {
+  background: var(--ws-panel);
+  color: var(--ws-text);
+  border: 1px solid var(--ws-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 15px;
+}
+
+.ws-notify-ask button.primary {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: #fff;
+}

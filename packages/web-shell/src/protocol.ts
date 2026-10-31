@@ -80,7 +80,18 @@ export const ShellChannels = {
   listDir: "web-shell:list-dir",
   /** 휴대폰에서 고른 파일을 서버에 올린다 (name, base64) → 서버 경로 */
   upload: "web-shell:upload",
+  /** 화면이 보이는지 (send: visible). 보는 탭이 없으면 알림을 웹 푸시로 보낸다 */
+  visibility: "web-shell:visibility",
+  /** 웹 푸시 공개 키 (VAPID) */
+  pushKey: "web-shell:push-key",
+  /** 이 브라우저의 푸시 구독을 저장한다 (PushSubscription JSON) */
+  pushSubscribe: "web-shell:push-subscribe",
+  /** 구독을 지운다 (endpoint) */
+  pushUnsubscribe: "web-shell:push-unsubscribe",
 } as const;
+
+/** 서비스 워커 주소 (웹 푸시를 받아 휴대폰 알림을 띄운다) */
+export const SERVICE_WORKER_PATH = "/ws-sw.js";
 
 export interface DirEntry {
   name: string;

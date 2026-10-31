@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { packArgs, unpackArgs, type ClientData, type Control, type DialogRequest, type MenuGroup } from "../protocol";
+import { packArgs, ShellChannels, unpackArgs, type ClientData, type Control, type DialogRequest, type MenuGroup } from "../protocol";
 import { SessionTable, type ClientSession, type SessionLimits } from "./session";
 
 /** ipcMain.handle 처리기의 첫 인자 (Electron의 IpcMainInvokeEvent 중 앱이 쓰는 부분) */
@@ -106,6 +106,11 @@ export class IpcHub {
     });
   }
 
+  /** 이 앱을 보고 있는 탭이 있는가 (붙어 있고 화면이 보이는 탭) */
+  anyVisible(): boolean {
+    return this.sessions.live().some((s) => s.connected && s.visible);
+  }
+
   /** 앱 메뉴를 바꾼다. 새로 붙는 탭에도 보낸다 */
   setMenu(groups: MenuGroup[]): void {
     this.menu = groups;
@@ -140,6 +145,10 @@ export class IpcHub {
       return;
     }
     const args = unpackArgs(data.args, data.u);
+    if (data.t === "send" && data.ch === ShellChannels.visibility) {
+      session.visible = args[0] === true;
+      return;
+    }
     const event: HubEvent = { sender: this.sender(session) };
     if (data.t === "send") {
       for (const listener of this.listeners.get(data.ch) ?? []) {

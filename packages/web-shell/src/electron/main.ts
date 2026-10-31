@@ -45,6 +45,22 @@ export function configureShell(next: ShellConfig): void {
   config = next;
 }
 
+/** 보는 탭이 없을 때 알림을 보낼 곳 (web-server.ts가 웹 푸시를 건다) */
+let pushNote: ((note: { title: string; body?: string }) => void) | undefined;
+export function onBackgroundNotify(send: (note: { title: string; body?: string }) => void): void {
+  pushNote = send;
+}
+
+/**
+ * 알림: 앱을 보고 있는 탭이 있으면 화면 안의 띠로, 없으면 웹 푸시(휴대폰 알림)로 보낸다.
+ * 화면 안의 띠는 뒤에 돌아왔을 때도 보이게 모든 탭에 남긴다.
+ */
+export function notify(title: string, body?: string, level?: "info" | "error"): void {
+  const visible = hub.anyVisible();
+  hub.controlAll({ kind: "notify", title, ...(body ? { body } : {}), ...(level ? { level } : {}) });
+  if (!visible) pushNote?.({ title, ...(body ? { body } : {}) });
+}
+
 // ── app ──────────────────────────────────────────────────────────────
 
 type Listener = (...args: any[]) => unknown;
@@ -189,8 +205,8 @@ export class BrowserWindow {
   on = (_event: string, _listener: Listener) => this;
   once = (_event: string, _listener: Listener) => this;
   isDestroyed = () => this.destroyed;
-  // 브라우저 탭이 보이는지는 알 수 없다. 알림은 늘 보낸다 (탭이 화면 안의 띠로 보인다)
-  isFocused = () => false;
+  // 브라우저가 화면이 보이는지 알린다 (보는 탭이 있으면 앱은 알림을 띄우지 않는다)
+  isFocused = () => hub.anyVisible();
   isVisible = () => true;
   isMinimized = () => false;
   restore = () => {};
@@ -257,7 +273,7 @@ export const dialog = {
     return { response: typeof answer === "number" ? answer : cancel, checkboxChecked: false };
   },
   showErrorBox(title: string, content: string): void {
-    hub.controlAll({ kind: "notify", title, body: content, level: "error" });
+    notify(title, content, "error");
   },
 };
 
@@ -367,9 +383,10 @@ export class Notification {
   constructor(private readonly options: { title?: string; body?: string } = {}) {}
 
   show(): void {
-    hub.controlAll({ kind: "notify", title: this.options.title ?? "", ...(this.options.body ? { body: this.options.body } : {}) });
+    notify(this.options.title ?? "", this.options.body);
   }
 
+  /** 눌렀을 때(click)는 브라우저가 앱 화면을 연다. 그 밖의 이벤트는 없다 */
   on(): this {
     return this;
   }

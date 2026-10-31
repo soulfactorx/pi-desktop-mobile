@@ -180,6 +180,24 @@ describe("이어지는 연결 (web-shell)", () => {
     expect(await hub.ask({ kind: "save" })).toBeUndefined();
   });
 
+  it("탭이 화면이 보인다고 알리면 보는 탭이 있는 것으로 보고, 끊기거나 숨으면 없는 것으로 본다", async () => {
+    const hub = new IpcHub();
+    const { transport, links } = setup(hub);
+    transport.connect();
+    await tick();
+    expect(hub.anyVisible()).toBe(false);
+    transport.send("web-shell:visibility", true);
+    await tick();
+    expect(hub.anyVisible()).toBe(true);
+    transport.send("web-shell:visibility", false);
+    await tick();
+    expect(hub.anyVisible()).toBe(false);
+    transport.send("web-shell:visibility", true);
+    await tick();
+    links[0]!.drop();
+    expect(hub.anyVisible()).toBe(false);
+  });
+
   it("메뉴는 새로 붙는 탭에도 보낸다", async () => {
     const hub = new IpcHub();
     hub.setMenu([{ label: "보기", items: [{ id: "m1", label: "지식베이스" }] }]);
