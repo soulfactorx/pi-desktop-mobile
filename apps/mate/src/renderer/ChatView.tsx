@@ -5,7 +5,7 @@ import type { ChatImage, ChatLine, InboxView, Overview } from "../shared/api";
 import type { Act } from "./App";
 import { InboxCard } from "./InboxPanel";
 import { relativeTime } from "./mate-view";
-import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
+import { canReadClipboard, enterHint, isSendKey, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import { ChatNavigator } from "./ChatNavigator";
 
@@ -211,11 +211,12 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
           <textarea
             value={text}
             rows={2}
-            placeholder={answerTo ? "답을 쓰세요" : "Mate에게 말하기 (Enter 보내기, Shift+Enter 줄바꿈, /로 명령)"}
+            placeholder={answerTo ? "답을 쓰세요" : enterHint("Mate에게 말하기 (Enter 보내기, Shift+Enter 줄바꿈, /로 명령)")}
             onChange={(e) => setText(e.target.value)}
             onPaste={onPaste}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              // PC는 Enter로 보내고, 휴대폰은 Enter가 줄바꿈이다 (보내기 버튼·Ctrl+Enter로 보낸다)
+              if (isSendKey(e.nativeEvent)) {
                 e.preventDefault();
                 void send(text, answerTo?.id, true);
               }
