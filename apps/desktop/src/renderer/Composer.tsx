@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import { formatBytes, parseDataUrl, rejectReason, toDataUrl, type ImageAttachment } from "./attachments";
-import { canReadClipboard, readClipboardImages, transferFiles, useSharedImages } from "./clipboard-images";
+import { canReadClipboard, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import {
   atQuery,
@@ -42,6 +42,8 @@ interface ComposerProps {
   /** 지금 모델이 이미지를 받는지. 아니면 첨부에 안내를 붙인다 */
   acceptsImages: boolean;
   onAbort: () => void;
+  /** 붙여 둔 이미지를 보관할 이름 (탭·세션). 없으면 보관하지 않는다 */
+  draftKey?: string;
 }
 
 /**
@@ -66,6 +68,8 @@ export function Composer(props: ComposerProps) {
   const { value, onChange, disabled, placeholder, running, commands, onNeedCommands, onSearchFiles, onSubmit, onAbort, acceptsImages } =
     props;
   const [images, setImages] = useState<ImageAttachment[]>([]);
+  // 붙여 둔 이미지를 보관해, 화면이 새로 열려도(휴대폰 공유 등) 남긴다
+  useDraftImages(props.draftKey, images, setImages);
   const [attachError, setAttachError] = useState<string | undefined>();
   const [dragging, setDragging] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);

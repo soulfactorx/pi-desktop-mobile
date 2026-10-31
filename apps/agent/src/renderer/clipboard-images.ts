@@ -78,3 +78,65 @@ export function useSharedImages(onFiles: (files: File[]) => void, enabled = true
     return () => window.removeEventListener(SHARED_IMAGES_EVENT, take);
   }, [enabled]);
 }
+
+/** 입력창에 붙여 둔 이미지를 잠깐 보관하는 곳 (IndexedDB). 휴대폰은 공유로 앱이 새로 열리면 붙여 둔 이미지를 잃어서 */
+const DRAFT_DB = "pi-draft-images";
+const DRAFT_STORE = "drafts";
+/** 이보다 오래된 보관은 되살리지 않는다 */
+const DRAFT_MAX_MS = 60 * 60_000;
+
+function draftDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open(DRAFT_DB, 1);
+    open.onupgradeneeded = () => open.result.createObjectStore(DRAFT_STORE);
+    open.onsuccess = () => resolve(open.result);
+    open.onerror = () => reject(open.error ?? new Error("보관함을 열지 못했습니다"));
+  });
+}
+
+async function draftRequest<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest): Promise<T> {
+  const db = await draftDb();
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const request = run(db.transaction(DRAFT_STORE, mode).objectStore(DRAFT_STORE));
+      request.onsuccess = () => resolve(request.result as T);
+      request.onerror = () => reject(request.error ?? new Error("보관함을 읽지 못했습니다"));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * 붙여 둔 이미지(data를 가진 항목)를 key별로 보관하고, 화면이 새로 열리면 되살린다.
+ * 공유로 앱이 새로 열려도 앞서 붙인 이미지가 남아 여러 장을 차례로 붙일 수 있다. 보내서 비우면 보관도 지운다.
+ * key가 없으면(대화가 없음 등) 아무것도 하지 않는다.
+ */
+export function useDraftImages<T extends { data: string }>(key: string | undefined, images: T[], setImages: (update: (prev: T[]) => T[]) => void): void {
+  const loadedKey = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!key || typeof indexedDB === "undefined") return;
+    let cancelled = false;
+    loadedKey.current = undefined;
+    void draftRequest<{ at: number; images: T[] } | undefined>("readonly", (store) => store.get(key))
+      .then((saved) => {
+        if (cancelled) return;
+        if (saved && Date.now() - saved.at < DRAFT_MAX_MS && saved.images.length > 0) {
+          // 되살린 것 앞에, 그 사이 붙은 것(공유받은 이미지 등)은 뒤에. 같은 이미지는 한 번만
+          setImages((prev) => [...saved.images, ...prev.filter((p) => !saved.images.some((s) => s.data === p.data))]);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) loadedKey.current = key;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  useEffect(() => {
+    // 되살리기 전에 저장하면 보관한 것을 덮어쓴다
+    if (!key || loadedKey.current !== key || typeof indexedDB === "undefined") return;
+    void draftRequest("readwrite", (store) => (images.length > 0 ? store.put({ at: Date.now(), images }, key) : store.delete(key))).catch(() => undefined);
+  }, [key, images]);
+}
