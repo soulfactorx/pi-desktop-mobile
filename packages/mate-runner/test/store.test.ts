@@ -68,6 +68,10 @@ describe("store", () => {
     expect(normalizeDuty({ ...raw, trigger: { kind: "daily", time: "25:00" } })).toMatch(/실행 시점/);
     const saved = await saveDuty(paths, { ...raw, trigger: { kind: "interval", minutes: 1 } });
     expect(saved.trigger).toEqual({ kind: "interval", minutes: 15 });
+    expect(normalizeDuty({ ...raw, trigger: { kind: "interval", minutes: 60, from: "8:00", to: "20:00", weekdays: [5, 1, 1] } })).toMatchObject({
+      trigger: { kind: "interval", minutes: 60, from: "08:00", to: "20:00", weekdays: [1, 5] },
+    });
+    expect(normalizeDuty({ ...raw, trigger: { kind: "interval", minutes: 60, from: "08:00" } })).toMatch(/시간대/);
     expect(normalizeDuty({ ...raw, trigger: { kind: "daily", time: "9:00", weekdays: [0, 1, 2, 3, 4, 5, 6] } })).toMatchObject({
       trigger: { kind: "daily", time: "9:00" },
     });

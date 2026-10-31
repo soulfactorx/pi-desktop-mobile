@@ -6,7 +6,11 @@ export * from "./activity-types";
 /** 언제 돌릴지 (설계 DESIGN-MATE.md §3) */
 export type Trigger =
   | { kind: "manual" }
-  | { kind: "interval"; minutes: number }
+  /**
+   * N분마다. from·to("HH:MM", 로컬 시각)를 주면 그 시간대에만 돈다 (from이 to보다 늦으면 자정을 넘는 시간대).
+   * weekdays: 0(일)~6(토), 없으면 매일
+   */
+  | { kind: "interval"; minutes: number; from?: string; to?: string; weekdays?: number[] }
   /** time: "HH:MM"(로컬 시각), weekdays: 0(일)~6(토), 없으면 매일 */
   | { kind: "daily"; time: string; weekdays?: number[] }
   /** 저장소 변화: 새 커밋이나 브랜치 바뀜 (M2) */
