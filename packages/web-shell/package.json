@@ -20,6 +20,8 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.2",
-    "ws": "^8.22.0"
+    "ws": "^8.22.0",
+    "web-push": "^3.6.7",
+    "@types/web-push": "^3.6.4"
   }
 }

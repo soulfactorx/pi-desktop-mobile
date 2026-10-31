@@ -41,6 +41,8 @@ export class ClientSession {
   dead = false;
   /** 마지막으로 브라우저에서 메시지를 받은 시각 (열기·대화상자를 보낼 탭을 고를 때) */
   lastActive = 0;
+  /** 브라우저가 알린 화면 보임 (끊기면 안 보이는 것으로 본다) */
+  visible = false;
 
   constructor(
     readonly id: string,
@@ -70,6 +72,7 @@ export class ClientSession {
     socket.once("close", () => {
       if (this.socket !== socket) return;
       this.socket = undefined;
+      this.visible = false;
       this.disconnectedAt = Date.now();
       if (this.ackTimer) clearTimeout(this.ackTimer);
       this.ackTimer = undefined;

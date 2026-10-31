@@ -70,6 +70,7 @@ export async function loadConfig(paths: MatePaths): Promise<MateConfig> {
     telegram: normalizeTelegram(raw.telegram),
     chatMcpServers: names(raw.chatMcpServers, isServerName),
     chatGrants: names(raw.chatGrants, isMcpToolName),
+    desktopNotify: raw.desktopNotify !== false,
   };
 }
 

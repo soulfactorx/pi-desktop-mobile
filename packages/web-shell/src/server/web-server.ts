@@ -4,8 +4,10 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { writeFileSync } from "node:fs";
 import { WebSocketServer } from "ws";
-import { clickMenu, hub } from "../electron/main";
-import { ShellChannels, WebPaths, type DirEntry, type DirListing } from "../protocol";
+import { clickMenu, hub, onBackgroundNotify } from "../electron/main";
+import { SERVICE_WORKER_PATH, ShellChannels, WebPaths, type DirEntry, type DirListing } from "../protocol";
+import { PushCenter } from "./push";
+import { SERVICE_WORKER_SOURCE } from "./service-worker";
 import { bearerToken, isLoopbackAddress, loadOrCreateToken, requestAllowed, tokenMatches } from "./auth";
 import { serveStatic } from "./static-files";
 
@@ -37,10 +39,18 @@ export function startWebServer(options: WebServerOptions): Promise<{ server: Ser
   const loopbackOnly = isLoopbackAddress(options.host);
   const allowed = (req: IncomingMessage) => requestAllowed({ host: req.headers.host, origin: req.headers.origin }, loopbackOnly);
   registerShellHandlers(options.dataDir);
+  const push = new PushCenter(options.dataDir);
+  registerPush(push, options.app);
 
   const server = createServer((req, res) => {
     if (!allowed(req)) {
       res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" }).end("허용하지 않는 주소입니다");
+      return;
+    }
+    if (req.url?.split("?")[0] === SERVICE_WORKER_PATH) {
+      // 서비스 워커는 사이트 전체(/)를 맡는다. 바뀌면 바로 새것을 쓰도록 캐시하지 않는다
+      res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache", "Service-Worker-Allowed": "/" });
+      res.end(SERVICE_WORKER_SOURCE);
       return;
     }
     if (req.url?.split("?")[0] === WebPaths.auth) {
@@ -107,6 +117,22 @@ export function startWebServer(options: WebServerOptions): Promise<{ server: Ser
         },
       });
     });
+  });
+}
+
+/**
+ * 웹 푸시: 브라우저가 알림을 허용하면 구독을 받아 두고, 보는 탭이 없을 때 앱의 알림(Notification)을 휴대폰 알림으로 보낸다.
+ * 알림 제목 앞에 앱 이름을 붙인다 (Pi Web·Agent·Mate가 같은 휴대폰에서 알림을 보내므로).
+ */
+function registerPush(push: PushCenter, app: string): void {
+  hub.override(ShellChannels.pushKey, () => push.publicKey());
+  hub.override(ShellChannels.pushSubscribe, (_event, subscription: unknown) => {
+    push.subscribe(subscription as Parameters<PushCenter["subscribe"]>[0]);
+    return push.count;
+  });
+  hub.override(ShellChannels.pushUnsubscribe, (_event, endpoint: string) => push.unsubscribe(String(endpoint)));
+  onBackgroundNotify((note) => {
+    void push.send({ title: note.title ? `${app} · ${note.title}` : app, ...(note.body ? { body: note.body } : {}) }).catch(() => 0);
   });
 }
 
