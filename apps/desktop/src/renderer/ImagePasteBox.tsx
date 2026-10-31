@@ -47,7 +47,7 @@ export function ImagePasteBox({ onFiles, onClose }: { onFiles: (files: File[]) =
         suppressContentEditableWarning
         role="textbox"
         aria-label="이미지 붙여넣기 칸"
-        data-placeholder="여기를 길게 눌러 붙여넣거나, 키보드의 클립보드에서 스크린샷을 누르세요"
+        data-placeholder="여기를 길게 눌러 붙여넣으세요. 갤럭시 스크린샷은 스크린샷 도구의 공유에서 이 앱을 고르면 바로 붙습니다"
         onPaste={onPaste}
         onInput={() => void onInput()}
         onDrop={(e) => {

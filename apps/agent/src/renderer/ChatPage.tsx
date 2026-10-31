@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } 
 import { ChatView } from "../vendor/renderer/ChatView";
 import { StatusLine, Widgets } from "../vendor/renderer/ExtensionUi";
 import { acceptsImages, MAX_IMAGE_BYTES, splitAttachments, withAttachments } from "./attachments";
-import { canReadClipboard, readBase64, readClipboardImages, transferFiles } from "./clipboard-images";
+import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import type { ImageAttachment } from "../shared/api";
 import { EXAMPLES } from "./examples";
@@ -136,6 +136,9 @@ export function ChatPage({
       }),
     ).then(addImages);
   };
+
+  // 휴대폰 웹앱으로 공유한 이미지(스크린샷 등)를 붙인다. 대화가 없으면 열릴 때까지 남겨 둔다
+  useSharedImages(addImageFiles, Boolean(session));
 
   /** 클립보드의 이미지(화면 캡처 등)를 붙여 넣는다. 글은 그대로 입력창에 들어간다 */
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {

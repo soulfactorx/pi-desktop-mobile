@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import { formatBytes, parseDataUrl, rejectReason, toDataUrl, type ImageAttachment } from "./attachments";
-import { canReadClipboard, readClipboardImages, transferFiles } from "./clipboard-images";
+import { canReadClipboard, readClipboardImages, transferFiles, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import {
   atQuery,
@@ -71,6 +71,8 @@ export function Composer(props: ComposerProps) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const [pasteBox, setPasteBox] = useState(false);
+  // 휴대폰 웹앱으로 공유한 이미지(스크린샷 등)는 지금 보이는 탭의 입력창에 붙인다
+  useSharedImages((files) => void attach(files), !disabled, () => Boolean(textarea.current?.offsetParent));
   // 히스토리를 보는 중이면 그 위치와, 보기 전에 쓰던 초안
   const browsing = useRef<{ index: number; draft: string; history: string[] } | undefined>(undefined);
   const [selected, setSelected] = useState(0);
