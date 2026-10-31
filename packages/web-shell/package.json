@@ -14,6 +14,7 @@
     "./stubs/updater": "./src/stubs/updater.ts",
     "./stubs/autostart": "./src/stubs/autostart.ts",
     "./notify": "./src/client/notify.ts",
+    "./share": "./src/client/share.ts",
     "./push": "./src/server/push.ts",
     "./service-worker": "./src/server/service-worker.ts",
     "./protocol": "./src/protocol.ts"

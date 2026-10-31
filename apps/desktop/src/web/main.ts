@@ -2,6 +2,7 @@ import { createPiDesktopApi } from "../shared/api-client";
 import { WebPaths } from "../shared/web-protocol";
 import { WsTransport, type LinkStatus } from "./ws-transport";
 import { onNotificationOpen, reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
+import { receiveSharedImages } from "@pi-desktop/web-shell/share";
 import { OPEN_SESSION_EVENT, parseSessionOpen, type SessionTarget } from "../shared/web-files";
 import { createWebFiles } from "./web-files";
 import "@pi-desktop/web-shell/client.css";
@@ -120,6 +121,8 @@ async function start(token: string): Promise<void> {
     if (appReady) window.dispatchEvent(new CustomEvent<SessionTarget>(OPEN_SESSION_EVENT, { detail: target }));
     else pendingOpen = target;
   });
+  // 다른 앱에서 공유한 이미지로 열렸으면 꺼내 둔다 (입력창이 가져간다)
+  void receiveSharedImages().catch((error: unknown) => console.warn("공유한 이미지를 읽지 못했습니다", error));
   document.getElementById("root")!.innerHTML = "";
   await import("../renderer/main");
   void setupNotifications(transport, "Pi Web").catch((error: unknown) => console.warn("알림을 준비하지 못했습니다", error));
