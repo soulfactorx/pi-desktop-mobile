@@ -4,8 +4,8 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { writeFileSync } from "node:fs";
 import { WebSocketServer } from "ws";
-import { clickMenu, hub, onBackgroundNotify } from "../electron/main";
-import { SERVICE_WORKER_PATH, ShellChannels, WebPaths, type DirEntry, type DirListing } from "../protocol";
+import { clickMenu, clickNotification, hub, onBackgroundNotify } from "../electron/main";
+import { CLICK_OPEN, SERVICE_WORKER_PATH, ShellChannels, WebPaths, type DirEntry, type DirListing } from "../protocol";
 import { PushCenter } from "./push";
 import { SERVICE_WORKER_SOURCE } from "./service-worker";
 import { bearerToken, isLoopbackAddress, loadOrCreateToken, requestAllowed, tokenMatches } from "./auth";
@@ -132,8 +132,11 @@ function registerPush(push: PushCenter, app: string): void {
   });
   hub.override(ShellChannels.pushUnsubscribe, (_event, endpoint: string) => push.unsubscribe(String(endpoint)));
   onBackgroundNotify((note) => {
-    void push.send({ title: note.title ? `${app} · ${note.title}` : app, ...(note.body ? { body: note.body } : {}) }).catch(() => 0);
+    void push
+      .send({ title: note.title ? `${app} · ${note.title}` : app, ...(note.body ? { body: note.body } : {}), ...(note.clickId ? { open: `${CLICK_OPEN}${note.clickId}` } : {}) })
+      .catch(() => 0);
   });
+  hub.override(ShellChannels.notificationClick, (_event, id: string) => clickNotification(String(id)));
 }
 
 /** 웹 껍데기가 직접 처리하는 채널: 메뉴 누르기, 대화상자의 폴더 훑기, 휴대폰 파일 올리기 */

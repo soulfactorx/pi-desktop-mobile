@@ -287,6 +287,11 @@
   border-left-color: var(--ws-error);
 }
 
+/* 누르면 그 알림의 화면(대화 등)으로 간다 */
+.ws-toast.clickable {
+  cursor: pointer;
+}
+
 .ws-toast p {
   grid-column: 1;
   margin: 0;

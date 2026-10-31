@@ -25,7 +25,7 @@ import { serveStatic } from "./static-files";
 import { WebRouter } from "./web-router";
 import { sessionNote } from "./session-notify";
 import { FileManager } from "./file-manager";
-import { FILE_DOWNLOAD_PATH, FileChannels } from "../shared/web-files";
+import { FILE_DOWNLOAD_PATH, FileChannels, sessionOpenValue } from "../shared/web-files";
 
 /**
  * 웹 서버 pi-web (설계 §5.10). 데스크톱 앱의 main 프로세스 자리를 Node 서버가 맡고, 화면은 브라우저로 연다.
@@ -92,7 +92,8 @@ function notifyInBackground(hostId: string, n: SessionEventNotification): void {
     }
     const cwd = sessionFolders.get(n.sessionId) ?? "";
     const note = sessionNote(n.event, basename(cwd) || cwd || "세션");
-    if (note) await push.send({ title: `Pi Web · ${note.title}`, body: note.body, tag: n.sessionId });
+    // 누르면 그 세션을 연다 (화면이 탭을 고르거나 새 탭으로 연다)
+    if (note) await push.send({ title: `Pi Web · ${note.title}`, body: note.body, tag: n.sessionId, open: sessionOpenValue({ hostId, sessionId: n.sessionId }) });
   })().catch(() => undefined);
 }
 const terminals = new TerminalService({ data: IpcChannels.terminalData, exit: IpcChannels.terminalExit });

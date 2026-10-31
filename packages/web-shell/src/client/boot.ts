@@ -1,6 +1,6 @@
-import { ShellChannels, WebPaths, type Control, type DialogRequest, type DirListing, type MenuGroup } from "../protocol";
+import { CLICK_OPEN, ShellChannels, WebPaths, type Control, type DialogRequest, type DirListing, type MenuGroup } from "../protocol";
 import { useTransport } from "./electron-renderer";
-import { reportVisibility, setupNotifications } from "./notify";
+import { onNotificationOpen, reportVisibility, setupNotifications } from "./notify";
 import { ResumableTransport, type LinkStatus } from "./transport";
 import "./shell.css";
 
@@ -132,6 +132,10 @@ async function start(options: BootOptions, token: string): Promise<void> {
     },
   );
   shell.bind(transport);
+  // 휴대폰 알림을 눌러 열렸으면 그 알림의 click 처리를 부른다 (연결되면 보낸다)
+  onNotificationOpen((open) => {
+    if (open.startsWith(CLICK_OPEN)) shell.clickNotification(open.slice(CLICK_OPEN.length));
+  });
   transport.watchPage();
   transport.connect();
   useTransport(transport);
@@ -207,7 +211,7 @@ class ShellUi {
         window.open(control.url, "_blank", "noopener");
         return;
       case "notify":
-        this.toast(control.title, control.body, control.level);
+        this.toast(control.title, control.body, control.level, control.clickId);
         return;
       case "menu":
         this.setMenu(control.groups);
@@ -224,7 +228,12 @@ class ShellUi {
 
   // ── 알림 ──
 
-  private toast(title: string, body?: string, level?: "info" | "error"): void {
+  /** 알림을 눌렀다고 서버에 알린다 (그 알림의 click 처리, 예: 그 대화로 가기) */
+  clickNotification(id: string): void {
+    this.transport?.send(ShellChannels.notificationClick, id);
+  }
+
+  private toast(title: string, body?: string, level?: "info" | "error", clickId?: string): void {
     if (!this.toasts) {
       this.toasts = el("div", "ws-toasts");
       document.body.append(this.toasts);
@@ -235,8 +244,18 @@ class ShellUi {
     if (body) item.append(el("p", undefined, body));
     const close = el("button", "ws-toast-close", "닫기");
     close.type = "button";
-    close.addEventListener("click", () => item.remove());
+    close.addEventListener("click", (event) => {
+      event.stopPropagation();
+      item.remove();
+    });
     item.append(close);
+    if (clickId) {
+      item.classList.add("clickable");
+      item.addEventListener("click", () => {
+        item.remove();
+        this.clickNotification(clickId);
+      });
+    }
     this.toasts.append(item);
     setTimeout(() => item.remove(), level === "error" ? 15_000 : 8_000);
   }

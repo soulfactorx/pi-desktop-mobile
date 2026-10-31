@@ -1,7 +1,8 @@
 import { createPiDesktopApi } from "../shared/api-client";
 import { WebPaths } from "../shared/web-protocol";
 import { WsTransport, type LinkStatus } from "./ws-transport";
-import { reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
+import { onNotificationOpen, reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
+import { OPEN_SESSION_EVENT, parseSessionOpen, type SessionTarget } from "../shared/web-files";
 import { createWebFiles } from "./web-files";
 import "@pi-desktop/web-shell/client.css";
 import "../renderer/styles.css";
@@ -101,7 +102,24 @@ async function start(token: string): Promise<void> {
   document.addEventListener("visibilitychange", () => reportVisibility(transport));
   transport.connect();
   window.piDesktop = createPiDesktopApi(transport, "web");
-  window.piWeb = { files: createWebFiles((channel, ...args) => transport.invoke(channel, ...args)) };
+  // 휴대폰 알림을 누르면 그 세션으로 간다. 화면(App)이 뜨기 전이면 맡아 두었다가 App이 읽는다
+  let pendingOpen: SessionTarget | undefined;
+  let appReady = false;
+  window.piWeb = {
+    files: createWebFiles((channel, ...args) => transport.invoke(channel, ...args)),
+    takeOpenSession: () => {
+      appReady = true;
+      const target = pendingOpen;
+      pendingOpen = undefined;
+      return target;
+    },
+  };
+  onNotificationOpen((open) => {
+    const target = parseSessionOpen(open);
+    if (!target) return;
+    if (appReady) window.dispatchEvent(new CustomEvent<SessionTarget>(OPEN_SESSION_EVENT, { detail: target }));
+    else pendingOpen = target;
+  });
   document.getElementById("root")!.innerHTML = "";
   await import("../renderer/main");
   void setupNotifications(transport, "Pi Web").catch((error: unknown) => console.warn("알림을 준비하지 못했습니다", error));

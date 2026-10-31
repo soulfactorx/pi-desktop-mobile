@@ -118,6 +118,9 @@ export const IpcChannels = {
   menuCommand: "agent:menu-command",
 } as const;
 
+/** 메뉴 명령: 이 대화(뒤에 세션 id)로 간다 (대화 알림을 눌렀을 때) */
+export const OPEN_CHAT_COMMAND = "open-chat:";
+
 export type { ConnectionState, PiSetupView, Schedule, TaskRecord };
 
 /** attach 결과. attach 도중 알림으로 온 이벤트도 함께 담는다 (Pi Desktop의 AttachResult와 같음) */

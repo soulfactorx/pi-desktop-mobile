@@ -47,9 +47,37 @@ export interface WebFilesApi {
   download(path: string): Promise<void>;
 }
 
+/** 휴대폰 알림의 open 값: 이 세션을 연다 (뒤에 JSON {hostId, sessionId}) */
+export const OPEN_SESSION_PREFIX = "session:";
+/** 알림을 눌러 세션을 열라는 화면 이벤트 (detail: SessionTarget) */
+export const OPEN_SESSION_EVENT = "pi-web:open-session";
+
+export interface SessionTarget {
+  hostId: string;
+  sessionId: string;
+}
+
+export function sessionOpenValue(target: SessionTarget): string {
+  return `${OPEN_SESSION_PREFIX}${JSON.stringify(target)}`;
+}
+
+export function parseSessionOpen(open: string): SessionTarget | undefined {
+  if (!open.startsWith(OPEN_SESSION_PREFIX)) return undefined;
+  try {
+    const value = JSON.parse(open.slice(OPEN_SESSION_PREFIX.length)) as Partial<SessionTarget>;
+    return typeof value.hostId === "string" && typeof value.sessionId === "string" ? { hostId: value.hostId, sessionId: value.sessionId } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 declare global {
   interface Window {
     /** 웹에만 있는 기능 (pi-web). 데스크톱 앱에는 없다 */
-    piWeb?: { files: WebFilesApi };
+    piWeb?: {
+      files: WebFilesApi;
+      /** 화면이 뜨기 전에 알림을 눌러 받은 세션 (한 번 읽으면 지운다). 그 뒤의 것은 OPEN_SESSION_EVENT로 */
+      takeOpenSession(): SessionTarget | undefined;
+    };
   }
 }
