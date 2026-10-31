@@ -102,26 +102,69 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 
 const OPEN_PARAM = "ws-open";
 
+const PENDING_CACHE = "ws-pending";
+const PENDING_OPEN = "/ws-pending/open";
+/** 알림을 누른 지 이만큼 지난 맡김은 버린다 */
+const PENDING_MAX_MS = 3 * 60_000;
+
 /**
  * 휴대폰 알림을 눌러 이 화면이 열리거나 앞으로 왔을 때, 알림의 open 값(서버가 정한다)을 handler에 넘긴다.
+ * 세 길로 오고, 같은 값은 한 번만 넘긴다.
  * - 열려 있던 탭: 서비스 워커가 보낸 메시지로
  * - 새로 연 탭: 주소의 ?ws-open= 으로 (읽은 뒤 주소에서 지운다)
+ * - 휴대폰이 뒤에 둔 탭을 버렸다가 새로 읽은 경우(메시지를 잃는다): 서비스 워커가 캐시에 맡겨 둔 것을 뜰 때·보일 때 꺼낸다
  */
 export function onNotificationOpen(handler: (open: string) => void): void {
+  let last = { open: "", at: 0 };
+  const deliver = (open: string) => {
+    const now = Date.now();
+    if (open === last.open && now - last.at < 10_000) return;
+    last = { open, at: now };
+    handler(open);
+  };
+  const takePending = async (): Promise<string | undefined> => {
+    if (!("caches" in window)) return undefined;
+    const cache = await caches.open(PENDING_CACHE);
+    const response = await cache.match(PENDING_OPEN);
+    if (!response) return undefined;
+    await cache.delete(PENDING_OPEN);
+    const at = Number(response.headers.get("X-At") ?? 0);
+    return Date.now() - at < PENDING_MAX_MS ? response.text() : undefined;
+  };
+  const checkPending = () =>
+    void takePending()
+      .then((open) => open && deliver(open))
+      .catch(() => undefined);
   try {
     const url = new URL(location.href);
     const open = url.searchParams.get(OPEN_PARAM);
     if (open) {
       url.searchParams.delete(OPEN_PARAM);
       history.replaceState(history.state, "", url.pathname + url.search + url.hash);
-      queueMicrotask(() => handler(open));
+      queueMicrotask(() => deliver(open));
     }
   } catch {
     // 주소를 읽을 수 없으면 넘긴다
   }
+  checkPending();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") checkPending();
+  });
   if (!("serviceWorker" in navigator)) return;
   navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
     const data = event.data as { type?: unknown; open?: unknown } | undefined;
-    if (data?.type === "ws-open" && typeof data.open === "string" && data.open) handler(data.open);
+    if (data?.type !== "ws-open" || typeof data.open !== "string" || !data.open) return;
+    // 메시지로 받았으면 맡겨 둔 것은 지운다 (보일 때 다시 넘기지 않게)
+    void takePending().catch(() => undefined);
+    deliver(data.open);
   });
+  navigator.serviceWorker.startMessages();
+}
+
+/** 화면 아래에 잠깐 띄우는 안내 (알림·공유를 받았는지 알려 준다) */
+export function showPageNote(text: string, ms = 5000): void {
+  const note = el("div", "ws-page-note", text);
+  note.setAttribute("role", "status");
+  document.body.append(note);
+  setTimeout(() => note.remove(), ms);
 }
