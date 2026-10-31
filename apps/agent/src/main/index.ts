@@ -31,7 +31,7 @@ import { LOCAL_HOST_ID, prepareAgentSsh, prepareAgentWsl, SSH_PREFIX, WSL_PREFIX
 import { schedulerDirFor, sessionParamsFor, sessionsDirFor } from "./host-session";
 import { resolveNodeRuntime } from "../vendor/main/node-runtime";
 import { ReplayCollector } from "../vendor/main/replay-collector";
-import { IpcChannels, type AttachResult, type ChatSummary, type CurrentHost, type HostView, type SessionSource, type ImageAttachment } from "../shared/api";
+import { IpcChannels, OPEN_CHAT_COMMAND, type AttachResult, type ChatSummary, type CurrentHost, type HostView, type SessionSource, type ImageAttachment } from "../shared/api";
 import { findPiDesktop, installPiDesktop, openPiDesktop } from "./pi-desktop";
 import type { PiSetupView } from "../shared/pi-setup";
 import { TaskWatcher } from "./task-watcher";
@@ -97,7 +97,7 @@ let sessionFolders = new Map<string, string>();
 
 /**
  * 대화 소식(답이 끝남·승인 요청·답을 기다림)을 OS 알림으로 띄운다 (session-notify.ts). 창을 보고 있으면 띄우지 않는다.
- * 예약 작업을 돌리는 스케줄러 세션은 작업 알림(notifyTask)이 맡으므로 알리지 않는다. 누르면 창을 앞으로 가져온다.
+ * 예약 작업을 돌리는 스케줄러 세션은 작업 알림(notifyTask)이 맡으므로 알리지 않는다. 누르면 창을 앞으로 가져오고 그 대화로 간다.
  */
 function notifySession(n: SessionEventNotification): void {
   if (!Notification.isSupported() || mainWindow?.isFocused() || !sessionNote(n.event, "")) return;
@@ -112,7 +112,13 @@ function notifySession(n: SessionEventNotification): void {
     if (!note) return;
     const shown = new Notification({ title: note.title, body: note.body });
     shown.on("click", () => {
-      if (!mainWindow) createWindow();
+      const openChat = () => sendToRenderer(IpcChannels.menuCommand, `${OPEN_CHAT_COMMAND}${n.sessionId}`);
+      if (mainWindow) openChat();
+      else {
+        createWindow();
+        // 새로 연 창은 화면이 뜬 뒤에 보낸다
+        (mainWindow as BrowserWindow | undefined)?.webContents.once("did-finish-load", openChat);
+      }
       if (mainWindow?.isMinimized()) mainWindow.restore();
       mainWindow?.show();
       mainWindow?.focus();

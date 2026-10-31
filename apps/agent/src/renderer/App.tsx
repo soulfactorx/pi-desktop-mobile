@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Toasts } from "../vendor/renderer/ExtensionUi";
-import type { ChatSummary, CurrentHost, PiSetupView, StoredChat, UpdateState } from "../shared/api";
+import { OPEN_CHAT_COMMAND, type ChatSummary, type CurrentHost, type PiSetupView, type StoredChat, type UpdateState } from "../shared/api";
 import { FolderBrowser } from "../vendor/renderer/FolderBrowser";
 import { ChatPage } from "./ChatPage";
 import { connectionLabel } from "./connection-label";
@@ -139,6 +139,15 @@ export function App() {
     await refreshSessions();
   };
 
+  /** 알림을 누른 대화로 간다 (열린 대화 목록을 새로 읽어 찾는다) */
+  const openChatById = async (sessionId: string) => {
+    setPage("chat");
+    if (sessionId === session?.sessionId) return;
+    const open = await window.piAgent.listSessions();
+    const target = open.find((s) => s.sessionId === sessionId);
+    if (target) await agent.attachTo(target);
+  };
+
   const moveToPicked = async () => {
     const folder = await pickFolder();
     if (folder) await moveTo(folder);
@@ -153,7 +162,8 @@ export function App() {
   const menu = useRef<(id: string) => void>(() => {});
   menu.current = (id: string) => {
     if (id === "page:history") setHistoryView("history");
-    if (id.startsWith("page:")) setPage(id.slice(5) as Page);
+    if (id.startsWith(OPEN_CHAT_COMMAND)) guard(() => openChatById(id.slice(OPEN_CHAT_COMMAND.length)));
+    else if (id.startsWith("page:")) setPage(id.slice(5) as Page);
     else if (id === "new-chat") guard(() => newChat());
     else if (id === "new-chat-folder") guard(newChatInFolder);
     else if (id === "rename-chat" && session) {
