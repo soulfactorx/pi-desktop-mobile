@@ -2,6 +2,7 @@ import { createPiDesktopApi } from "../shared/api-client";
 import { WebPaths } from "../shared/web-protocol";
 import { WsTransport, type LinkStatus } from "./ws-transport";
 import { reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
+import { createWebFiles } from "./web-files";
 import "@pi-desktop/web-shell/client.css";
 import "../renderer/styles.css";
 import "./web.css";
@@ -100,6 +101,7 @@ async function start(token: string): Promise<void> {
   document.addEventListener("visibilitychange", () => reportVisibility(transport));
   transport.connect();
   window.piDesktop = createPiDesktopApi(transport, "web");
+  window.piWeb = { files: createWebFiles((channel, ...args) => transport.invoke(channel, ...args)) };
   document.getElementById("root")!.innerHTML = "";
   await import("../renderer/main");
   void setupNotifications(transport, "Pi Web").catch((error: unknown) => console.warn("알림을 준비하지 못했습니다", error));

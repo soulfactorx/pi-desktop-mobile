@@ -95,6 +95,9 @@ export const WEB_MENU: WebMenuGroup[] = [
   },
 ];
 
+/** 파일 관리자의 "이 폴더에서 새 세션": 지금 탭에 보내는 명령 (뒤에 폴더 경로를 붙인다, Workspace.tsx) */
+export const OPEN_SESSION_COMMAND = "open-session:";
+
 /** 웹 메뉴의 명령 id들 */
 export function webMenuCommandIds(groups: readonly WebMenuGroup[] = WEB_MENU): string[] {
   return groups.flatMap((g) => g.items.flatMap((i) => (i.kind === "command" ? [i.id] : [])));

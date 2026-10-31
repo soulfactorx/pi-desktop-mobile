@@ -30,6 +30,7 @@ import { piSessionIdOf, tuiCommand } from "./tui-command";
 import { useSession } from "./use-session";
 import { ExtensionDialog, StatusLine, Toasts, Widgets } from "./ExtensionUi";
 import { FolderBrowser } from "./FolderBrowser";
+import { OPEN_SESSION_COMMAND } from "./web-menu";
 import { NewFolderDialog } from "./NewFolderDialog";
 import logoUrl from "../../build/icon.svg?url";
 import { SshHostsDialog } from "./SshHostsDialog";
@@ -839,6 +840,18 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
   // 메뉴바 명령: 지금 탭만 처리한다. 대부분은 같은 id의 명령 팔레트 명령을 실행한다.
   const menuRef = useRef<(id: string) => void>(() => {});
   menuRef.current = (id: string) => {
+    // 웹 파일 관리자의 "이 폴더에서 새 세션" (폴더는 웹 서버, 곧 로컬 호스트의 것이다)
+    if (id.startsWith(OPEN_SESSION_COMMAND)) {
+      const path = id.slice(OPEN_SESSION_COMMAND.length);
+      if (!isLocal) {
+        setInfo("파일 관리자의 폴더는 이 기기(로컬)의 것입니다. 로컬 호스트 탭에서 여세요.");
+        return;
+      }
+      setCwd(path);
+      setDrawerOpen(false);
+      void guard(() => openSession(path));
+      return;
+    }
     switch (id) {
       case "palette":
         void openPalette();

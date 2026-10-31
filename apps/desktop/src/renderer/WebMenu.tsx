@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { inputDebugEnabled, inputMode, setInputDebug, setInputMode } from "./terminal-input-settings";
-import { WEB_MENU, type WebSetting } from "./web-menu";
+import { OPEN_SESSION_COMMAND, WEB_MENU, type WebSetting } from "./web-menu";
+import { FileManager } from "./FileManager";
 
 function settingOn(id: WebSetting): boolean {
   if (id === "input-live") return inputMode() === "live";
@@ -20,6 +21,9 @@ function applySetting(id: WebSetting): void {
  */
 export function WebMenu({ onCommand }: { onCommand: (id: string) => void }) {
   const [open, setOpen] = useState(false);
+  /** 파일 관리자 (웹에만 있다, window.piWeb) */
+  const [filesOpen, setFilesOpen] = useState(false);
+  const files = window.piWeb?.files;
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +49,21 @@ export function WebMenu({ onCommand }: { onCommand: (id: string) => void }) {
       {open && (
         <div className="web-menu-backdrop" onClick={() => setOpen(false)}>
           <div className="web-menu" role="menu" aria-label="메뉴" onClick={(e) => e.stopPropagation()}>
+            {files && (
+              <section className="web-menu-group">
+                <h3>휴대폰</h3>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    setFilesOpen(true);
+                  }}
+                >
+                  <span>파일 관리자</span>
+                </button>
+              </section>
+            )}
             {WEB_MENU.map((group) => (
               <section key={group.label} className="web-menu-group">
                 <h3>{group.label}</h3>
@@ -86,6 +105,16 @@ export function WebMenu({ onCommand }: { onCommand: (id: string) => void }) {
             ))}
           </div>
         </div>
+      )}
+      {filesOpen && files && (
+        <FileManager
+          api={files}
+          onClose={() => setFilesOpen(false)}
+          onOpenSession={(path) => {
+            setFilesOpen(false);
+            onCommand(`${OPEN_SESSION_COMMAND}${path}`);
+          }}
+        />
       )}
     </>
   );

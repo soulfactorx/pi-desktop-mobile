@@ -24,6 +24,8 @@ import { bearerToken, isLoopbackAddress, loadOrCreateToken, requestAllowed, toke
 import { serveStatic } from "./static-files";
 import { WebRouter } from "./web-router";
 import { sessionNote } from "./session-notify";
+import { FileManager } from "./file-manager";
+import { FILE_DOWNLOAD_PATH, FileChannels } from "../shared/web-files";
 
 /**
  * 웹 서버 pi-web (설계 §5.10). 데스크톱 앱의 main 프로세스 자리를 Node 서버가 맡고, 화면은 브라우저로 연다.
@@ -116,6 +118,23 @@ router.handle(IpcChannels.confirmUpdate, () => undefined);
 router.handle(IpcChannels.installUpdate, () => undefined);
 router.handle(IpcChannels.openRelease, () => undefined);
 
+// 파일 관리자 (설계 §5.10): 서버(Termux)의 홈 폴더 아래를 화면에서 다룬다
+const files = new FileManager();
+router.handle(FileChannels.list, (_peer, path?: string) => files.list(path));
+router.handle(FileChannels.makeDir, (_peer, parent: string, name: string) => files.makeDir(parent, name));
+router.handle(FileChannels.makeFile, (_peer, parent: string, name: string) => files.makeFile(parent, name));
+router.handle(FileChannels.rename, (_peer, path: string, name: string) => files.rename(path, name));
+router.handle(FileChannels.transfer, (_peer, paths: string[], dest: string, mode: "move" | "copy") =>
+  files.transfer(Array.isArray(paths) ? paths.map(String) : [], dest, mode === "copy" ? "copy" : "move"),
+);
+router.handle(FileChannels.remove, (_peer, paths: string[]) => files.remove(Array.isArray(paths) ? paths.map(String) : []));
+router.handle(FileChannels.readText, (_peer, path: string) => files.readText(path));
+router.handle(FileChannels.writeText, (_peer, path: string, text: string, baseMtime?: number) =>
+  files.writeText(path, String(text), typeof baseMtime === "number" ? baseMtime : undefined),
+);
+router.handle(FileChannels.upload, (_peer, dir: string, name: string, base64: string) => files.upload(dir, String(name), String(base64)));
+router.handle(FileChannels.downloadTicket, async (_peer, path: string) => ({ url: `${FILE_DOWNLOAD_PATH}?ticket=${await files.downloadTicket(path)}`}));
+
 // 웹 푸시 구독 (화면은 web-shell의 notify.ts)
 router.handle(ShellChannels.pushKey, () => push.publicKey());
 router.handle(ShellChannels.pushSubscribe, (_peer, subscription: unknown) => {
@@ -129,6 +148,14 @@ const allowed = (req: IncomingMessage) => requestAllowed({ host: req.headers.hos
 const server = createServer((req, res) => {
   if (!allowed(req)) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" }).end("허용하지 않는 주소입니다");
+    return;
+  }
+  if (req.url?.split("?")[0] === FILE_DOWNLOAD_PATH) {
+    // 브라우저가 링크로 받으므로 토큰 대신 화면이 받은 일회용 티켓을 확인한다
+    const ticket = new URL(req.url, "http://localhost").searchParams.get("ticket");
+    void files.serveDownload(ticket, res).then((ok) => {
+      if (!ok && !res.headersSent) res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("내려받기 주소가 지났거나 맞지 않습니다");
+    });
     return;
   }
   if (req.url?.split("?")[0] === SERVICE_WORKER_PATH) {
