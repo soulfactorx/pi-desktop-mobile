@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import { formatBytes, parseDataUrl, rejectReason, toDataUrl, type ImageAttachment } from "./attachments";
-import { canReadClipboard, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
+import { canReadClipboard, enterHint, isSendKey, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import {
   atQuery,
@@ -249,7 +249,8 @@ export function Composer(props: ComposerProps) {
         return;
       }
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    // PC는 Enter로 보내고, 휴대폰은 Enter가 줄바꿈이다 (보내기 버튼·Ctrl+Enter로 보낸다)
+    if (isSendKey(e.nativeEvent)) {
       e.preventDefault();
       submit(running ? "followUp" : undefined);
       return;
@@ -341,7 +342,7 @@ export function Composer(props: ComposerProps) {
       )}
       <textarea
         ref={textarea}
-        placeholder={placeholder}
+        placeholder={enterHint(placeholder)}
         value={value}
         onChange={(e) => {
           browsing.current = undefined;

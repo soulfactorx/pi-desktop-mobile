@@ -140,3 +140,24 @@ export function useDraftImages<T extends { data: string }>(key: string | undefin
     void draftRequest("readwrite", (store) => (images.length > 0 ? store.put({ at: Date.now(), images }, key) : store.delete(key))).catch(() => undefined);
   }, [key, images]);
 }
+
+/** 휴대폰처럼 터치가 주 입력인 화면인지. 그런 화면은 Shift를 누르기 어려워 Enter를 줄바꿈으로 쓴다 */
+export function touchTyping(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+}
+
+/**
+ * 입력창에서 이 키가 "보내기"인지. PC는 Enter(줄바꿈은 Shift+Enter), 휴대폰은 Enter가 줄바꿈이고 보내기 버튼으로 보낸다.
+ * 어디서든 Ctrl·Cmd+Enter는 보낸다. 한글 조합 중인 Enter는 아니다.
+ */
+export function isSendKey(e: { key: string; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; isComposing?: boolean }): boolean {
+  if (e.key !== "Enter" || e.isComposing) return false;
+  if (e.ctrlKey || e.metaKey) return true;
+  return !e.shiftKey && !touchTyping();
+}
+
+/** 입력창 안내의 Enter 설명을 휴대폰에 맞게 바꾼다 */
+export function enterHint(text: string): string {
+  if (!touchTyping()) return text;
+  return text.replace(/Enter (전송|보내기), Shift\+Enter 줄바꿈/, "Enter 줄바꿈, 보내기 버튼으로 전송");
+}

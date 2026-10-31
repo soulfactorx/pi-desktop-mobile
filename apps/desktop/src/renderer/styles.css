@@ -3728,3 +3728,139 @@ details > summary.settings-section {
 .image-paste-close {
   padding: 0 10px;
 }
+
+/* 긴 대화 찾아가기 (ChatNavigator): 대화 스크롤 칸의 오른쪽 아래에 떠 있다 */
+.chat-nav {
+  position: sticky;
+  bottom: 8px;
+  height: 0;
+  display: flex;
+  justify-content: flex-end;
+  /* 높이 0인 줄에서 안쪽이 제 높이를 갖게 (늘어나면 0이 되어 아래로 넘쳐 잘린다) */
+  align-items: flex-end;
+  z-index: 5;
+  pointer-events: none;
+}
+.chat-nav-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: min(420px, 100%);
+}
+.chat-nav-inner > * {
+  pointer-events: auto;
+}
+.chat-nav-bar,
+.chat-nav-search,
+.chat-nav-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
+}
+.chat-nav-bar {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  opacity: 0.85;
+}
+.chat-nav-bar:hover,
+.chat-nav-bar:focus-within {
+  opacity: 1;
+}
+.chat-nav button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+}
+.chat-nav button:hover,
+.chat-nav button.on {
+  background: var(--panel-2);
+}
+.chat-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.chat-nav-search {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 3px 3px 8px;
+}
+.chat-nav-search input {
+  width: 160px;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.chat-nav-count {
+  min-width: 40px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chat-nav-panel {
+  width: min(360px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chat-nav-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 6px 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.chat-nav-empty {
+  margin: 12px;
+  color: var(--muted);
+}
+.chat-nav-turns {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+}
+.chat-nav-turns button {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 13px;
+}
+.chat-nav-turn-no {
+  flex: none;
+  color: var(--muted);
+  min-width: 20px;
+}
+.chat-nav-turn-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-nav-flash {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  transition: outline-color 1s;
+}
+::highlight(chat-search) {
+  background: rgb(255 214 0 / 40%);
+}
+::highlight(chat-search-current) {
+  background: rgb(255 140 0 / 80%);
+  color: #000;
+}

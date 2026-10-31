@@ -3,6 +3,7 @@ import type { AssistantBlock, ChatItem } from "./chat-state";
 import { Markdown } from "./markdown/Markdown";
 import { resendCandidate } from "./run-status";
 import { ToolCard, type ToolCardActions } from "./ToolCards";
+import { ChatNavigator } from "./ChatNavigator";
 
 /** 대화 목록. 새 내용이 오면 사용자가 위로 스크롤해 둔 경우가 아니면 맨 아래로 따라간다. */
 export function ChatView({
@@ -45,6 +46,7 @@ export function ChatView({
         />
       ))}
       {running && <div className="working">Pi가 작업 중…</div>}
+      <ChatNavigator scroller={scroller} turnSelector=".msg.user" />
     </div>
   );
 }

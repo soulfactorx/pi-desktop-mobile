@@ -5,8 +5,9 @@ import type { ChatImage, ChatLine, InboxView, Overview } from "../shared/api";
 import type { Act } from "./App";
 import { InboxCard } from "./InboxPanel";
 import { relativeTime } from "./mate-view";
-import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
+import { canReadClipboard, enterHint, isSendKey, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
+import { ChatNavigator } from "./ChatNavigator";
 
 /** 한 번에 보낼 수 있는 이미지 (실행기와 같은 한도) */
 const MAX_IMAGES = 4;
@@ -43,6 +44,7 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
   useDraftImages("mate", images, setImages);
   const [imageNote, setImageNote] = useState<string>();
   const bottom = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const [pasteBox, setPasteBox] = useState(false);
 
@@ -132,7 +134,7 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
 
   return (
     <section className="chat">
-      <div className="chat-log">
+      <div className="chat-log" ref={log}>
         {entries.length === 0 && (
           <div className="empty chat-empty">
             <p>Mate에게 무엇이든 물어보거나 시켜 보세요.</p>
@@ -160,6 +162,7 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
         {chat.busy && <div className="chat-busy muted">Mate가 답을 쓰는 중…{chat.busy.source === "telegram" ? " (휴대폰 대화)" : ""}</div>}
         {chat.pending > 0 && !chat.busy && <div className="chat-busy muted">맡긴 일 {chat.pending}건이 끝나면 결과를 알려 드릴게요.</div>}
         <div ref={bottom} />
+        <ChatNavigator scroller={log} turnSelector=".bubble.user" textSelector=".bubble-text" />
       </div>
       <div className="chat-input">
         {answerTo && (
@@ -208,11 +211,12 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
           <textarea
             value={text}
             rows={2}
-            placeholder={answerTo ? "답을 쓰세요" : "Mate에게 말하기 (Enter 보내기, Shift+Enter 줄바꿈, /로 명령)"}
+            placeholder={answerTo ? "답을 쓰세요" : enterHint("Mate에게 말하기 (Enter 보내기, Shift+Enter 줄바꿈, /로 명령)")}
             onChange={(e) => setText(e.target.value)}
             onPaste={onPaste}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              // PC는 Enter로 보내고, 휴대폰은 Enter가 줄바꿈이다 (보내기 버튼·Ctrl+Enter로 보낸다)
+              if (isSendKey(e.nativeEvent)) {
                 e.preventDefault();
                 void send(text, answerTo?.id, true);
               }
