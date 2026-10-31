@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import { formatBytes, parseDataUrl, rejectReason, toDataUrl, type ImageAttachment } from "./attachments";
 import { canReadClipboard, readClipboardImages, transferFiles } from "./clipboard-images";
+import { ImagePasteBox } from "./ImagePasteBox";
 import {
   atQuery,
   fileMention,
@@ -69,6 +70,7 @@ export function Composer(props: ComposerProps) {
   const [dragging, setDragging] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const [pasteBox, setPasteBox] = useState(false);
   // 히스토리를 보는 중이면 그 위치와, 보기 전에 쓰던 초안
   const browsing = useRef<{ index: number; draft: string; history: string[] } | undefined>(undefined);
   const [selected, setSelected] = useState(0);
@@ -200,15 +202,17 @@ export function Composer(props: ComposerProps) {
     void attach(files);
   }
 
-  /** "클립보드 이미지" 버튼: 붙여넣기 메뉴가 글만 받는 휴대폰 브라우저에서도 이미지를 붙인다 */
+  /**
+   * 📋 버튼: 붙여넣기 칸을 열고(키보드의 클립보드에 있는 스크린샷은 이 칸으로만 들어온다),
+   * 브라우저가 클립보드를 읽게 해 주면 거기 있는 이미지는 바로 붙이고 칸을 닫는다
+   */
   async function pasteFromClipboard() {
-    try {
-      const files = await readClipboardImages();
-      if (files.length === 0) return setAttachError("클립보드에 이미지가 없습니다");
-      await attach(files);
-    } catch (error) {
-      setAttachError((error as Error).message);
-    }
+    setPasteBox(true);
+    if (!canReadClipboard()) return;
+    const files = await readClipboardImages().catch(() => []);
+    if (files.length === 0) return;
+    setPasteBox(false);
+    await attach(files);
   }
 
   function onDrop(e: DragEvent<HTMLElement>) {
@@ -320,6 +324,15 @@ export function Composer(props: ComposerProps) {
             {attachError && <span className="attachment-error">{attachError}</span>}
           </div>
         )}
+      {pasteBox && !disabled && (
+        <ImagePasteBox
+          onFiles={(files) => {
+            setPasteBox(false);
+            void attach(files);
+          }}
+          onClose={() => setPasteBox(false)}
+        />
+      )}
       <textarea
         ref={textarea}
         placeholder={placeholder}
@@ -339,11 +352,9 @@ export function Composer(props: ComposerProps) {
       </div>
       <div className="actions">
         <div className="image-buttons">
-          {canReadClipboard() && (
-            <button type="button" className="image-button" disabled={disabled} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
-              📋
-            </button>
-          )}
+          <button type="button" className="image-button" disabled={disabled} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
+            📋
+          </button>
           <button type="button" className="image-button" disabled={disabled} onClick={() => imageInput.current?.click()} title="이미지 고르기" aria-label="이미지 고르기">
             🖼
           </button>
