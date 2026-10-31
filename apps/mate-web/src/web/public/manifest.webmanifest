@@ -18,10 +18,12 @@
         {
           "name": "images",
           "accept": [
-            "image/png",
-            "image/jpeg",
-            "image/gif",
-            "image/webp"
+            "image/*",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp"
           ]
         }
       ]

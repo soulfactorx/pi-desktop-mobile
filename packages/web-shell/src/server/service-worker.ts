@@ -27,17 +27,35 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "POST" || url.pathname !== "/ws-share") return;
   event.respondWith((async () => {
+    // 무엇을 받았는지 화면이 보여 줄 수 있게 남긴다 (못 받았을 때 원인을 찾게)
+    const info = { at: Date.now(), fields: [], error: "" };
     try {
-      const form = await event.request.formData();
-      const files = form.getAll("images").filter((f) => f && typeof f !== "string" && String(f.type).startsWith("image/"));
       const cache = await caches.open("ws-share");
       for (const key of await cache.keys()) await cache.delete(key);
+      const form = await event.request.formData();
       let i = 0;
-      for (const file of files.slice(0, 10)) {
-        await cache.put(new Request("/ws-share/" + i++), new Response(file, { headers: { "Content-Type": file.type, "X-File-Name": encodeURIComponent(file.name || "") } }));
+      // 항목 이름(images)에 기대지 않고 모든 파일을 본다. 형식이 비었으면 파일 이름의 확장자로 본다
+      for (const [field, value] of form.entries()) {
+        if (typeof value === "string") {
+          info.fields.push(field + ":text");
+          continue;
+        }
+        const ext = (/\.([a-z0-9]+)$/i.exec(value.name || "") || [])[1] || "";
+        const byExt = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", heic: "image/heic" }[ext.toLowerCase()];
+        const type = String(value.type || "").startsWith("image/") ? value.type : byExt || "";
+        info.fields.push(field + ":" + (value.type || "?") + ":" + value.size);
+        if (!type || i >= 10) continue;
+        await cache.put(new Request("/ws-share/" + i++), new Response(value, { headers: { "Content-Type": type, "X-File-Name": encodeURIComponent(value.name || "") } }));
       }
+      await cache.put(new Request("/ws-share-info"), new Response(JSON.stringify(info), { headers: { "Content-Type": "application/json" } }));
     } catch (error) {
-      // 읽지 못하면 화면만 연다
+      info.error = String(error && error.message || error);
+      try {
+        const cache = await caches.open("ws-share");
+        await cache.put(new Request("/ws-share-info"), new Response(JSON.stringify(info), { headers: { "Content-Type": "application/json" } }));
+      } catch (e) {
+        // 남기지 못하면 넘긴다
+      }
     }
     return Response.redirect("/?ws-share=" + Date.now(), 303);
   })());

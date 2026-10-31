@@ -35,9 +35,13 @@ export async function receiveSharedImages(): Promise<number> {
   } catch {
     // 주소를 읽을 수 없으면 캐시만 본다
   }
-  const files = "caches" in window ? await takeSharedFiles() : [];
+  const { files, info } = "caches" in window ? await takeShared() : { files: [], info: undefined };
   if (files.length === 0) {
-    if (shared) showPageNote("공유한 이미지를 받지 못했습니다. 잠시 뒤 다시 공유해 보세요");
+    if (shared || info) {
+      // 받은 항목(이름:형식:크기)을 함께 보여 원인을 찾게 한다
+      const detail = info ? (info.error ? `오류: ${info.error}` : `받은 항목: ${info.fields.join(", ") || "없음"}`) : "서비스 워커가 남긴 기록 없음";
+      showPageNote(`공유한 이미지를 받지 못했습니다 (${detail})`, 15_000);
+    }
     return 0;
   }
   showPageNote(`공유한 이미지 ${files.length}장을 받았습니다. 입력창에 붙입니다`);
@@ -55,16 +59,27 @@ export function watchSharedImages(): void {
   });
 }
 
-async function takeSharedFiles(): Promise<File[]> {
+interface ShareInfo {
+  at: number;
+  fields: string[];
+  error: string;
+}
+
+async function takeShared(): Promise<{ files: File[]; info: ShareInfo | undefined }> {
   const cache = await caches.open(SHARE_CACHE);
   const files: File[] = [];
+  let info: ShareInfo | undefined;
   for (const request of await cache.keys()) {
     const response = await cache.match(request);
     await cache.delete(request);
     if (!response) continue;
+    if (new URL(request.url).pathname === "/ws-share-info") {
+      info = (await response.json().catch(() => undefined)) as ShareInfo | undefined;
+      continue;
+    }
     const blob = await response.blob();
     const name = decodeURIComponent(response.headers.get("X-File-Name") ?? "") || `공유한 이미지.${(blob.type.split("/")[1] ?? "png").replace("jpeg", "jpg")}`;
     files.push(new File([blob], name, { type: blob.type }));
   }
-  return files;
+  return { files, info };
 }
