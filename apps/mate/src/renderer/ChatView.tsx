@@ -7,6 +7,7 @@ import { InboxCard } from "./InboxPanel";
 import { relativeTime } from "./mate-view";
 import { canReadClipboard, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
+import { ChatNavigator } from "./ChatNavigator";
 
 /** 한 번에 보낼 수 있는 이미지 (실행기와 같은 한도) */
 const MAX_IMAGES = 4;
@@ -43,6 +44,7 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
   useDraftImages("mate", images, setImages);
   const [imageNote, setImageNote] = useState<string>();
   const bottom = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const [pasteBox, setPasteBox] = useState(false);
 
@@ -132,7 +134,7 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
 
   return (
     <section className="chat">
-      <div className="chat-log">
+      <div className="chat-log" ref={log}>
         {entries.length === 0 && (
           <div className="empty chat-empty">
             <p>Mate에게 무엇이든 물어보거나 시켜 보세요.</p>
@@ -160,6 +162,7 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
         {chat.busy && <div className="chat-busy muted">Mate가 답을 쓰는 중…{chat.busy.source === "telegram" ? " (휴대폰 대화)" : ""}</div>}
         {chat.pending > 0 && !chat.busy && <div className="chat-busy muted">맡긴 일 {chat.pending}건이 끝나면 결과를 알려 드릴게요.</div>}
         <div ref={bottom} />
+        <ChatNavigator scroller={log} turnSelector=".bubble.user" textSelector=".bubble-text" />
       </div>
       <div className="chat-input">
         {answerTo && (
