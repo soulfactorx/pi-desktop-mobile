@@ -102,3 +102,22 @@ describe("WebRouter", () => {
     expect(socket.sent).toEqual([]);
   });
 });
+
+describe("보는 탭 (휴대폰 알림)", () => {
+  it("탭이 화면이 보인다고 알리면 보는 탭이 있고, 숨거나 끊기면 없다", async () => {
+    const router = new WebRouter();
+    const socket = new FakeSocket();
+    router.attach(socket);
+    expect(router.anyVisible()).toBe(false);
+    socket.receive({ t: "send", ch: "web-shell:visibility", args: [true] });
+    await tick();
+    expect(router.anyVisible()).toBe(true);
+    socket.receive({ t: "send", ch: "web-shell:visibility", args: [false] });
+    await tick();
+    expect(router.anyVisible()).toBe(false);
+    socket.receive({ t: "send", ch: "web-shell:visibility", args: [true] });
+    await tick();
+    socket.close();
+    expect(router.anyVisible()).toBe(false);
+  });
+});

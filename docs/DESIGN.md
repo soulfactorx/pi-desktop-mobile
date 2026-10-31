@@ -1226,6 +1226,7 @@ Pi는 세션 파일 잠금을 문서화하지 않았다. 그래서 **같은 세�
   - `pi-web`: start(백그라운드, `termux-wake-lock`)·run·stop·restart·status·url·open·log·update·uninstall. 서버를 꺼도 데몬과 Pi 세션은 계속 돈다.
   - 데이터: `~/.pi-web/data`(토큰, ssh-hosts.json, imports.json, copies.json, activity-log.jsonl, server.log). 데스크톱 앱의 userData에 해당한다. 데몬 홈(`~/.pi-desktop`)은 데스크톱과 같다.
 - 앱 자동 업데이트는 웹에서 끈다(`status: "disabled"`). 웹 묶음은 `pi-web update`로 바꾼다.
+- **휴대폰 알림**: 휴대폰 브라우저는 백그라운드에서 연결이 끊기고, 안드로이드 크롬은 페이지의 `new Notification`을 막아 화면(App.tsx)의 알림이 닿지 않는다. 그래서 서버가 세션 이벤트를 보고 보는 탭이 없으면 웹 푸시로 보낸다 (`server/session-notify.ts`: 작업 끝남 `agent_settled`, 답을 기다리는 대화상자). 제목에 세션 폴더 이름, 같은 세션은 tag로 묶는다. 구독·서비스 워커·알림 켜기 카드·보는 탭 알리기는 web-shell(§5.11 "알림")의 것을 그대로 쓴다.
 - 개발: `npm run dev:web -w @pi-desktop/desktop`(mock LLM + 웹 서버, 데이터는 `.dev/pi-web`).
 - 아직 하지 않은 것
   - 실제 Android 기기에서의 확인 (Linux에서 360×780 화면, 서버 재시작·재연결, 설치 스크립트를 `--file`로 확인했다)

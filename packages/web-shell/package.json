@@ -12,7 +12,11 @@
     "./build": "./src/build.ts",
     "./client.css": "./src/client/shell.css",
     "./stubs/updater": "./src/stubs/updater.ts",
-    "./stubs/autostart": "./src/stubs/autostart.ts"
+    "./stubs/autostart": "./src/stubs/autostart.ts",
+    "./notify": "./src/client/notify.ts",
+    "./push": "./src/server/push.ts",
+    "./service-worker": "./src/server/service-worker.ts",
+    "./protocol": "./src/protocol.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
