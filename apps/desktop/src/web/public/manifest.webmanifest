@@ -17,14 +17,7 @@
       "files": [
         {
           "name": "images",
-          "accept": [
-            "image/*",
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".webp"
-          ]
+          "accept": ["image/*"]
         }
       ]
     }
