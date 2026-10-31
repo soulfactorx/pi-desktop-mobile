@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { appendBlocked, appendChat, appendChatQuestion, appendProposal, makeProposal, PERMISSION_OPTIONS, readChat } from "@pi-desktop/mate-kit";
+import { appendBlocked, appendChat, appendChatAction, appendChatQuestion, appendProposal, makeProposal, PERMISSION_OPTIONS, readChat } from "@pi-desktop/mate-kit";
 import { askPermission } from "../src/permission";
 import { addChatRequest, ChatAgent, loadChatState } from "../src/chat/chat-agent";
 import { chatSystemPrompt, openQuestions } from "../src/chat/context";
@@ -10,6 +10,8 @@ import { parseSchedulePhrase } from "../src/chat/schedule-phrase";
 import type { RunInput, RunOutcome } from "../src/executor";
 import { matePaths, type MatePaths } from "../src/paths";
 import { listDuties, loadConfig, loadInboxState, saveConfig, saveDuty, takeRequests } from "../src/store";
+import { readFile } from "node:fs/promises";
+import { WEB_SEARCH } from "../src/chat/web-search";
 
 describe("실행 시점 표현", () => {
   it("대화에서 쓰는 표현을 계기로 바꾼다", () => {
@@ -184,6 +186,61 @@ describe("ChatAgent", () => {
     // 대화는 다시 실행하지 않는다
     expect(calls).toHaveLength(1);
     expect(await takeRequests(paths)).toEqual([]);
+  });
+
+  it("인터넷이 필요하면 웹 검색을 켤지 묻고, 허용하면 켜고 방금 요청에 다시 답한다 (앱을 모르는 사용자)", async () => {
+    // 모델이 enable_web을 부른다 (첫 차례만)
+    agent = new ChatAgent({
+      paths,
+      kitDir,
+      locatePi: async () => ({ cliPath: "pi" }),
+      exec: noGit,
+      log: () => {},
+      runPi: (async (_l: unknown, input: RunInput) => {
+        calls.push(input);
+        if (calls.length === 1) await appendChatAction(input.chat!.actionsPath, { action: "enable_web" });
+        return { status: "done", costUsd: 0, tokens: 1, proposals: 0, summary: calls.length === 1 ? "웹 검색이 필요해요" : "서울은 맑아요" };
+      }) as never,
+    });
+    expect(await chatSystemPrompt(paths, Date.now())).toContain("웹 검색 꺼짐");
+    agent.submit({ text: "오늘 서울 날씨 어때?", source: "app" });
+    await agent.whenIdle();
+    const question = (await readChat(paths.chat)).find((l) => l.kind === "question")!;
+    expect(question.text).toContain("웹 검색을 켤까요?");
+    expect(question.permission).toEqual({ dutyId: "mate-chat", commands: WEB_SEARCH.tools, mcpServers: ["exa"], retry: "오늘 서울 날씨 어때?" });
+
+    agent.submit({ text: PERMISSION_OPTIONS[0], source: "app", answerTo: question.id });
+    await agent.whenIdle();
+    const config = await loadConfig(paths);
+    expect(config.chatMcpServers).toEqual(["exa"]);
+    expect(config.chatGrants).toEqual(WEB_SEARCH.tools);
+    expect(JSON.parse(await readFile(paths.mcp, "utf8")).mcpServers.exa.url).toBe("https://mcp.exa.ai/mcp");
+    // 다시 답한다: 같은 요청을 웹 검색 도구와 함께
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.duty).toMatchObject({ prompt: "오늘 서울 날씨 어때?", mcpServers: ["exa"], grants: WEB_SEARCH.tools });
+    expect((await readChat(paths.chat)).at(-1)).toMatchObject({ role: "mate", text: "서울은 맑아요" });
+    expect(await chatSystemPrompt(paths, Date.now())).toContain("웹 검색 켜짐");
+    expect(await agent.doAction({ action: "enable_web" }, "app")).toMatch(/이미 켜져/);
+
+    // 폴더와 상관없는 임무: Mate 홈의 작업 폴더에서, 대화에서 허용한 웹 검색을 그대로 쓴다
+    expect(await agent.doAction({ action: "create_duty", name: "아침 날씨", prompt: "서울 날씨를 알려 줘", schedule: "daily 07:00", profile: "observe", web: true }, "app")).toMatch(
+      /만들었어요: 아침 날씨\. 임무 탭/,
+    );
+    const duty = (await listDuties(paths)).find((d) => d.name === "아침 날씨")!;
+    expect(duty).toMatchObject({ cwd: join(paths.home, "workspace"), profile: "observe", mcpServers: ["exa"], grants: WEB_SEARCH.tools, trigger: { kind: "daily", time: "07:00" } });
+  });
+
+  it("대화에서 막힌 MCP 도구를 허용하면 방금 요청에 다시 답한다", async () => {
+    await saveConfig(paths, { chatMcpServers: ["github"] });
+    agent.submit({ text: "열린 PR 알려 줘", source: "app" });
+    await agent.whenIdle();
+    await appendBlocked(calls[0]!.blockedPath!, { name: "mcp__github__list_prs", command: "PR 목록", at: 1 });
+    expect(await askPermission(paths, calls[0]!.duty, "c1", calls[0]!.blockedPath!, Date.now(), "열린 PR 알려 줘")).toBe(true);
+    const question = (await readChat(paths.chat)).find((l) => l.kind === "question")!;
+    agent.submit({ text: PERMISSION_OPTIONS[0], source: "app", answerTo: question.id });
+    await agent.whenIdle();
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.duty).toMatchObject({ prompt: "열린 PR 알려 줘", grants: ["mcp__github__list_prs"] });
   });
 
   it("/new는 대화 번호를 올리고 구분선을 남긴다", async () => {

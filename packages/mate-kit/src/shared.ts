@@ -105,8 +105,10 @@ export interface ChatLine {
   /**
    * 막힌 명령의 허용을 묻는 질문이면 그 임무와 명령 이름. 답(PERMISSION_OPTIONS)은 모델을 거치지 않고
    * 실행기가 바로 처리한다: 허용하면 임무에 저장하고 다시 실행한다
+   * - mcpServers: 허용하면 함께 켤 MCP 서버 (대화가 "웹 검색 켜기"를 물을 때. 없으면 mcp.json에 넣는다)
+   * - retry: 대화에서 물었으면, 허용한 뒤 다시 답할 사용자의 요청
    */
-  permission?: { dutyId: string; commands: string[] };
+  permission?: { dutyId: string; commands: string[]; mcpServers?: string[]; retry?: string };
 }
 
 export type Severity = "info" | "warn" | "action";

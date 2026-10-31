@@ -1,12 +1,13 @@
 import { watch, type FSWatcher } from "node:fs";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import { appendChat, extensionEntries, isMcpToolName, PERMISSION_OPTIONS, readChat, readChatActions, readInbox, type ChatLine } from "@pi-desktop/mate-kit";
+import { appendChat, appendChatQuestion, extensionEntries, isMcpToolName, PERMISSION_OPTIONS, readChat, readChatActions, readInbox, type ChatLine } from "@pi-desktop/mate-kit";
 import { delegateInboxItem } from "../delegate";
 import { isolationDirOf, runPi as defaultRunPi, type PiLaunch } from "../executor";
 import type { MatePaths } from "../paths";
 import { folderAlias, parseCommand } from "../remote/messages";
 import { addRequest, dutyIdFrom, listDuties, listRuns, loadConfig, readJson, saveConfig, saveDuty, setInboxStatus, writeJsonAtomic } from "../store";
+import { enableWebSearch, WEB_SEARCH, webSearchOn } from "./web-search";
 import { localDateKey } from "../schedule";
 import { CHAT_DUTY_ID, type Duty } from "../types";
 import { askPermission } from "../permission";
@@ -76,6 +77,8 @@ export class ChatAgent {
   private timer: NodeJS.Timeout | undefined;
   private watcher: FSWatcher | undefined;
   private abort = new AbortController();
+  /** 지금 답하는 사용자의 요청 (웹 검색을 켠 뒤 다시 답할 때) */
+  private currentRequest: string | undefined;
   private readonly listeners = new Set<(line: ChatLine) => void>();
 
   constructor(private readonly options: ChatAgentOptions) {}
@@ -247,11 +250,21 @@ export class ChatAgent {
       return true;
     }
     if (permission.dutyId === CHAT_DUTY_ID) {
-      // 대화에서 막힌 MCP 도구: 설정에 더한다. 대화는 다시 실행하지 않으니 다시 말해 달라고 한다
+      // 대화에서 막힌 MCP 도구(또는 "웹 검색 켜기"): 설정에 더한다. 물었던 요청이 있으면 바로 다시 답한다
+      if (permission.mcpServers?.length) await enableWebSearch(paths, permission.mcpServers);
       const config = await loadConfig(paths);
-      await saveConfig(paths, { chatGrants: [...new Set([...config.chatGrants, ...permission.commands.filter(isMcpToolName)])] });
-      this.options.log(`chat permission granted chat tools=${permission.commands.join(",")}`);
-      await this.say(request.source, `✅ 대화에서 ${permission.commands.join(", ")}을(를) 허용했어요. 다시 말씀해 주시면 써 볼게요.`, "notice");
+      await saveConfig(paths, {
+        chatGrants: [...new Set([...config.chatGrants, ...permission.commands.filter(isMcpToolName)])],
+        ...(permission.mcpServers?.length ? { chatMcpServers: [...new Set([...config.chatMcpServers, ...permission.mcpServers])] } : {}),
+      });
+      this.options.log(`chat permission granted chat tools=${permission.commands.join(",")} servers=${(permission.mcpServers ?? []).join(",")}`);
+      const done = permission.mcpServers?.length ? "✅ 웹 검색을 켰어요." : `✅ 대화에서 ${permission.commands.join(", ")}을(를) 허용했어요.`;
+      if (!permission.retry) {
+        await this.say(request.source, `${done} 다시 말씀해 주시면 써 볼게요.`, "notice");
+        return true;
+      }
+      await this.say(request.source, `${done} 방금 요청에 다시 답할게요.`, "notice");
+      await this.think({ text: permission.retry, source: request.source, lineId: question.id });
       return true;
     }
     const duty = (await listDuties(paths)).find((d) => d.id === permission.dutyId);
@@ -278,6 +291,7 @@ export class ChatAgent {
   private async think(request: ChatRequest): Promise<void> {
     const { paths } = this.options;
     const now = this.now();
+    this.currentRequest = request.text;
     this.state.busy = { since: now, source: request.source };
     await this.save();
     try {
@@ -333,7 +347,7 @@ export class ChatAgent {
       await this.say(request.source, text);
       this.options.log(`chat turn status=${outcome.status} cost=${outcome.costUsd.toFixed(4)}`);
       // 처음 쓰는 MCP 도구가 막혔으면 대화에서 허용할지 묻는다
-      await askPermission(paths, duty, runId, blockedPath, this.now()).catch((error: Error) => this.options.log(`chat permission ask error ${error.message}`));
+      await askPermission(paths, duty, runId, blockedPath, this.now(), request.text).catch((error: Error) => this.options.log(`chat permission ask error ${error.message}`));
       const actions = await readChatActions(actionsPath);
       await rm(actionsPath, { force: true });
       const notes: string[] = [];
@@ -390,9 +404,38 @@ export class ChatAgent {
         await setInboxStatus(paths, [item.id], action.action === "accept" ? "accepted" : "dismissed");
         return `${action.action === "accept" ? "👍 확인함" : "🗑 버림"}: ${item.title}`;
       }
+      case "enable_web": {
+        if (await webSearchOn(paths)) return "🌐 웹 검색은 이미 켜져 있어요.";
+        const asked = await appendChatQuestion(
+          paths.chat,
+          {
+            text: [
+              "이 일에는 인터넷 검색이 필요해요. 웹 검색을 켤까요?",
+              `• ${WEB_SEARCH.label}: 검색어와 읽을 웹 페이지 주소가 ${WEB_SEARCH.host}로 나가요. 파일이나 대화 내용은 보내지 않아요.`,
+              "켜면 대화와 임무에서 날씨·뉴스·검색을 쓸 수 있어요. 설정 탭에서 언제든 끌 수 있어요.",
+            ].join("\n"),
+            options: [...PERMISSION_OPTIONS],
+            dutyId: CHAT_DUTY_ID,
+            permission: {
+              dutyId: CHAT_DUTY_ID,
+              commands: WEB_SEARCH.tools,
+              mcpServers: [WEB_SEARCH.server],
+              ...(this.currentRequest ? { retry: this.currentRequest } : {}),
+            },
+          },
+          this.now(),
+        );
+        return asked ? "🌐 웹 검색을 켤지 위의 질문에서 골라 주세요." : "🌐 웹 검색을 켤지 묻는 질문이 이미 있어요. 위에서 골라 주세요.";
+      }
       case "create_duty": {
-        const folder = await this.resolveFolder(str("folder"));
+        const config = await loadConfig(paths);
+        // 폴더와 상관없는 일(날씨·뉴스 등)은 Mate 홈의 작업 폴더에서 돈다
+        const folder = str("folder") ? await this.resolveFolder(str("folder")) : await this.workspace();
         if (!folder) return `⚠️ 폴더 "${str("folder")}"을(를) 모르겠어요. 경로를 알려 주세요.`;
+        const web = action.web === true;
+        if (web) await enableWebSearch(paths, [WEB_SEARCH.server]);
+        // 대화에서 이미 웹 검색을 허용했으면 임무에도 허용해 둔다 (같은 것을 두 번 묻지 않게)
+        const webGrants = web ? WEB_SEARCH.tools.filter((t) => config.chatGrants.includes(t)) : [];
         const trigger = parseSchedulePhrase(str("schedule"));
         if (!trigger) return `⚠️ 실행 시점 "${str("schedule")}"을(를) 이해하지 못했어요.`;
         const name = str("name") || str("prompt").slice(0, 40);
@@ -406,9 +449,13 @@ export class ChatAgent {
           prompt: str("prompt"),
           profile,
           trigger,
+          ...(web ? { mcpServers: [WEB_SEARCH.server] } : {}),
+          ...(webGrants.length ? { grants: webGrants } : {}),
           createdAt: this.now(),
         });
-        return `🗓 임무를 만들었어요: ${duty.name} (${folderAlias(duty.cwd)}). 임무 탭에서 고칠 수 있어요.`;
+        const where = str("folder") ? ` (${folderAlias(duty.cwd)})` : "";
+        const webNote = web && webGrants.length < WEB_SEARCH.tools.length ? " 처음 실행할 때 웹 검색을 허용할지 물어요." : "";
+        return `🗓 임무를 만들었어요: ${duty.name}${where}.${webNote} 임무 탭에서 고칠 수 있어요.`;
       }
       case "pause":
       case "resume":
@@ -417,6 +464,13 @@ export class ChatAgent {
       default:
         return `⚠️ 모르는 할 일이에요: ${String(action.action)}`;
     }
+  }
+
+  /** 폴더와 상관없는 임무가 도는 곳 (Mate 홈의 workspace) */
+  private async workspace(): Promise<string> {
+    const dir = join(this.options.paths.home, "workspace");
+    await mkdir(dir, { recursive: true });
+    return dir;
   }
 
   /** 아는 폴더 이름이나, 실제로 있는 절대 경로 */
