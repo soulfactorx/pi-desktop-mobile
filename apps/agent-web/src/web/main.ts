@@ -1,4 +1,5 @@
 import { bootWebApp } from "@pi-desktop/web-shell/client";
+import { setupCompactHeader } from "@pi-desktop/web-shell/compact-header";
 
 /**
  * Pi Desktop Agent 웹 화면의 시작점 (설계 DESIGN.md §5.11).
@@ -13,5 +14,7 @@ bootWebApp({
     await import("../../../agent/src/renderer/main");
     // 앱 화면 CSS 뒤에 두어야 같은 선택자를 덮는다
     await import("./web.css");
+    // 휴대폰: 대화 위 정보 줄(대화 이름·폴더·모델)을 접었다 편다. 키보드가 뜨면 저절로 접는다
+    setupCompactHeader({ hide: [".chat-page .page-head"], anchor: ".chat-page", key: "pi-agent-compact-header" });
   },
 });
