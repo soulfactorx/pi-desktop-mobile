@@ -9,6 +9,7 @@ import { Methods, type SessionEventNotification, type SessionSummary } from "@pi
 import { PushCenter } from "@pi-desktop/web-shell/push";
 import { SERVICE_WORKER_SOURCE } from "@pi-desktop/web-shell/service-worker";
 import { SERVICE_WORKER_PATH, ShellChannels } from "@pi-desktop/web-shell/protocol";
+import { handleShareRequest } from "@pi-desktop/web-shell/share-inbox";
 import { IpcChannels, type UpdateState } from "../shared/api";
 import { WebPaths } from "../shared/web-protocol";
 import { ActionLog } from "../main/action-log";
@@ -147,6 +148,8 @@ router.handle(ShellChannels.pushUnsubscribe, (_peer, endpoint: string) => push.u
 const allowed = (req: IncomingMessage) => requestAllowed({ host: req.headers.host, origin: req.headers.origin }, loopbackOnly);
 
 const server = createServer((req, res) => {
+  // 휴대폰 공유(스크린샷 등): 다른 앱이 보내 Origin이 이 서버가 아니므로 주소(Host)만 본다
+  if (handleShareRequest(req, res, requestAllowed({ host: req.headers.host }, loopbackOnly))) return;
   if (!allowed(req)) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" }).end("허용하지 않는 주소입니다");
     return;

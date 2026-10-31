@@ -10,6 +10,7 @@ import { PushCenter } from "./push";
 import { SERVICE_WORKER_SOURCE } from "./service-worker";
 import { bearerToken, isLoopbackAddress, loadOrCreateToken, requestAllowed, tokenMatches } from "./auth";
 import { serveStatic } from "./static-files";
+import { handleShareRequest } from "./share-inbox";
 
 export { hub };
 export { bearerToken, isLoopbackAddress, loadOrCreateToken, requestAllowed, tokenMatches } from "./auth";
@@ -43,6 +44,8 @@ export function startWebServer(options: WebServerOptions): Promise<{ server: Ser
   registerPush(push, options.app);
 
   const server = createServer((req, res) => {
+    // 다른 앱이 보낸 공유는 Origin이 이 서버가 아니므로 주소(Host)만 본다
+    if (handleShareRequest(req, res, requestAllowed({ host: req.headers.host }, loopbackOnly))) return;
     if (!allowed(req)) {
       res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" }).end("허용하지 않는 주소입니다");
       return;
