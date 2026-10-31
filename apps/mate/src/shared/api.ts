@@ -22,6 +22,13 @@ import type { FsListDirResult } from "@pi-desktop/host-protocol/messages";
 export type { FsListDirResult, SshHostConfig };
 
 /** 고를 수 있는 호스트 (DESIGN-MATE-REMOTE.md §3.1) */
+/** 대화에 붙이는 이미지 (base64, data: 머리 없이) */
+export interface ChatImage {
+  name: string;
+  mimeType: string;
+  data: string;
+}
+
 export interface HostView {
   id: string;
   kind: "local" | "wsl" | "ssh";
@@ -238,8 +245,11 @@ export interface MateApi {
   telegramPair(): Promise<TelegramView>;
   telegramUnpair(): Promise<TelegramView>;
   telegramTest(): Promise<void>;
-  /** Mate에게 말한다 ("/"로 시작하면 명령). answerTo는 Mate 질문에 답할 때 그 질문 줄 id */
-  chatSend(text: string, answerTo?: string): Promise<void>;
+  /**
+   * Mate에게 말한다 ("/"로 시작하면 명령). answerTo는 Mate 질문에 답할 때 그 질문 줄 id.
+   * images는 붙여넣거나 고른 이미지 (4장, 한 장 5MB까지)
+   */
+  chatSend(text: string, answerTo?: string, images?: ChatImage[]): Promise<void>;
   /** Mate 홈의 파일이 바뀌면 불린다. 해제 함수를 돌려준다 */
   onChanged(listener: () => void): () => void;
 }

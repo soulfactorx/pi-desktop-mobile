@@ -45,6 +45,8 @@ export interface RunInput {
   installHints?: string[];
   /** 대화(chat): 권한 단계·시스템 안내·이어 쓸 세션을 바꾼다 (임무 실행에는 쓰지 않음) */
   chat?: { sessionId: string; systemPrompt: string; actionsPath: string };
+  /** 지시와 함께 넘길 이미지 파일 (Pi의 `@파일`. 대화에서 붙인 이미지) */
+  images?: string[];
 }
 
 export interface RunOutcome {
@@ -119,6 +121,7 @@ export function piArgs(input: RunInput): string[] {
     // 모델을 정하지 않았으면 Pi 기본 모델(settings.json)을 따른다
     ...(input.model ? ["--model", input.model] : []),
     "--append-system-prompt", input.chat?.systemPrompt ?? mateSystemPrompt(duty, input.cause, input.installHints),
+    ...(input.images ?? []).map((file) => `@${file}`),
     duty.prompt,
   ];
 }

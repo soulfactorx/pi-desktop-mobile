@@ -109,6 +109,8 @@ export interface ChatLine {
    * - retry: 대화에서 물었으면, 허용한 뒤 다시 답할 사용자의 요청
    */
   permission?: { dutyId: string; commands: string[]; mcpServers?: string[]; retry?: string };
+  /** 사용자가 이 말과 함께 보낸 이미지 수 */
+  images?: number;
 }
 
 export type Severity = "info" | "warn" | "action";

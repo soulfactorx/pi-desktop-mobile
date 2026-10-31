@@ -701,6 +701,17 @@ button.small {
   justify-content: flex-end;
 }
 
+/* 클립보드 이미지·이미지 고르기 */
+.image-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.image-button {
+  flex: 1;
+  padding-inline: 6px;
+}
+
 .banner {
   white-space: pre-wrap;
 }

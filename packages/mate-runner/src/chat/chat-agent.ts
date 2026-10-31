@@ -13,6 +13,7 @@ import { CHAT_DUTY_ID, type Duty } from "../types";
 import { askPermission } from "../permission";
 import type { Exec } from "../watchers";
 import { COMMAND_HELP, findDuty, findFolder, instruct, runCommand, type ChatSource, type CommandContext } from "./commands";
+import { chatImagesOf, removeChatImages } from "./chat-images";
 import { chatSystemPrompt } from "./context";
 import { parseSchedulePhrase } from "./schedule-phrase";
 
@@ -31,6 +32,8 @@ export interface ChatRequest {
   answerTo?: string;
   /** 앱이 사용자 줄을 이미 남겼으면 그 id (없으면 여기서 남김) */
   lineId?: string;
+  /** 함께 보낸 이미지 파일 (Mate 홈의 chat/images 안. 답한 뒤 지운다) */
+  images?: string[];
 }
 
 /** chat/state.json (실행기가 씀, 앱은 읽기만) */
@@ -147,6 +150,7 @@ export class ChatAgent {
           this.options.log(`chat error ${error.stack ?? error.message}`);
           return this.say(next.source, `⚠️ 처리하지 못했어요: ${error.message}`, "notice");
         });
+        await removeChatImages(next.images);
       }
     } finally {
       this.working = false;
@@ -172,8 +176,9 @@ export class ChatAgent {
           source: raw.source === "telegram" ? "telegram" : "app",
           ...(typeof raw.answerTo === "string" ? { answerTo: raw.answerTo } : {}),
           ...(typeof raw.lineId === "string" ? { lineId: raw.lineId } : {}),
+          ...(chatImagesOf(this.options.paths, raw.images).length ? { images: chatImagesOf(this.options.paths, raw.images) } : {}),
         });
-      }
+      } else await removeChatImages(chatImagesOf(this.options.paths, raw?.images));
     }
     return out;
   }
@@ -339,6 +344,7 @@ export class ChatAgent {
           timeoutSec: CHAT_TIMEOUT_SEC,
           maxCostUsd: config.maxCostUsd,
           chat: { sessionId: `mate-chat-${this.state.epoch}`, systemPrompt, actionsPath },
+          ...(request.images?.length ? { images: request.images } : {}),
         },
         this.abort.signal,
       );

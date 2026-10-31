@@ -37,6 +37,8 @@ export function matePaths(home: string) {
     chatRequests: join(home, "chat", "requests"),
     /** 대화 한 차례의 할 일 목록 (mate_do) */
     chatActions: join(home, "chat", "actions"),
+    /** 대화에 붙인 이미지 (Pi에 넘기고 답한 뒤 지운다) */
+    chatImages: join(home, "chat", "images"),
     /** 대화 상태 (실행기가 씀: 세션 번호·생각 중·결과를 기다리는 실행) */
     chatState: join(home, "chat", "state.json"),
     /** 임무가 고르는 스킬과 MCP 서버 (DESIGN-APPS.md §3.4). Pi 형식 그대로 */
