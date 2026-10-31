@@ -38,6 +38,7 @@ export function reportVisibility(transport: NotifyTransport): void {
 }
 
 const NOTIFY_ASKED_KEY = "pi-web-notify-asked";
+const ASK_AGAIN_MS = 24 * 60 * 60_000;
 
 /**
  * 휴대폰 알림 (웹 푸시). 서비스 워커를 올리고, 알림이 허용되어 있으면 구독을 서버에 보낸다.
@@ -47,7 +48,9 @@ export async function setupNotifications(transport: NotifyTransport, title: stri
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
   await navigator.serviceWorker.register(SERVICE_WORKER_PATH, { scope: "/" });
   if (Notification.permission === "granted") return subscribePush(transport);
-  if (Notification.permission === "denied" || readStored(NOTIFY_ASKED_KEY)) return;
+  // "나중에"를 누른 지 하루가 지나면 다시 묻는다 (앱을 다시 설치하면 허용이 풀리므로 한 번만 묻고 끝내지 않는다)
+  const asked = Number(readStored(NOTIFY_ASKED_KEY));
+  if (Notification.permission === "denied" || (Number.isFinite(asked) && Date.now() - asked < ASK_AGAIN_MS)) return;
   const card = el("div", "ws-notify-ask");
   card.setAttribute("role", "dialog");
   card.append(
@@ -62,7 +65,7 @@ export async function setupNotifications(transport: NotifyTransport, title: stri
   actions.append(later, enable);
   card.append(actions);
   const close = () => {
-    store(NOTIFY_ASKED_KEY, "1");
+    store(NOTIFY_ASKED_KEY, String(Date.now()));
     card.remove();
   };
   later.addEventListener("click", close);
@@ -71,6 +74,31 @@ export async function setupNotifications(transport: NotifyTransport, title: stri
     void Notification.requestPermission().then((permission) => (permission === "granted" ? subscribePush(transport) : undefined));
   });
   document.body.append(card);
+}
+
+/**
+ * 메뉴의 "알림 시험": 알림이 오는지 바로 확인한다. 허용을 아직 안 했으면 묻고, 막혀 있으면 켜는 곳을 알려 주고,
+ * 허용되어 있으면 구독을 다시 서버에 맡긴 뒤 시험 알림을 보낸다. 결과는 화면 위 안내로 보인다.
+ */
+export async function checkNotifications(transport: NotifyTransport): Promise<void> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    return showPageNote("이 브라우저는 휴대폰 알림(웹 푸시)을 지원하지 않습니다", 8000);
+  }
+  let permission = Notification.permission;
+  if (permission === "default") permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    return showPageNote("알림이 꺼져 있습니다. 휴대폰 설정 → 애플리케이션 → 이 앱(또는 Chrome) → 알림에서 켠 뒤 다시 눌러 주세요", 12_000);
+  }
+  try {
+    await subscribePush(transport);
+    const result: { sent: number; total: number } = await transport.invoke(ShellChannels.pushTest);
+    showPageNote(
+      result.sent > 0 ? `시험 알림을 보냈습니다 (기기 ${result.sent}개). 곧 휴대폰 알림이 와야 합니다` : `시험 알림을 보내지 못했습니다 (등록된 기기 ${result.total}개)`,
+      8000,
+    );
+  } catch (error) {
+    showPageNote(`알림을 준비하지 못했습니다: ${(error as Error).message}`, 12_000);
+  }
 }
 
 async function subscribePush(transport: NotifyTransport): Promise<void> {

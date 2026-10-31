@@ -62,6 +62,16 @@ export function WebMenu({ onCommand }: { onCommand: (id: string) => void }) {
                 >
                   <span>파일 관리자</span>
                 </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    void window.piWeb?.checkNotifications();
+                  }}
+                >
+                  <span>알림 켜기·시험</span>
+                </button>
               </section>
             )}
             {WEB_MENU.map((group) => (

@@ -1,7 +1,7 @@
 import { createPiDesktopApi } from "../shared/api-client";
 import { WebPaths } from "../shared/web-protocol";
 import { WsTransport, type LinkStatus } from "./ws-transport";
-import { onNotificationOpen, reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
+import { checkNotifications, onNotificationOpen, reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
 import { watchSharedImages } from "@pi-desktop/web-shell/share";
 import { OPEN_SESSION_EVENT, parseSessionOpen, type SessionTarget } from "../shared/web-files";
 import { createWebFiles } from "./web-files";
@@ -108,6 +108,7 @@ async function start(token: string): Promise<void> {
   let appReady = false;
   window.piWeb = {
     files: createWebFiles((channel, ...args) => transport.invoke(channel, ...args)),
+    checkNotifications: () => checkNotifications(transport),
     takeOpenSession: () => {
       appReady = true;
       const target = pendingOpen;
