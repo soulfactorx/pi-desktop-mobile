@@ -1,6 +1,6 @@
 import { CLICK_OPEN, ShellChannels, WebPaths, type Control, type DialogRequest, type DirListing, type MenuGroup } from "../protocol";
 import { useTransport } from "./electron-renderer";
-import { onNotificationOpen, reportVisibility, setupNotifications } from "./notify";
+import { checkNotifications, onNotificationOpen, reportVisibility, setupNotifications } from "./notify";
 import { watchSharedImages } from "./share";
 import { ResumableTransport, type LinkStatus } from "./transport";
 import "./shell.css";
@@ -192,6 +192,7 @@ class ShellUi {
 
   bind(transport: ResumableTransport): void {
     this.transport = transport;
+    this.setMenu(this.menuGroups);
   }
 
   link(status: LinkStatus): void {
@@ -267,11 +268,7 @@ class ShellUi {
 
   private setMenu(groups: MenuGroup[]): void {
     this.menuGroups = groups;
-    if (groups.length === 0) {
-      this.menuButton?.remove();
-      this.menuButton = undefined;
-      return;
-    }
+    // 앱 메뉴가 없어도 "알림 켜기·시험"이 있어 메뉴 단추는 늘 둔다
     if (this.menuButton) return;
     const button = el("button", "ws-menu-button", "⋮");
     button.type = "button";
@@ -309,6 +306,19 @@ class ShellUi {
       }
       panel.append(section);
     }
+    // 웹 껍데기가 직접 다는 항목: 알림 시험 (앱 메뉴와 상관없이)
+    const phone = el("section");
+    phone.append(el("h3", undefined, "휴대폰"));
+    const test = el("button");
+    test.type = "button";
+    test.setAttribute("role", "menuitem");
+    test.append(el("span", undefined, "알림 켜기·시험"), el("span", "ws-menu-check", ""));
+    test.addEventListener("click", () => {
+      close();
+      if (this.transport) void checkNotifications(this.transport);
+    });
+    phone.append(test);
+    panel.append(phone);
     const closeButton = el("button", "ws-menu-close", "닫기");
     closeButton.type = "button";
     closeButton.addEventListener("click", close);

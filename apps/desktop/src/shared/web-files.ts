@@ -78,6 +78,8 @@ declare global {
       files: WebFilesApi;
       /** 화면이 뜨기 전에 알림을 눌러 받은 세션 (한 번 읽으면 지운다). 그 뒤의 것은 OPEN_SESSION_EVENT로 */
       takeOpenSession(): SessionTarget | undefined;
+      /** 알림을 켜고(묻기) 시험 알림을 보낸다. 결과는 화면 위 안내로 */
+      checkNotifications(): Promise<void>;
     };
   }
 }

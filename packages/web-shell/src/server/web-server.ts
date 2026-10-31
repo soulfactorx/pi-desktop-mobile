@@ -134,6 +134,7 @@ function registerPush(push: PushCenter, app: string): void {
     return push.count;
   });
   hub.override(ShellChannels.pushUnsubscribe, (_event, endpoint: string) => push.unsubscribe(String(endpoint)));
+  hub.override(ShellChannels.pushTest, async () => ({ sent: await push.send({ title: `${app} · 알림 시험`, body: "휴대폰 알림이 잘 옵니다." }), total: push.count }));
   onBackgroundNotify((note) => {
     void push
       .send({ title: note.title ? `${app} · ${note.title}` : app, ...(note.body ? { body: note.body } : {}), ...(note.clickId ? { open: `${CLICK_OPEN}${note.clickId}` } : {}) })

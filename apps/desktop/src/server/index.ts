@@ -144,6 +144,7 @@ router.handle(ShellChannels.pushSubscribe, (_peer, subscription: unknown) => {
   return push.count;
 });
 router.handle(ShellChannels.pushUnsubscribe, (_peer, endpoint: string) => push.unsubscribe(String(endpoint)));
+router.handle(ShellChannels.pushTest, async () => ({ sent: await push.send({ title: "Pi Web · 알림 시험", body: "휴대폰 알림이 잘 옵니다." }), total: push.count }));
 
 const allowed = (req: IncomingMessage) => requestAllowed({ host: req.headers.host, origin: req.headers.origin }, loopbackOnly);
 

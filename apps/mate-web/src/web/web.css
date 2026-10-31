@@ -116,3 +116,13 @@
     overflow-x: auto;
   }
 }
+
+/* 웹 껍데기의 ⋮ 메뉴(알림 켜기·시험) 단추가 오른쪽 위에 떠 있으므로 머리줄 오른쪽을 비운다 */
+.top {
+  padding-right: 56px;
+}
+@media (max-width: 720px) {
+  .top {
+    padding-right: 56px;
+  }
+}
