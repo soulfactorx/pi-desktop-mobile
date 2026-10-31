@@ -1,11 +1,14 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import type { SessionEventNotification } from "@pi-desktop/host-protocol";
+import { Methods, type SessionEventNotification, type SessionSummary } from "@pi-desktop/host-protocol";
+import { PushCenter } from "@pi-desktop/web-shell/push";
+import { SERVICE_WORKER_SOURCE } from "@pi-desktop/web-shell/service-worker";
+import { SERVICE_WORKER_PATH, ShellChannels } from "@pi-desktop/web-shell/protocol";
 import { IpcChannels, type UpdateState } from "../shared/api";
 import { WebPaths } from "../shared/web-protocol";
 import { ActionLog } from "../main/action-log";
@@ -20,6 +23,7 @@ import { TerminalService } from "../main/terminal";
 import { bearerToken, isLoopbackAddress, loadOrCreateToken, requestAllowed, tokenMatches } from "./auth";
 import { serveStatic } from "./static-files";
 import { WebRouter } from "./web-router";
+import { sessionNote } from "./session-notify";
 
 /**
  * 웹 서버 pi-web (설계 §5.10). 데스크톱 앱의 main 프로세스 자리를 Node 서버가 맡고, 화면은 브라우저로 연다.
@@ -59,12 +63,36 @@ const token = loadOrCreateToken(join(dataDir, "token"));
 const router = new WebRouter();
 const replays = new ReplayCollector<SessionEventNotification>();
 const sshHosts = new SshHostStore(join(dataDir, "ssh-hosts.json"));
-const hosts = new HostManager({
+const push = new PushCenter(dataDir);
+const hosts: HostManager = new HostManager({
   agentScript,
   agentVersion: agentVersion(agentScript),
   sshHosts,
-  ...hostEventHandlers((channel, ...payload) => router.broadcast(channel, ...payload), replays),
+  ...hostEventHandlers((channel, ...payload) => {
+    router.broadcast(channel, ...payload);
+    if (channel === IpcChannels.sessionEvent) notifyInBackground(payload[0] as string, payload[1] as SessionEventNotification);
+  }, replays),
 });
+
+/** 세션 id → 폴더 (알림 제목용). 모르는 세션이 오면 그 호스트의 목록을 다시 읽는다 */
+const sessionFolders = new Map<string, string>();
+
+/**
+ * 휴대폰 알림 (설계 §5.10 "알림", web-shell의 웹 푸시). 보는 탭이 없을 때 작업이 끝나거나 답을 기다리면 웹 푸시로 보낸다.
+ * 보는 탭이 있으면 화면이 이미 보여 준다.
+ */
+function notifyInBackground(hostId: string, n: SessionEventNotification): void {
+  if (router.anyVisible() || push.count === 0 || !sessionNote(n.event, "")) return;
+  void (async () => {
+    if (!sessionFolders.has(n.sessionId)) {
+      const sessions = await hosts.get(hostId).request<SessionSummary[]>(Methods.sessionList);
+      for (const s of sessions) sessionFolders.set(s.sessionId, s.cwd);
+    }
+    const cwd = sessionFolders.get(n.sessionId) ?? "";
+    const note = sessionNote(n.event, basename(cwd) || cwd || "세션");
+    if (note) await push.send({ title: `Pi Web · ${note.title}`, body: note.body, tag: n.sessionId });
+  })().catch(() => undefined);
+}
 const terminals = new TerminalService({ data: IpcChannels.terminalData, exit: IpcChannels.terminalExit });
 
 registerHandlers(router, {
@@ -88,11 +116,25 @@ router.handle(IpcChannels.confirmUpdate, () => undefined);
 router.handle(IpcChannels.installUpdate, () => undefined);
 router.handle(IpcChannels.openRelease, () => undefined);
 
+// 웹 푸시 구독 (화면은 web-shell의 notify.ts)
+router.handle(ShellChannels.pushKey, () => push.publicKey());
+router.handle(ShellChannels.pushSubscribe, (_peer, subscription: unknown) => {
+  push.subscribe(subscription as Parameters<PushCenter["subscribe"]>[0]);
+  return push.count;
+});
+router.handle(ShellChannels.pushUnsubscribe, (_peer, endpoint: string) => push.unsubscribe(String(endpoint)));
+
 const allowed = (req: IncomingMessage) => requestAllowed({ host: req.headers.host, origin: req.headers.origin }, loopbackOnly);
 
 const server = createServer((req, res) => {
   if (!allowed(req)) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" }).end("허용하지 않는 주소입니다");
+    return;
+  }
+  if (req.url?.split("?")[0] === SERVICE_WORKER_PATH) {
+    // 서비스 워커는 사이트 전체(/)를 맡는다. 바뀌면 바로 새것을 쓰도록 캐시하지 않는다
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache", "Service-Worker-Allowed": "/" });
+    res.end(SERVICE_WORKER_SOURCE);
     return;
   }
   if (req.url?.split("?")[0] === WebPaths.auth) {

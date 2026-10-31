@@ -52,10 +52,14 @@ export function App() {
   const onStatus = useCallback((id: string, status: WorkspaceStatus) => {
     const before = statusesRef.current[id];
     setStatuses((prev) => ({ ...prev, [id]: status }));
-    if (id === activeRef.current) return;
     const kind = attentionFor(before, status);
     if (!kind) return;
-    setAttention((prev) => ({ ...prev, [id]: kind }));
+    // 지금 보는 탭은 창을 보고 있으면 화면에 이미 보인다. 창을 내려 두었거나 다른 창을 보고 있으면 알린다
+    if (id === activeRef.current) {
+      if (document.visibilityState === "visible" && document.hasFocus()) return;
+    } else {
+      setAttention((prev) => ({ ...prev, [id]: kind }));
+    }
     notify(status.title, kind, () => activate(id));
   }, [activate]);
 

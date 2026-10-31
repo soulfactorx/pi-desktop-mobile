@@ -35,6 +35,7 @@ import { IpcChannels, type AttachResult, type ChatSummary, type CurrentHost, typ
 import { findPiDesktop, installPiDesktop, openPiDesktop } from "./pi-desktop";
 import type { PiSetupView } from "../shared/pi-setup";
 import { TaskWatcher } from "./task-watcher";
+import { sessionNote } from "./session-notify";
 import { appMenuTemplate } from "./app-menu";
 import { OWNER, REPO, Updater } from "./updater";
 
@@ -89,6 +90,35 @@ function notifyTask(task: TaskRecord): void {
   const origin = task.origin === "schedule" ? "예약" : task.origin === "peer-out" ? `${task.peer?.name ?? "피어"}에게 맡긴 작업` : task.origin === "peer-in" ? `${task.peer?.name ?? "피어"}가 맡긴 작업` : "작업";
   const body = (task.status === "failed" ? task.error : task.result)?.slice(0, 200) ?? "";
   new Notification({ title: `${origin} ${status}: ${task.title}`, body }).show();
+}
+
+/** 알림에 쓸 대화의 폴더 (세션 id → cwd). 모르는 세션이 오면 목록을 다시 읽는다 */
+let sessionFolders = new Map<string, string>();
+
+/**
+ * 대화 소식(답이 끝남·승인 요청·답을 기다림)을 OS 알림으로 띄운다 (session-notify.ts). 창을 보고 있으면 띄우지 않는다.
+ * 예약 작업을 돌리는 스케줄러 세션은 작업 알림(notifyTask)이 맡으므로 알리지 않는다. 누르면 창을 앞으로 가져온다.
+ */
+function notifySession(n: SessionEventNotification): void {
+  if (!Notification.isSupported() || mainWindow?.isFocused() || !sessionNote(n.event, "")) return;
+  void (async () => {
+    if (!sessionFolders.has(n.sessionId) && connection) {
+      const sessions = await connection.request<SessionSummary[]>(Methods.sessionList);
+      sessionFolders = new Map(sessions.map((s) => [s.sessionId, s.cwd]));
+    }
+    const cwd = sessionFolders.get(n.sessionId);
+    if (!cwd || !hostPaths || cwd === schedulerDir()) return;
+    const note = sessionNote(n.event, basename(cwd) || cwd);
+    if (!note) return;
+    const shown = new Notification({ title: note.title, body: note.body });
+    shown.on("click", () => {
+      if (!mainWindow) createWindow();
+      if (mainWindow?.isMinimized()) mainWindow.restore();
+      mainWindow?.show();
+      mainWindow?.focus();
+    });
+    shown.show();
+  })().catch(() => undefined);
 }
 
 /** 이 PC를 호스트로 쓸 때의 경로 */
@@ -213,6 +243,7 @@ function createConnection(hostId: string, onConnected: () => void): HostConnecti
     onSessionEvent: (n) => {
       replays.capture(n.sessionId, n);
       sendToRenderer(IpcChannels.sessionEvent, n);
+      notifySession(n);
     },
     onSessionExit: (n) => sendToRenderer(IpcChannels.sessionExit, n),
     onUiResolved: (n) => sendToRenderer(IpcChannels.uiResolved, n),
@@ -528,6 +559,7 @@ async function switchHost(hostId: string): Promise<void> {
   currentHostId = hostId;
   connection?.dispose();
   hostPaths = undefined;
+  sessionFolders = new Map();
   connection = connectTo(hostId);
   connection.start();
   watchTasks();

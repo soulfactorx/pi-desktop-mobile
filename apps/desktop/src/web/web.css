@@ -42,3 +42,13 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* 웹 껍데기(web-shell)의 알림 켜기 카드 색을 화면 색 변수에 맞춘다 */
+:root {
+  --ws-bg: var(--bg);
+  --ws-panel: var(--panel-2);
+  --ws-border: var(--border);
+  --ws-text: var(--text);
+  --ws-muted: var(--muted);
+  --ws-accent: var(--accent);
+}

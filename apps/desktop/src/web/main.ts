@@ -1,6 +1,8 @@
 import { createPiDesktopApi } from "../shared/api-client";
 import { WebPaths } from "../shared/web-protocol";
 import { WsTransport, type LinkStatus } from "./ws-transport";
+import { reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
+import "@pi-desktop/web-shell/client.css";
 import "../renderer/styles.css";
 import "./web.css";
 
@@ -90,11 +92,17 @@ async function start(token: string): Promise<void> {
   }
   storeToken(token);
   const scheme = location.protocol === "https:" ? "wss:" : "ws:";
-  const transport = new WsTransport(`${scheme}//${location.host}${WebPaths.socket}?token=${encodeURIComponent(token)}`, showLink);
+  const transport: WsTransport = new WsTransport(`${scheme}//${location.host}${WebPaths.socket}?token=${encodeURIComponent(token)}`, (status) => {
+    showLink(status);
+    // 다시 붙으면 서버가 이 탭을 새로 보므로 화면이 보이는지 다시 알린다 (보는 탭이 없으면 알림을 웹 푸시로)
+    if (status === "open") reportVisibility(transport);
+  });
+  document.addEventListener("visibilitychange", () => reportVisibility(transport));
   transport.connect();
   window.piDesktop = createPiDesktopApi(transport, "web");
   document.getElementById("root")!.innerHTML = "";
   await import("../renderer/main");
+  void setupNotifications(transport, "Pi Web").catch((error: unknown) => console.warn("알림을 준비하지 못했습니다", error));
 }
 
 const token = takeTokenFromUrl() ?? readStoredToken();

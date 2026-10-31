@@ -11,15 +11,20 @@ export interface PeerSocket {
 }
 
 const OPEN = 1;
+/** web-shell의 ShellChannels.visibility와 같다 (화면 쪽은 web-shell의 notify.ts를 쓴다) */
+const VISIBILITY_CHANNEL = "web-shell:visibility";
 
 /** 브라우저 탭 하나. Electron의 WebContents 자리를 맡는다 (터미널 출력은 그 탭에만 보낸다) */
 export class WsPeer implements Peer {
   private destroyed = false;
+  /** 브라우저가 알린 화면 보임 (보는 탭이 없으면 알림을 웹 푸시로 보낸다) */
+  visible = false;
   private readonly events = new EventEmitter();
 
   constructor(private readonly socket: PeerSocket) {
     socket.once("close", () => {
       this.destroyed = true;
+      this.visible = false;
       this.events.emit("destroyed");
     });
   }
@@ -79,11 +84,20 @@ export class WebRouter implements Router {
     return this.peers.size;
   }
 
+  /** 이 앱을 보고 있는 탭이 있는가 */
+  anyVisible(): boolean {
+    return [...this.peers].some((p) => p.visible);
+  }
+
   async dispatch(peer: WsPeer, text: string): Promise<void> {
     const message = parseClientMessage(text);
     if (!message) return;
     const args = unpackArgs(message.args, message.u);
     if (message.t === "send") {
+      if (message.ch === VISIBILITY_CHANNEL) {
+        peer.visible = args[0] === true;
+        return;
+      }
       try {
         this.listeners.get(message.ch)?.(peer, ...args);
       } catch {

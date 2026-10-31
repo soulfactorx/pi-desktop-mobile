@@ -154,6 +154,7 @@ desktop-agent에 있던 기능을 Pi의 어느 부분으로 옮길지 정한다.
 | **P4 백그라운드** | `tasks`(워커 세션), 스케줄러, 알림 | 앱을 닫아도 예약 작업이 돈다. PR을 나눈다: ① tasks ② 스케줄러 ③ 앱 작업 목록·알림 |
 | | **구현 메모 (P4-①)**: `delegate_task`·`list_tasks`·`cancel_task`. 워커는 자식 Pi(`process.argv`의 cli와 `-e`를 물려받음, `PI_DESKTOP_AGENT_WORKER=1`이라 위임 도구 없음). 승인 제목 첫 줄 끝에 `(작업 <id>)`. 동시 2개, 결과는 대화에 4000자까지(전문은 `tasks/<id>.json`). RPC는 `hasUI`가 늘 true라 사람이 없는 실행은 `PI_DESKTOP_AGENT_UNATTENDED=1`로 알리고 permissions·ask_user가 따른다 | |
 | | **구현 메모 (P4-②)**: 앱이 데몬에 붙을 때마다 `<데몬 홈>/scheduler` 폴더의 세션이 돌고 있는지 보고 없으면 `PI_DESKTOP_AGENT_SCHEDULER=1`로 연다. 그 세션의 schedule 확장이 30초마다 `schedules.json`을 보고 도래한 예약(놓친 것은 한 번)을 사람 없는 워커로 돌려 `tasks/<id>.json`에 남긴다. 대화 세션의 `schedule_task`는 "쓰기"로 승인. dev:mock 앱으로 앱 창을 모두 닫은 뒤에도 예약이 도는 것을 확인했다. PC를 다시 켜면 데몬이 없으므로 앱을 한 번 열어야 다시 돈다(OS 스케줄러 연동은 하지 않음) | |
+| | **알림 (대화)**: 창을 보고 있지 않으면 대화의 소식을 OS 알림으로 띄운다 (`main/session-notify.ts`). 답이 끝남(`agent_settled`), 승인 요청(`[승인 요청]` select), 답을 기다리는 대화상자(select·confirm·input·editor). 제목에 대화 폴더 이름. 예약을 돌리는 스케줄러 세션은 작업 알림이 맡으므로 알리지 않는다. 누르면 창을 앞으로 가져온다 | |
 | | **구현 메모 (P4-③)**: 앱 메인의 `TaskWatcher`가 `tasks/`를 5초마다 읽어 새로 끝난 작업을 Electron Notification으로 알린다(창을 보고 있으면 생략, 앱을 켤 때 이미 끝난 것은 알리지 않음). "작업" 화면에서 예약 켜기·끄기·지우기와 최근 작업 결과를 본다. 로컬 호스트만 지원(앱이 상태 폴더를 직접 읽음). P4 완료 | |
 | P5 확장 | `peers`/네트워크, 권한 상승, 배포 설정 | |
 | | **구현 메모 (P5 진행 중)**: 네트워크(카드·페어링·질문 N1~N3, 피어 작업 맡기기 N4)와 권한 상승은 §4 표에 적은 대로 들어갔다. 중계 서버(N5)는 보류하고 설계만 남겼다(§8) | |

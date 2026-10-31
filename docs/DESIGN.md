@@ -134,6 +134,7 @@ Workspace = { id, hostId, cwd, title, pinned, lastSessionFile, layout }
   - 개발 실행은 잠그지 않는다. 개발 실행의 userData가 설치본과 같은 `Pi Desktop`이라, 잠그면 설치본이 떠 있을 때 개발 실행이 바로 끝나고 여러 worktree의 dev:mock도 함께 못 띄운다.
   - Mate처럼 개발 실행의 userData를 `(dev)`로 옮기지 않았다. 옮기면 개발 실행이 쓰던 SSH 호스트·가져오기·복사 기록을 잃는다.
 - 숨긴 탭이 실행 중→끝남이 되면 "완료", 확장 다이얼로그·끼어들기·열기 선택이 생기면 "입력 필요"를 탭에 표시하고 OS 알림을 띄운다. 탭을 열면 표시를 지운다.
+- 지금 보는 탭도 창을 내려 두었거나 다른 창을 보고 있으면(화면이 안 보이거나 창에 포커스가 없으면) 같은 OS 알림을 띄운다 (탭 표시는 하지 않는다).
 - 같은 세션을 두 탭에서 열 수 있다. main 프로세스는 attach 중에도 실시간 이벤트를 모든 탭에 보내고, attach 결과의 재생 이벤트와는 seq로 중복을 거른다.
 
 ### 3.4 상주 세션 — GUI를 닫아도 작업은 계속된다 (v0.3 신규)
@@ -1226,6 +1227,7 @@ Pi는 세션 파일 잠금을 문서화하지 않았다. 그래서 **같은 세�
   - `pi-web`: start(백그라운드, `termux-wake-lock`)·run·stop·restart·status·url·open·log·update·uninstall. 서버를 꺼도 데몬과 Pi 세션은 계속 돈다.
   - 데이터: `~/.pi-web/data`(토큰, ssh-hosts.json, imports.json, copies.json, activity-log.jsonl, server.log). 데스크톱 앱의 userData에 해당한다. 데몬 홈(`~/.pi-desktop`)은 데스크톱과 같다.
 - 앱 자동 업데이트는 웹에서 끈다(`status: "disabled"`). 웹 묶음은 `pi-web update`로 바꾼다.
+- **휴대폰 알림**: 휴대폰 브라우저는 백그라운드에서 연결이 끊기고, 안드로이드 크롬은 페이지의 `new Notification`을 막아 화면(App.tsx)의 알림이 닿지 않는다. 그래서 서버가 세션 이벤트를 보고 보는 탭이 없으면 웹 푸시로 보낸다 (`server/session-notify.ts`: 작업 끝남 `agent_settled`, 답을 기다리는 대화상자). 제목에 세션 폴더 이름, 같은 세션은 tag로 묶는다. 구독·서비스 워커·알림 켜기 카드·보는 탭 알리기는 web-shell(§5.11 "알림")의 것을 그대로 쓴다.
 - 개발: `npm run dev:web -w @pi-desktop/desktop`(mock LLM + 웹 서버, 데이터는 `.dev/pi-web`).
 - 아직 하지 않은 것
   - 실제 Android 기기에서의 확인 (Linux에서 360×780 화면, 서버 재시작·재연결, 설치 스크립트를 `--file`로 확인했다)
