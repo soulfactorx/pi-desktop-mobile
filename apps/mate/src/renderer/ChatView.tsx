@@ -6,6 +6,7 @@ import type { Act } from "./App";
 import { InboxCard } from "./InboxPanel";
 import { relativeTime } from "./mate-view";
 import { canReadClipboard, readBase64, readClipboardImages, transferFiles } from "./clipboard-images";
+import { ImagePasteBox } from "./ImagePasteBox";
 
 /** 한 번에 보낼 수 있는 이미지 (실행기와 같은 한도) */
 const MAX_IMAGES = 4;
@@ -41,6 +42,7 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
   const [imageNote, setImageNote] = useState<string>();
   const bottom = useRef<HTMLDivElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const [pasteBox, setPasteBox] = useState(false);
 
   const answered = useMemo(() => {
     const map = new Map<string, string>();
@@ -108,15 +110,17 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
     void addImageFiles(files);
   };
 
-  /** "클립보드 이미지" 버튼: 붙여넣기 메뉴가 글만 받는 휴대폰 브라우저에서도 이미지를 붙인다 */
+  /**
+   * 📋 버튼: 붙여넣기 칸을 열고(키보드의 클립보드에 있는 스크린샷은 이 칸으로만 들어온다),
+   * 브라우저가 클립보드를 읽게 해 주면 거기 있는 이미지는 바로 붙이고 칸을 닫는다
+   */
   const pasteFromClipboard = async () => {
-    try {
-      const files = await readClipboardImages();
-      if (files.length === 0) return setImageNote("클립보드에 이미지가 없어요");
-      await addImageFiles(files);
-    } catch (error) {
-      setImageNote((error as Error).message);
-    }
+    setPasteBox(true);
+    if (!canReadClipboard()) return;
+    const files = await readClipboardImages().catch(() => []);
+    if (files.length === 0) return;
+    setPasteBox(false);
+    await addImageFiles(files);
   };
 
   const hints = text.startsWith("/") && !text.includes("\n") ? COMMANDS.filter(([c]) => c.trim().startsWith(text.trim().split(" ")[0]!)) : [];
@@ -186,6 +190,15 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
             {imageNote && <span className="muted small-text">{imageNote}</span>}
           </div>
         )}
+        {pasteBox && (
+          <ImagePasteBox
+            onFiles={(files) => {
+              setPasteBox(false);
+              void addImageFiles(files);
+            }}
+            onClose={() => setPasteBox(false)}
+          />
+        )}
         <div className="chat-row">
           <textarea
             value={text}
@@ -205,11 +218,9 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
               보내기
             </button>
             <div className="image-buttons">
-              {canReadClipboard() && (
-                <button className="small" disabled={sending} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
-                  📋
-                </button>
-              )}
+              <button className="small" disabled={sending} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
+                📋
+              </button>
               <button className="small" disabled={sending} onClick={() => imageInput.current?.click()} title="이미지 고르기" aria-label="이미지 고르기">
                 🖼
               </button>

@@ -679,3 +679,30 @@ code.copy {
 .folder-list li {
   padding: 2px 0;
 }
+
+/* 휴대폰 키보드의 클립보드(스크린샷)를 받는 붙여넣기 칸 */
+.image-paste {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  margin-bottom: 6px;
+}
+.image-paste-box {
+  flex: 1;
+  min-height: 44px;
+  max-height: 120px;
+  overflow: hidden;
+  padding: 8px;
+  border: 2px dashed var(--accent, #3b82f6);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+.image-paste-box:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.image-paste-close {
+  padding: 0 10px;
+}

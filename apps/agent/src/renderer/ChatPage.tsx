@@ -3,6 +3,7 @@ import { ChatView } from "../vendor/renderer/ChatView";
 import { StatusLine, Widgets } from "../vendor/renderer/ExtensionUi";
 import { acceptsImages, MAX_IMAGE_BYTES, splitAttachments, withAttachments } from "./attachments";
 import { canReadClipboard, readBase64, readClipboardImages, transferFiles } from "./clipboard-images";
+import { ImagePasteBox } from "./ImagePasteBox";
 import type { ImageAttachment } from "../shared/api";
 import { EXAMPLES } from "./examples";
 import { FolderMenu } from "./FolderMenu";
@@ -57,6 +58,7 @@ export function ChatPage({
   const [attachNote, setAttachNote] = useState<string>();
   const input = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
+  const [pasteBox, setPasteBox] = useState(false);
 
   // 대화가 열리면 바로 입력할 수 있게 한다
   useEffect(() => {
@@ -143,15 +145,17 @@ export function ChatPage({
     addImageFiles(files);
   };
 
-  /** "클립보드 이미지" 버튼: 붙여넣기 메뉴가 글만 받는 휴대폰 브라우저에서도 이미지를 붙인다 */
+  /**
+   * 📋 버튼: 붙여넣기 칸을 열고(키보드의 클립보드에 있는 스크린샷은 이 칸으로만 들어온다),
+   * 브라우저가 클립보드를 읽게 해 주면 거기 있는 이미지는 바로 붙이고 칸을 닫는다
+   */
   const pasteFromClipboard = async () => {
-    try {
-      const files = await readClipboardImages();
-      if (files.length === 0) return setAttachNote("클립보드에 이미지가 없습니다");
-      addImageFiles(files);
-    } catch (error) {
-      setAttachNote((error as Error).message);
-    }
+    setPasteBox(true);
+    if (!canReadClipboard()) return;
+    const files = await readClipboardImages().catch(() => []);
+    if (files.length === 0) return;
+    setPasteBox(false);
+    addImageFiles(files);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -280,6 +284,15 @@ export function ChatPage({
           {attachNote && <span className="muted small-text">{attachNote}</span>}
         </div>
       )}
+      {pasteBox && session && (
+        <ImagePasteBox
+          onFiles={(files) => {
+            setPasteBox(false);
+            addImageFiles(files);
+          }}
+          onClose={() => setPasteBox(false)}
+        />
+      )}
       <div className="composer">
         <textarea
           ref={input}
@@ -303,11 +316,9 @@ export function ChatPage({
             파일 첨부
           </button>
           <div className="image-buttons">
-            {canReadClipboard() && (
-              <button disabled={!session} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
-                📋
-              </button>
-            )}
+            <button disabled={!session} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
+              📋
+            </button>
             <button disabled={!session} onClick={() => imageInput.current?.click()} title="이 기기에서 이미지 고르기" aria-label="이 기기에서 이미지 고르기">
               🖼
             </button>
