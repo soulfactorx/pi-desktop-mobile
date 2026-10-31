@@ -99,3 +99,29 @@ function base64UrlBytes(text: string): Uint8Array<ArrayBuffer> {
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }
+
+const OPEN_PARAM = "ws-open";
+
+/**
+ * 휴대폰 알림을 눌러 이 화면이 열리거나 앞으로 왔을 때, 알림의 open 값(서버가 정한다)을 handler에 넘긴다.
+ * - 열려 있던 탭: 서비스 워커가 보낸 메시지로
+ * - 새로 연 탭: 주소의 ?ws-open= 으로 (읽은 뒤 주소에서 지운다)
+ */
+export function onNotificationOpen(handler: (open: string) => void): void {
+  try {
+    const url = new URL(location.href);
+    const open = url.searchParams.get(OPEN_PARAM);
+    if (open) {
+      url.searchParams.delete(OPEN_PARAM);
+      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+      queueMicrotask(() => handler(open));
+    }
+  } catch {
+    // 주소를 읽을 수 없으면 넘긴다
+  }
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
+    const data = event.data as { type?: unknown; open?: unknown } | undefined;
+    if (data?.type === "ws-open" && typeof data.open === "string" && data.open) handler(data.open);
+  });
+}

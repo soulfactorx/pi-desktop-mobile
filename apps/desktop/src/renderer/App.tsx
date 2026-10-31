@@ -17,6 +17,7 @@ import { UpdateBadge, useUpdateState } from "./UpdateBadge";
 import { forgetTab, MAIN_TAB, setTabHost, setTabSession } from "./use-session";
 import { MENU_EVENT, Workspace, type WorkspaceStatus } from "./Workspace";
 import { WebMenu } from "./WebMenu";
+import { OPEN_SESSION_EVENT, type SessionTarget } from "../shared/web-files";
 
 /**
  * 워크스페이스 탭 (설계 §3.3). 탭마다 호스트와 세션을 따로 가지고, 숨긴 탭도 연결과 상태를 유지한다.
@@ -108,6 +109,32 @@ export function App() {
     },
     [activate],
   );
+
+  // pi-web: 휴대폰 알림을 누르면 그 세션으로 간다 (보는 탭이 있으면 그 탭, 없으면 새 탭). 데스크톱 앱에는 piWeb이 없다
+  const openNotified = useRef<(target: SessionTarget) => void>(() => {});
+  openNotified.current = (target) => {
+    const shown = tabShowing(statusesRef.current, target.hostId, target.sessionId);
+    if (shown) return activate(shown);
+    void window.piDesktop
+      .listSessions(target.hostId)
+      .then((sessions) => {
+        const session = sessions.find((s) => s.sessionId === target.sessionId);
+        if (session) openActivity({ hostId: target.hostId, hostLabel: "", session } as ActivityEntry);
+      })
+      .catch(() => undefined);
+  };
+  useEffect(() => {
+    if (!window.piWeb) return;
+    const onOpen = (event: Event) => openNotified.current((event as CustomEvent<SessionTarget>).detail);
+    window.addEventListener(OPEN_SESSION_EVENT, onOpen);
+    // 상태(statuses)가 오기 전에 열면 보는 탭을 못 찾아 새 탭을 열 수 있어 잠깐 기다린다
+    const pending = window.piWeb.takeOpenSession();
+    const timer = pending ? setTimeout(() => openNotified.current(pending), 1500) : undefined;
+    return () => {
+      window.removeEventListener(OPEN_SESSION_EVENT, onOpen);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   // 명령 팔레트의 탭 명령
   const appCommands = useMemo((): PaletteCommand[] => {

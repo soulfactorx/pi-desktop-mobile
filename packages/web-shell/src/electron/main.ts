@@ -46,19 +46,37 @@ export function configureShell(next: ShellConfig): void {
 }
 
 /** 보는 탭이 없을 때 알림을 보낼 곳 (web-server.ts가 웹 푸시를 건다) */
-let pushNote: ((note: { title: string; body?: string }) => void) | undefined;
-export function onBackgroundNotify(send: (note: { title: string; body?: string }) => void): void {
+type BackgroundNote = { title: string; body?: string; clickId?: string };
+let pushNote: ((note: BackgroundNote) => void) | undefined;
+export function onBackgroundNotify(send: (note: BackgroundNote) => void): void {
   pushNote = send;
+}
+
+/** 누를 수 있는 알림의 click 처리 (최근 것만 둔다) */
+const notificationClicks = new Map<string, () => void>();
+const MAX_NOTIFICATION_CLICKS = 50;
+
+/** 화면(띠·휴대폰 알림)에서 알림을 눌렀다 */
+export function clickNotification(id: string): void {
+  const click = notificationClicks.get(id);
+  notificationClicks.delete(id);
+  click?.();
 }
 
 /**
  * 알림: 앱을 보고 있는 탭이 있으면 화면 안의 띠로, 없으면 웹 푸시(휴대폰 알림)로 보낸다.
  * 화면 안의 띠는 뒤에 돌아왔을 때도 보이게 모든 탭에 남긴다.
  */
-export function notify(title: string, body?: string, level?: "info" | "error"): void {
+export function notify(title: string, body?: string, level?: "info" | "error", onClick?: () => void): void {
   const visible = hub.anyVisible();
-  hub.controlAll({ kind: "notify", title, ...(body ? { body } : {}), ...(level ? { level } : {}) });
-  if (!visible) pushNote?.({ title, ...(body ? { body } : {}) });
+  let clickId: string | undefined;
+  if (onClick) {
+    clickId = randomBytes(9).toString("base64url");
+    notificationClicks.set(clickId, onClick);
+    while (notificationClicks.size > MAX_NOTIFICATION_CLICKS) notificationClicks.delete(notificationClicks.keys().next().value!);
+  }
+  hub.controlAll({ kind: "notify", title, ...(body ? { body } : {}), ...(level ? { level } : {}), ...(clickId ? { clickId } : {}) });
+  if (!visible) pushNote?.({ title, ...(body ? { body } : {}), ...(clickId ? { clickId } : {}) });
 }
 
 // ── app ──────────────────────────────────────────────────────────────
@@ -380,14 +398,18 @@ export class Notification {
     return true;
   }
 
+  private readonly clicks: Array<() => void> = [];
+
   constructor(private readonly options: { title?: string; body?: string } = {}) {}
 
   show(): void {
-    notify(this.options.title ?? "", this.options.body);
+    const clicks = [...this.clicks];
+    notify(this.options.title ?? "", this.options.body, undefined, clicks.length ? () => clicks.forEach((c) => c()) : undefined);
   }
 
-  /** 눌렀을 때(click)는 브라우저가 앱 화면을 연다. 그 밖의 이벤트는 없다 */
-  on(): this {
+  /** click: 화면의 띠나 휴대폰 알림을 누르면 (브라우저가 앱 화면을 연 뒤) 부른다. 그 밖의 이벤트는 없다 */
+  on(event: string, listener: () => void): this {
+    if (event === "click") this.clicks.push(listener);
     return this;
   }
 }

@@ -18,6 +18,11 @@ export interface PushPayload {
   url?: string;
   /** 같은 tag의 알림은 바뀌어 하나로 보인다 */
   tag?: string;
+  /**
+   * 알림을 누르면 화면에 넘길 값 (앱이 정한다. 예: Pi Web의 세션, web-shell 앱의 Notification click).
+   * 열린 탭이 있으면 그 탭에, 없으면 새로 연 탭의 주소(?ws-open=)로 넘긴다 (client/notify.ts onNotificationOpen)
+   */
+  open?: string;
 }
 
 interface VapidKeys {

@@ -31,7 +31,7 @@ export type Control =
   /** 새 창(탭)으로 주소를 연다 (shell.openExternal) */
   | { kind: "open"; url: string }
   /** 알림 (Notification, 오류 상자) */
-  | { kind: "notify"; title: string; body?: string; level?: "info" | "error" }
+  | { kind: "notify"; title: string; body?: string; level?: "info" | "error"; clickId?: string }
   /** 앱 메뉴가 바뀌었다 (Menu.setApplicationMenu) */
   | { kind: "menu"; groups: MenuGroup[] }
   /** 대화상자를 띄워 답을 받는다. 답은 ClientData answer로 */
@@ -88,7 +88,12 @@ export const ShellChannels = {
   pushSubscribe: "web-shell:push-subscribe",
   /** 구독을 지운다 (endpoint) */
   pushUnsubscribe: "web-shell:push-unsubscribe",
+  /** 알림(Notification)을 눌렀다 (send: clickId). 서버가 그 알림의 click 처리를 부른다 */
+  notificationClick: "web-shell:notification-click",
 } as const;
+
+/** 휴대폰 알림의 open 값: web-shell 앱의 Notification click (뒤에 clickId) */
+export const CLICK_OPEN = "click:";
 
 /** 서비스 워커 주소 (웹 푸시를 받아 휴대폰 알림을 띄운다) */
 export const SERVICE_WORKER_PATH = "/ws-sw.js";
