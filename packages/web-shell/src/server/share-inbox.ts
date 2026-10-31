@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { Readable } from "node:stream";
 
 /**
  * 휴대폰에 설치한 웹앱으로 "공유"한 이미지 받기 (Web Share Target, manifest의 share_target → POST /ws-share).
@@ -64,30 +63,104 @@ export function handleShareRequest(req: IncomingMessage, res: ServerResponse, al
 
 async function receive(req: IncomingMessage): Promise<Inbox> {
   const entry: Inbox = { files: [], fields: [], expires: Date.now() + KEEP_MS };
+  const contentType = String(req.headers["content-type"] ?? "");
   try {
-    const length = Number(req.headers["content-length"] ?? 0);
-    if (length > MAX_BYTES) throw new Error(`${(length / 1024 / 1024).toFixed(1)}MB라 너무 큽니다 (30MB까지)`);
-    const request = new Request("http://localhost/ws-share", {
-      method: "POST",
-      headers: { "content-type": String(req.headers["content-type"] ?? "") },
-      body: Readable.toWeb(req) as ReadableStream,
-      duplex: "half",
-    } as RequestInit);
-    const form = await request.formData();
-    for (const [field, value] of form.entries()) {
-      if (typeof value === "string") {
-        entry.fields.push(`${field}:text`);
+    const body = await readBody(req);
+    const boundary = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType);
+    if (!boundary) throw new Error(`multipart가 아닙니다 (${contentType || "형식 없음"}, ${body.length}바이트)`);
+    const parts = parseMultipart(body, boundary[1] ?? boundary[2]!);
+    if (parts.length === 0) throw new Error(`항목을 찾지 못했습니다 (${body.length}바이트)`);
+    for (const part of parts) {
+      if (part.filename === undefined) {
+        entry.fields.push(`${part.name}:text`);
         continue;
       }
-      entry.fields.push(`${field}:${value.type || "?"}:${value.size}`);
-      const ext = /\.([a-z0-9]+)$/i.exec(value.name || "")?.[1]?.toLowerCase() ?? "";
-      const type = value.type.startsWith("image/") ? value.type : IMAGE_EXT[ext];
-      if (!type || entry.files.length >= MAX_FILES) continue;
-      entry.files.push({ name: value.name || "", type, data: Buffer.from(await value.arrayBuffer()).toString("base64") });
+      entry.fields.push(`${part.name}:${part.type || "?"}:${part.data.length}`);
+      const ext = /\.([a-z0-9]+)$/i.exec(part.filename)?.[1]?.toLowerCase() ?? "";
+      const type = part.type.startsWith("image/") ? part.type : (IMAGE_EXT[ext] ?? sniffImage(part.data));
+      if (!type || part.data.length === 0 || entry.files.length >= MAX_FILES) continue;
+      entry.files.push({ name: part.filename, type, data: part.data.toString("base64") });
     }
   } catch (error) {
     entry.error = (error as Error).message;
-    req.resume();
   }
   return entry;
+}
+
+async function readBody(req: IncomingMessage): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BYTES) {
+      req.resume();
+      throw new Error(`${(size / 1024 / 1024).toFixed(1)}MB가 넘어 너무 큽니다 (30MB까지)`);
+    }
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
+interface Part {
+  name: string;
+  filename?: string;
+  type: string;
+  data: Buffer;
+}
+
+/**
+ * multipart/form-data를 너그럽게 나눈다 (Node의 FormData는 휴대폰 공유의 본문을 "Failed to parse"로 거절했다).
+ * 줄바꿈이 CRLF가 아니어도, 파일 이름이 UTF-8 그대로여도, 끝 경계가 빠져도 읽는다.
+ */
+export function parseMultipart(body: Buffer, boundary: string): Part[] {
+  const delimiter = Buffer.from(`--${boundary}`);
+  const parts: Part[] = [];
+  let at = body.indexOf(delimiter);
+  while (at !== -1) {
+    let start = at + delimiter.length;
+    if (body.subarray(start, start + 2).toString() === "--") break;
+    // 경계 뒤 줄바꿈
+    if (body[start] === 0x0d) start++;
+    if (body[start] === 0x0a) start++;
+    const next = body.indexOf(delimiter, start);
+    let end = next === -1 ? body.length : next;
+    // 다음 경계 앞의 줄바꿈은 본문이 아니다
+    if (body[end - 1] === 0x0a) end--;
+    if (body[end - 1] === 0x0d) end--;
+    const chunk = body.subarray(start, end);
+    let headerEnd = chunk.indexOf("\r\n\r\n");
+    let skip = 4;
+    if (headerEnd === -1) {
+      headerEnd = chunk.indexOf("\n\n");
+      skip = 2;
+    }
+    if (headerEnd !== -1) {
+      const headers = chunk.subarray(0, headerEnd).toString("utf8");
+      const disposition = /content-disposition:([^\r\n]*)/i.exec(headers)?.[1] ?? "";
+      const name = /\bname="([^"]*)"/i.exec(disposition)?.[1] ?? /\bname=([^;\s]+)/i.exec(disposition)?.[1] ?? "";
+      const star = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(disposition)?.[1];
+      const plain = /\bfilename="([^"]*)"/i.exec(disposition)?.[1] ?? /\bfilename=([^;\s]+)/i.exec(disposition)?.[1];
+      let filename = plain;
+      if (star) {
+        try {
+          filename = decodeURIComponent(star.trim());
+        } catch {
+          filename = star.trim();
+        }
+      }
+      const type = /content-type:\s*([^\r\n;]*)/i.exec(headers)?.[1]?.trim().toLowerCase() ?? "";
+      parts.push({ name, ...(filename !== undefined ? { filename } : {}), type, data: Buffer.from(chunk.subarray(headerEnd + skip)) });
+    }
+    at = next;
+  }
+  return parts;
+}
+
+/** 형식·확장자가 없을 때 파일 앞부분으로 이미지 종류를 본다 */
+function sniffImage(data: Buffer): string | undefined {
+  if (data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return "image/jpeg";
+  if (data.subarray(0, 4).toString("latin1") === "GIF8") return "image/gif";
+  if (data.subarray(0, 4).toString("latin1") === "RIFF" && data.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  return undefined;
 }
