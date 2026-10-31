@@ -1,7 +1,7 @@
 import { CLICK_OPEN, ShellChannels, WebPaths, type Control, type DialogRequest, type DirListing, type MenuGroup } from "../protocol";
 import { useTransport } from "./electron-renderer";
 import { onNotificationOpen, reportVisibility, setupNotifications } from "./notify";
-import { receiveSharedImages } from "./share";
+import { watchSharedImages } from "./share";
 import { ResumableTransport, type LinkStatus } from "./transport";
 import "./shell.css";
 
@@ -134,7 +134,7 @@ async function start(options: BootOptions, token: string): Promise<void> {
   );
   shell.bind(transport);
   // 다른 앱에서 공유한 이미지로 열렸으면 꺼내 둔다 (입력창이 가져간다)
-  void receiveSharedImages().catch((error: unknown) => console.warn("공유한 이미지를 읽지 못했습니다", error));
+  watchSharedImages();
   // 휴대폰 알림을 눌러 열렸으면 그 알림의 click 처리를 부른다 (연결되면 보낸다)
   onNotificationOpen((open) => {
     if (open.startsWith(CLICK_OPEN)) shell.clickNotification(open.slice(CLICK_OPEN.length));

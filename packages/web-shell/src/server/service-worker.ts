@@ -4,7 +4,8 @@
  * - push: 서버가 보낸 { title, body, url, tag }로 알림을 띄운다
  * - fetch POST /ws-share: 설치한 앱으로 "공유"한 이미지(Web Share Target, manifest의 share_target)를 캐시(ws-share)에 두고
  *   화면(/?ws-share=)으로 보낸다. 화면이 꺼내 입력창에 붙인다 (client/share.ts). 그 밖의 요청은 건드리지 않는다
- * - notificationclick: 열려 있는 이 앱 탭을 앞으로 가져오고(알림의 open 값을 그 탭에 보낸다), 없으면 새로 연다 (?ws-open=)
+ * - notificationclick: 알림의 open 값을 캐시(ws-pending)에 맡겨 두고, 열려 있는 이 앱 탭에 보내며 앞으로 가져온다. 없으면 새로 연다 (?ws-open=).
+ *   휴대폰은 뒤에 둔 탭을 버렸다가 앞으로 올 때 새로 읽어 메시지를 잃으므로, 화면은 뜰 때·보일 때 캐시도 확인한다 (client/notify.ts)
  * 화면 파일을 미리 받아 두지는 않는다 (서버가 같은 휴대폰에 있어 오프라인일 일이 없다).
  */
 export const SERVICE_WORKER_SOURCE = `
@@ -47,12 +48,24 @@ self.addEventListener("notificationclick", (event) => {
   const target = new URL(data.url || "./", self.registration.scope);
   if (data.open) target.searchParams.set("ws-open", data.open);
   event.waitUntil((async () => {
+    if (data.open) {
+      try {
+        const cache = await caches.open("ws-pending");
+        await cache.put(new Request("/ws-pending/open"), new Response(data.open, { headers: { "X-At": String(Date.now()) } }));
+      } catch (error) {
+        // 맡기지 못하면 메시지·주소로만 넘긴다
+      }
+    }
     const tabs = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const tab of tabs) {
       if (!tab.url.startsWith(self.registration.scope)) continue;
-      await tab.focus();
       if (data.open) tab.postMessage({ type: "ws-open", open: data.open });
-      return;
+      try {
+        await tab.focus();
+        return;
+      } catch (error) {
+        // 앞으로 가져오지 못하면 새로 연다
+      }
     }
     await self.clients.openWindow(target.href);
   })());
