@@ -37,6 +37,8 @@ describe("piArgs", () => {
     expect(observe.slice(0, 4)).toEqual(["--mode", "json", "--session-dir", "/h/sessions"]);
     expect(observe[observe.indexOf("--tools") + 1]).toBe("read,grep,find,ls,bash");
     expect(observe.at(-1)).toBe("CI를 봐");
+    // 대화에 붙인 이미지는 지시 바로 앞에 Pi의 @파일로 넘긴다
+    expect(piArgs({ ...input, images: ["/h/chat/images/a.png"] }).slice(-2)).toEqual(["@/h/chat/images/a.png", "CI를 봐"]);
     const propose = piArgs({ ...input, duty: { ...duty, profile: "propose" } });
     expect(propose[propose.indexOf("--tools") + 1]).toBe("read,grep,find,ls,bash,mate_propose,mate_ask");
     expect(propose[propose.indexOf("--append-system-prompt") + 1]).toContain("mate_propose");

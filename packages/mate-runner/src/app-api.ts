@@ -7,6 +7,7 @@ import { readMcpFile, serverViews, updateMcpFile, withEnabled, withoutServer, wi
 import { WEB_SEARCH_PRESETS } from "@pi-desktop/pi-isolation/mcp-presets";
 import { listDirectories, makeDirectory } from "../../host-agent/src/dir-list";
 import { addChatRequest, loadChatState } from "./chat/chat-agent";
+import { removeChatImages, saveChatImages } from "./chat/chat-images";
 import { delegateInboxItem } from "./delegate";
 import type { PiLaunch } from "./executor";
 import { applyInboxChange, discardInboxChange } from "./inbox-change";
@@ -176,12 +177,19 @@ export function mateAppApi(ctx: MateAppContext): MateAppApi {
     emptyTrash: (ids?: string[]) => emptyTrash(paths, ids),
 
     // 대화: 사용자의 말을 기록에 남기고 대화 담당에 넘긴다 (답은 대화 담당이 남긴다)
-    chatSend: async (text: string, answerTo?: string) => {
-      const t = String(text ?? "").trim().slice(0, 4000);
+    // images: 붙여넣거나 고른 이미지 (Pi에 함께 넘긴다. 이미지를 볼 수 없는 모델이면 Pi가 알린다)
+    chatSend: async (text: string, answerTo?: string, images?: unknown) => {
+      const files = await saveChatImages(paths, images);
+      const t = (String(text ?? "").trim() || (files.length > 0 ? "첨부한 이미지를 봐 주세요." : "")).slice(0, 4000);
       if (!t) return;
       const answer = typeof answerTo === "string" ? answerTo : undefined;
-      const line = await appendChat(paths.chat, { role: "user", text: t, source: "app", ...(answer ? { answerTo: answer } : {}) });
-      await addChatRequest(paths, { text: t, source: "app", lineId: line.id, ...(answer ? { answerTo: answer } : {}) });
+      try {
+        const line = await appendChat(paths.chat, { role: "user", text: t, source: "app", ...(answer ? { answerTo: answer } : {}), ...(files.length ? { images: files.length } : {}) });
+        await addChatRequest(paths, { text: t, source: "app", lineId: line.id, ...(answer ? { answerTo: answer } : {}), ...(files.length ? { images: files } : {}) });
+      } catch (error) {
+        await removeChatImages(files);
+        throw error;
+      }
     },
 
     // 스킬·MCP (Mate 홈의 skills/·mcp.json, Agent와 같은 코드)

@@ -51,7 +51,7 @@ const api: MateApi = {
   telegramPair: () => ipcRenderer.invoke(IpcChannels.telegramPair),
   telegramUnpair: () => ipcRenderer.invoke(IpcChannels.telegramUnpair),
   telegramTest: () => ipcRenderer.invoke(IpcChannels.telegramTest),
-  chatSend: (text, answerTo) => ipcRenderer.invoke(IpcChannels.chatSend, text, answerTo),
+  chatSend: (text, answerTo, images) => ipcRenderer.invoke(IpcChannels.chatSend, text, answerTo, images),
   checkForUpdates: (interactive) => ipcRenderer.invoke(IpcChannels.checkForUpdates, interactive === true),
   confirmUpdate: () => ipcRenderer.invoke(IpcChannels.confirmUpdate),
   onUpdateState: (listener) => {

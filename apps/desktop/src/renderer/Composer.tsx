@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import { formatBytes, parseDataUrl, rejectReason, toDataUrl, type ImageAttachment } from "./attachments";
+import { canReadClipboard, readClipboardImages, transferFiles } from "./clipboard-images";
 import {
   atQuery,
   fileMention,
@@ -67,6 +68,7 @@ export function Composer(props: ComposerProps) {
   const [attachError, setAttachError] = useState<string | undefined>();
   const [dragging, setDragging] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
   // 히스토리를 보는 중이면 그 위치와, 보기 전에 쓰던 초안
   const browsing = useRef<{ index: number; draft: string; history: string[] } | undefined>(undefined);
   const [selected, setSelected] = useState(0);
@@ -192,10 +194,21 @@ export function Composer(props: ComposerProps) {
   }
 
   function onPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
-    const files = [...e.clipboardData.files];
+    const files = transferFiles(e.clipboardData);
     if (files.length === 0) return; // 글 붙여넣기는 그대로
     e.preventDefault();
     void attach(files);
+  }
+
+  /** "클립보드 이미지" 버튼: 붙여넣기 메뉴가 글만 받는 휴대폰 브라우저에서도 이미지를 붙인다 */
+  async function pasteFromClipboard() {
+    try {
+      const files = await readClipboardImages();
+      if (files.length === 0) return setAttachError("클립보드에 이미지가 없습니다");
+      await attach(files);
+    } catch (error) {
+      setAttachError((error as Error).message);
+    }
   }
 
   function onDrop(e: DragEvent<HTMLElement>) {
@@ -325,6 +338,28 @@ export function Composer(props: ComposerProps) {
       />
       </div>
       <div className="actions">
+        <div className="image-buttons">
+          {canReadClipboard() && (
+            <button type="button" className="image-button" disabled={disabled} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
+              📋
+            </button>
+          )}
+          <button type="button" className="image-button" disabled={disabled} onClick={() => imageInput.current?.click()} title="이미지 고르기" aria-label="이미지 고르기">
+            🖼
+          </button>
+          <input
+            ref={imageInput}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            multiple
+            hidden
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = "";
+              if (files.length > 0) void attach(files);
+            }}
+          />
+        </div>
         {running && parsed.kind !== "bash" ? (
           <>
             <button type="button" disabled={parsed.kind === "empty"} onClick={() => submit("steer")} title="현재 턴이 끝나면 바로 끼워 넣기">

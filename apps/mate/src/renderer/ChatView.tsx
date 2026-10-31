@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatLine, InboxView, Overview } from "../shared/api";
+import type { ChatImage, ChatLine, InboxView, Overview } from "../shared/api";
 import type { Act } from "./App";
 import { InboxCard } from "./InboxPanel";
 import { relativeTime } from "./mate-view";
+import { canReadClipboard, readBase64, readClipboardImages, transferFiles } from "./clipboard-images";
+
+/** 한 번에 보낼 수 있는 이미지 (실행기와 같은 한도) */
+const MAX_IMAGES = 4;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 /** 입력창이 "/"로 시작하면 보여 줄 명령 */
 const COMMANDS: Array<[string, string]> = [
@@ -31,7 +37,10 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
   const [text, setText] = useState("");
   const [answerTo, setAnswerTo] = useState<ChatLine>();
   const [sending, setSending] = useState(false);
+  const [images, setImages] = useState<ChatImage[]>([]);
+  const [imageNote, setImageNote] = useState<string>();
   const bottom = useRef<HTMLDivElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
 
   const answered = useMemo(() => {
     const map = new Map<string, string>();
@@ -53,15 +62,60 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
     bottom.current?.scrollIntoView({ block: "end" });
   }, [lastKey, chat.busy]);
 
-  const send = async (value: string, to?: string) => {
+  /** 입력창의 말을 보낸다. 선택지 버튼(withImages=false)은 붙인 이미지를 남겨 둔다 */
+  const send = async (value: string, to?: string, withImages = false) => {
     const t = value.trim();
-    if (!t || sending) return;
+    const attached = withImages ? images : [];
+    if ((!t && attached.length === 0) || sending) return;
     setSending(true);
-    const ok = await act(() => window.mate.chatSend(t, to));
+    const ok = await act(() => window.mate.chatSend(t, to, attached.length > 0 ? attached : undefined));
     setSending(false);
     if (ok) {
       setText("");
       setAnswerTo(undefined);
+      if (withImages) {
+        setImages([]);
+        setImageNote(undefined);
+      }
+    }
+  };
+
+  /** 붙여넣기·클립보드·고르기로 받은 이미지 파일을 붙인다 */
+  const addImageFiles = async (files: File[]) => {
+    const notes: string[] = [];
+    const added: ChatImage[] = [];
+    for (const file of files) {
+      const name = file.name || "붙여 넣은 이미지";
+      if (!IMAGE_TYPES.includes(file.type)) notes.push(`${name}: PNG·JPEG·GIF·WebP 이미지만 붙일 수 있어요`);
+      else if (file.size > MAX_IMAGE_BYTES) notes.push(`${name}: 5MB보다 커요`);
+      else if (images.length + added.length >= MAX_IMAGES) notes.push(`이미지는 한 번에 ${MAX_IMAGES}장까지예요`);
+      else {
+        try {
+          added.push({ name, mimeType: file.type, data: await readBase64(file) });
+        } catch {
+          notes.push(`${name}: 읽지 못했어요`);
+        }
+      }
+    }
+    if (added.length > 0) setImages((prev) => [...prev, ...added].slice(0, MAX_IMAGES));
+    setImageNote(notes.length > 0 ? [...new Set(notes)].join("\n") : undefined);
+  };
+
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = transferFiles(e.clipboardData).filter((f) => f.type.startsWith("image/"));
+    if (files.length === 0) return; // 글 붙여넣기는 그대로
+    e.preventDefault();
+    void addImageFiles(files);
+  };
+
+  /** "클립보드 이미지" 버튼: 붙여넣기 메뉴가 글만 받는 휴대폰 브라우저에서도 이미지를 붙인다 */
+  const pasteFromClipboard = async () => {
+    try {
+      const files = await readClipboardImages();
+      if (files.length === 0) return setImageNote("클립보드에 이미지가 없어요");
+      await addImageFiles(files);
+    } catch (error) {
+      setImageNote((error as Error).message);
     }
   };
 
@@ -119,23 +173,59 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
             ))}
           </ul>
         )}
+        {(images.length > 0 || imageNote) && (
+          <div className="chat-images">
+            {images.map((image, i) => (
+              <span key={i} className="chat-image" title={image.name}>
+                <img src={`data:${image.mimeType};base64,${image.data}`} alt={image.name} />
+                <button className="link" title="빼기" aria-label={`${image.name} 빼기`} onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}>
+                  ×
+                </button>
+              </span>
+            ))}
+            {imageNote && <span className="muted small-text">{imageNote}</span>}
+          </div>
+        )}
         <div className="chat-row">
           <textarea
             value={text}
             rows={2}
             placeholder={answerTo ? "답을 쓰세요" : "Mate에게 말하기 (Enter 보내기, Shift+Enter 줄바꿈, /로 명령)"}
             onChange={(e) => setText(e.target.value)}
+            onPaste={onPaste}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                void send(text, answerTo?.id);
+                void send(text, answerTo?.id, true);
               }
             }}
           />
           <div className="chat-buttons">
-            <button className="primary" disabled={!text.trim() || sending} onClick={() => void send(text, answerTo?.id)}>
+            <button className="primary" disabled={(!text.trim() && images.length === 0) || sending} onClick={() => void send(text, answerTo?.id, true)}>
               보내기
             </button>
+            <div className="image-buttons">
+              {canReadClipboard() && (
+                <button className="small" disabled={sending} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
+                  📋
+                </button>
+              )}
+              <button className="small" disabled={sending} onClick={() => imageInput.current?.click()} title="이미지 고르기" aria-label="이미지 고르기">
+                🖼
+              </button>
+              <input
+                ref={imageInput}
+                type="file"
+                accept={IMAGE_TYPES.join(",")}
+                multiple
+                hidden
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])];
+                  e.target.value = "";
+                  if (files.length > 0) void addImageFiles(files);
+                }}
+              />
+            </div>
             <button className="small" title="앞의 대화를 잊고 새로 시작합니다" disabled={sending} onClick={() => void send("/new")}>
               새 대화
             </button>
@@ -178,6 +268,7 @@ function ChatBubble({
       <div className="bubble user">
         <div className="bubble-text">{line.text}</div>
         <div className="bubble-meta muted">
+          {line.images ? `🖼 이미지 ${line.images}장 · ` : ""}
           {line.answerTo ? "질문에 답함 · " : ""}
           {relativeTime(line.at, now)}
           {phone}

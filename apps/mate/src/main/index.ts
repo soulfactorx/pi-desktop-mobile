@@ -386,7 +386,9 @@ function registerIpc(): void {
     return telegramView(runnerStore);
   });
   ipcMain.handle(IpcChannels.telegramTest, () => sendTelegramTest(runnerStore));
-  ipcMain.handle(IpcChannels.chatSend, (_e, text: string, answerTo?: string) => call("chatSend", String(text ?? ""), typeof answerTo === "string" ? answerTo : undefined));
+  ipcMain.handle(IpcChannels.chatSend, (_e, text: string, answerTo?: string, images?: unknown) =>
+    call("chatSend", String(text ?? ""), typeof answerTo === "string" ? answerTo : null, Array.isArray(images) && images.length > 0 ? images : null),
+  );
   ipcMain.handle(IpcChannels.piReadiness, (_e, refresh: boolean) => readiness(refresh === true));
   ipcMain.handle(IpcChannels.installPiDesktop, () =>
     installPiDesktop(mainWindow, (received, total) => sendToWindow(IpcChannels.installProgress, received, total)),

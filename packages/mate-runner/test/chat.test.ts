@@ -12,6 +12,8 @@ import { matePaths, type MatePaths } from "../src/paths";
 import { listDuties, loadConfig, loadInboxState, saveConfig, saveDuty, takeRequests } from "../src/store";
 import { readFile } from "node:fs/promises";
 import { WEB_SEARCH } from "../src/chat/web-search";
+import { chatImagesOf, saveChatImages } from "../src/chat/chat-images";
+import { existsSync } from "node:fs";
 
 describe("실행 시점 표현", () => {
   it("대화에서 쓰는 표현을 계기로 바꾼다", () => {
@@ -79,6 +81,19 @@ describe("ChatAgent", () => {
     lines = await readChat(paths.chat);
     expect(lines.at(-1)).toMatchObject({ role: "mate", text: "알겠어요" });
     expect((await loadChatState(paths)).cost?.usd).toBeCloseTo(0.002);
+  });
+
+  it("붙인 이미지는 Pi에 함께 넘기고, 답한 뒤 지운다. chat/images 밖의 경로는 받지 않는다", async () => {
+    const png = Buffer.from("89504e470d0a1a0a", "hex").toString("base64");
+    const [file] = await saveChatImages(paths, [{ mimeType: "image/png", data: png }]);
+    expect(file!.startsWith(paths.chatImages)).toBe(true);
+    await addChatRequest(paths, { text: "이 화면 뭐야?", source: "app", images: [file!, "/etc/passwd", join(paths.chatImages, "..", "state.json")] });
+    await agent.pump();
+    expect(calls[0]!.images).toEqual([file]);
+    expect(existsSync(file!)).toBe(false);
+    expect(chatImagesOf(paths, [paths.chatImages, 3])).toEqual([]);
+    await expect(saveChatImages(paths, [{ mimeType: "image/svg+xml", data: png }])).rejects.toThrow("PNG");
+    await expect(saveChatImages(paths, Array(5).fill({ mimeType: "image/png", data: png }))).rejects.toThrow("4장");
   });
 
   it("mate_do 할 일: 임무 만들기·제안 처리·일시 정지, 모르는 폴더는 거절", async () => {

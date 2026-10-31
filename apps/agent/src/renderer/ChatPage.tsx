@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } 
 import { ChatView } from "../vendor/renderer/ChatView";
 import { StatusLine, Widgets } from "../vendor/renderer/ExtensionUi";
 import { acceptsImages, MAX_IMAGE_BYTES, splitAttachments, withAttachments } from "./attachments";
+import { canReadClipboard, readBase64, readClipboardImages, transferFiles } from "./clipboard-images";
 import type { ImageAttachment } from "../shared/api";
 import { EXAMPLES } from "./examples";
 import { FolderMenu } from "./FolderMenu";
@@ -55,6 +56,7 @@ export function ChatPage({
   const [images, setImages] = useState<Array<Required<Pick<ImageAttachment, "name" | "mimeType" | "data">>>>([]);
   const [attachNote, setAttachNote] = useState<string>();
   const input = useRef<HTMLTextAreaElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
 
   // 대화가 열리면 바로 입력할 수 있게 한다
   useEffect(() => {
@@ -118,25 +120,38 @@ export function ChatPage({
     setAttachNote(failed.length > 0 ? `붙이지 못한 이미지: ${failed.map((i) => `${i.name} (${i.error})`).join(", ")}` : undefined);
   };
 
-  /** 클립보드의 이미지(화면 캡처 등)를 붙여 넣는다. 글은 그대로 입력창에 들어간다 */
-  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = [...e.clipboardData.files].filter((file) => file.type.startsWith("image/"));
-    if (files.length === 0 || !session) return;
-    e.preventDefault();
+  /** 브라우저가 준 이미지 파일(붙여넣기·클립보드·기기에서 고르기)을 붙인다 */
+  const addImageFiles = (files: File[]) => {
     if (!acceptsImages(model?.input)) return setAttachNote("이 모델은 이미지를 볼 수 없습니다. 이미지를 받는 모델로 바꾸세요.");
     void Promise.all(
-      files.map(
-        (file) =>
-          new Promise<ImageAttachment>((resolve) => {
-            const name = file.name || "붙여 넣은 이미지";
-            if (file.size > MAX_IMAGE_BYTES) return resolve({ name, mimeType: file.type, error: "5MB보다 큽니다" });
-            const reader = new FileReader();
-            reader.onload = () => resolve({ name, mimeType: file.type, data: String(reader.result).replace(/^data:[^,]*,/, "") });
-            reader.onerror = () => resolve({ name, mimeType: file.type, error: "읽지 못했습니다" });
-            reader.readAsDataURL(file);
-          }),
-      ),
+      files.map(async (file): Promise<ImageAttachment> => {
+        const name = file.name || "붙여 넣은 이미지";
+        if (file.size > MAX_IMAGE_BYTES) return { name, mimeType: file.type, error: "5MB보다 큽니다" };
+        return readBase64(file).then(
+          (data) => ({ name, mimeType: file.type, data }),
+          () => ({ name, mimeType: file.type, error: "읽지 못했습니다" }),
+        );
+      }),
     ).then(addImages);
+  };
+
+  /** 클립보드의 이미지(화면 캡처 등)를 붙여 넣는다. 글은 그대로 입력창에 들어간다 */
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = transferFiles(e.clipboardData).filter((file) => file.type.startsWith("image/"));
+    if (files.length === 0 || !session) return;
+    e.preventDefault();
+    addImageFiles(files);
+  };
+
+  /** "클립보드 이미지" 버튼: 붙여넣기 메뉴가 글만 받는 휴대폰 브라우저에서도 이미지를 붙인다 */
+  const pasteFromClipboard = async () => {
+    try {
+      const files = await readClipboardImages();
+      if (files.length === 0) return setAttachNote("클립보드에 이미지가 없습니다");
+      addImageFiles(files);
+    } catch (error) {
+      setAttachNote((error as Error).message);
+    }
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -287,6 +302,28 @@ export function ChatPage({
           >
             파일 첨부
           </button>
+          <div className="image-buttons">
+            {canReadClipboard() && (
+              <button disabled={!session} onClick={() => void pasteFromClipboard()} title="클립보드의 이미지 붙이기" aria-label="클립보드의 이미지 붙이기">
+                📋
+              </button>
+            )}
+            <button disabled={!session} onClick={() => imageInput.current?.click()} title="이 기기에서 이미지 고르기" aria-label="이 기기에서 이미지 고르기">
+              🖼
+            </button>
+            <input
+              ref={imageInput}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])];
+                e.target.value = "";
+                if (files.length > 0) addImageFiles(files);
+              }}
+            />
+          </div>
           <button className="primary" disabled={!session || (!draft.trim() && images.length === 0)} onClick={submit}>
             보내기
           </button>

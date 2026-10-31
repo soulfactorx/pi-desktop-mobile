@@ -142,3 +142,14 @@
   white-space: pre-wrap;
   font-size: 12px;
 }
+
+/* 클립보드 이미지·이미지 고르기 */
+.image-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.image-buttons button {
+  flex: 1;
+  padding-inline: 6px;
+}

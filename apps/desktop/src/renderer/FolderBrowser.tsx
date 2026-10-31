@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type { FsListDirResult } from "@pi-desktop/host-protocol/messages";
 import { childPath, emptyText, errorText, pathCrumbs, visibleDirs } from "./folder-browser";
 
@@ -16,6 +16,7 @@ interface Props {
  * Windows 폴더 선택 대화상자로는 볼 수 없는 WSL(나중에 SSH) 안의 폴더를 고른다.
  * - 글자를 치면 이 폴더의 하위 폴더를 거르고, ↑·↓로 고르고 Enter로 들어간다
  * - 거르기 칸이 빈 채 Backspace를 누르면 상위 폴더로, Ctrl+Enter는 지금 폴더를 고른다
+ * - 마우스는 한 번 눌러 고르고 두 번 눌러 들어간다. 터치(휴대폰 브라우저)는 두 번 누르기가 없어 한 번 눌러 들어간다
  */
 export function FolderBrowser({ hostId, hostLabel, initialPath, onPick, onClose }: Props) {
   const [listing, setListing] = useState<FsListDirResult | undefined>();
@@ -144,7 +145,7 @@ export function FolderBrowser({ hostId, hostLabel, initialPath, onPick, onClose 
               key={name}
               data-index={i}
               className={`folder-item${i === selected ? " selected" : ""}`}
-              onClick={() => setSelected(i)}
+              onClick={(e) => (isTouchTap(e) ? enter(name) : setSelected(i))}
               onDoubleClick={() => enter(name)}
             >
               {name}/
@@ -195,4 +196,11 @@ export function FolderBrowser({ hostId, hostLabel, initialPath, onPick, onClose 
       </div>
     </div>
   );
+}
+
+/** 손가락으로 누른 것인지 (click의 pointerType. 알 수 없으면 화면이 터치 위주인지로 본다) */
+function isTouchTap(e: MouseEvent): boolean {
+  const type = (e.nativeEvent as PointerEvent).pointerType;
+  if (type) return type === "touch" || type === "pen";
+  return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 }
