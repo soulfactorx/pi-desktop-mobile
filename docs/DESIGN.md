@@ -1227,6 +1227,12 @@ Pi는 세션 파일 잠금을 문서화하지 않았다. 그래서 **같은 세�
   - `pi-web`: start(백그라운드, `termux-wake-lock`)·run·stop·restart·status·url·open·log·update·uninstall. 서버를 꺼도 데몬과 Pi 세션은 계속 돈다.
   - 데이터: `~/.pi-web/data`(토큰, ssh-hosts.json, imports.json, copies.json, activity-log.jsonl, server.log). 데스크톱 앱의 userData에 해당한다. 데몬 홈(`~/.pi-desktop`)은 데스크톱과 같다.
 - 앱 자동 업데이트는 웹에서 끈다(`status: "disabled"`). 웹 묶음은 `pi-web update`로 바꾼다.
+- **파일 관리자** (`server/file-manager.ts`, `renderer/FileManager.tsx`, ⋮ 메뉴): Termux 홈은 안드로이드 파일 앱으로 열 수 없어 화면에서 서버(휴대폰)의 파일을 다룬다. 웹에만 있다(`window.piWeb.files`, 채널은 `shared/web-files.ts`).
+  - 홈 폴더 아래만 다룬다 (경로를 글자로 견준다. `~/storage`처럼 홈 안의 링크를 따라 휴대폰 공용 저장소로 가는 것은 된다)
+  - 훑기(폴더 먼저, 숨긴 파일 보기), 새 폴더·파일, 이름 바꾸기, 복사·이동(같은 이름은 덮어쓰지 않음, 다른 저장소로는 복사 후 지움), 지우기(휴지통 없이, 화면이 한 번 더 묻는다. 링크는 링크만)
+  - 글 보기·고치기 2MB까지 (연 뒤 다른 곳에서 바뀌었으면 덮어쓰지 않는다, 이진 파일은 열지 않는다). 올리기는 한 파일 100MB까지, 같은 이름이면 (1)을 붙인다
+  - 내려받기는 브라우저가 링크로 받으므로 60초짜리 일회용 티켓 주소(`/api/files/download?ticket=`)를 준다 (토큰을 주소에 넣지 않게)
+  - "이 폴더에서 새 세션": 지금 탭(로컬 호스트)에 그 폴더로 세션을 연다
 - **휴대폰 알림**: 휴대폰 브라우저는 백그라운드에서 연결이 끊기고, 안드로이드 크롬은 페이지의 `new Notification`을 막아 화면(App.tsx)의 알림이 닿지 않는다. 그래서 서버가 세션 이벤트를 보고 보는 탭이 없으면 웹 푸시로 보낸다 (`server/session-notify.ts`: 작업 끝남 `agent_settled`, 답을 기다리는 대화상자). 제목에 세션 폴더 이름, 같은 세션은 tag로 묶는다. 구독·서비스 워커·알림 켜기 카드·보는 탭 알리기는 web-shell(§5.11 "알림")의 것을 그대로 쓴다.
 - 개발: `npm run dev:web -w @pi-desktop/desktop`(mock LLM + 웹 서버, 데이터는 `.dev/pi-web`).
 - 아직 하지 않은 것

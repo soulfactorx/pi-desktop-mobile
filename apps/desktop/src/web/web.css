@@ -52,3 +52,211 @@
   --ws-muted: var(--muted);
   --ws-accent: var(--accent);
 }
+
+/* 파일 관리자 (FileManager.tsx, 웹에만 있다) */
+.modal.file-manager {
+  width: min(720px, 100vw - 16px);
+  height: min(860px, 100dvh - 16px);
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  position: relative;
+}
+
+.file-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.file-crumbs .link-button:disabled {
+  color: var(--text);
+  font-weight: 600;
+  opacity: 1;
+}
+
+.file-tools,
+.file-selection,
+.file-sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.file-tools button,
+.file-selection button,
+.file-foot button {
+  min-height: 38px;
+}
+
+.file-tools button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.file-selection {
+  align-items: center;
+}
+
+.file-clip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.file-list li {
+  display: flex;
+  align-items: stretch;
+}
+
+.file-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.file-list li.picked {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.file-row {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 10px;
+}
+
+.file-row input {
+  grid-row: 1 / span 2;
+}
+
+.file-icon {
+  grid-row: 1 / span 2;
+  font-size: 20px;
+}
+
+.file-name {
+  overflow-wrap: anywhere;
+}
+
+.file-meta {
+  grid-column: -2;
+  font-size: 12px;
+}
+
+.file-more {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 14px;
+  font-size: 18px;
+}
+
+.file-empty {
+  padding: 16px;
+  justify-content: center;
+}
+
+.file-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.file-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(0 0 0 / 35%);
+  border-radius: inherit;
+}
+
+.file-sheet {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+}
+
+.file-sheet-title {
+  overflow-wrap: anywhere;
+  padding: 4px 4px 8px;
+}
+
+.file-sheet > button {
+  text-align: left;
+  min-height: 44px;
+}
+
+.file-sheet input {
+  font-size: 16px;
+  padding: 10px;
+}
+
+.file-sheet-actions {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.modal.file-editor .file-text {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  font: 14px/1.5 ui-monospace, Consolas, monospace;
+  white-space: pre;
+  overflow: auto;
+}
+
+@media (max-width: 720px) {
+  .modal.file-manager {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    padding: calc(8px + env(safe-area-inset-top)) 8px 8px;
+  }
+
+  .modal.file-editor .file-text {
+    font-size: 16px; /* 16px보다 작으면 입력할 때 화면이 확대된다 */
+  }
+}
