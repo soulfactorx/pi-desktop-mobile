@@ -20,6 +20,7 @@ import type { Schedule } from "@pi-desktop/agent-kit/schedule-plan";
 import type { ConnectionState } from "../vendor/shared/api";
 import type { PiSetupView } from "./pi-setup";
 import type { McpCheckResult, McpServerView } from "@pi-desktop/pi-isolation/mcp-presets";
+import type { AppId, Importables, PackageResult, PackageView } from "@pi-desktop/pi-resources/types";
 import type { BulkAction, EntryInput, KnowledgeEntry, KnowledgeStats, ReviewItem } from "@pi-desktop/agent-kit/memory-types";
 import type { SkillInput, SkillView } from "@pi-desktop/agent-kit/skill-types";
 import type { AgentCard, CardDraft, NetworkState, PeerPolicy, PeerSettings } from "./network";
@@ -82,6 +83,11 @@ export const IpcChannels = {
   setMcpEnabled: "agent:set-mcp-enabled",
   removeMcp: "agent:remove-mcp",
   checkMcp: "agent:check-mcp",
+  packagesList: "agent:packages-list",
+  packageInstall: "agent:package-install",
+  packageRemove: "agent:package-remove",
+  importList: "agent:import-list",
+  importSkill: "agent:import-skill",
   networkState: "agent:network-state",
   setNetworkSettings: "agent:set-network-settings",
   saveCard: "agent:save-card",
@@ -277,6 +283,15 @@ export interface AgentApi {
   removeMcp(name: string): Promise<McpServerView[]>;
   /** pi mcp list로 연결을 확인한다 */
   checkMcp(): Promise<McpCheckResult>;
+  /** 앱 홈에 설치한 Pi 패키지(확장) (DESIGN-APPS.md §3.5) */
+  packagesList(): Promise<PackageView[]>;
+  /** pi install을 앱 홈에 (오래 걸릴 수 있다) */
+  packageInstall(source: string): Promise<PackageResult>;
+  packageRemove(source: string): Promise<PackageResult>;
+  /** 다른 앱(Pi Desktop·Mate)에서 가져올 수 있는 스킬·패키지 */
+  importList(): Promise<Importables>;
+  /** 다른 앱의 스킬을 앱 홈으로 복사한다 */
+  importSkill(from: AppId, name: string): Promise<void>;
   /** 에이전트 네트워크 (피어) */
   networkState(): Promise<NetworkState>;
   setNetworkSettings(settings: PeerSettings): Promise<void>;

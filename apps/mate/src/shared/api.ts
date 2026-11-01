@@ -16,6 +16,7 @@ import type { ChatView, DutyDraft, DutyView, InboxView, ObserveView, Overview, R
 export type { ChatView, DutyDraft, DutyView, InboxView, ObserveView, Overview, RunnerView, TranscriptItem };
 import type { SkillInput, SkillView } from "@pi-desktop/agent-kit/skill-types";
 import type { McpCheckResult, McpServerView } from "@pi-desktop/pi-isolation/mcp-presets";
+import type { AppId, Importables, PackageResult, PackageView } from "@pi-desktop/pi-resources/types";
 import type { SshHostConfig } from "@pi-desktop/host-deploy/types";
 import type { FsListDirResult } from "@pi-desktop/host-protocol/messages";
 
@@ -110,6 +111,11 @@ export const IpcChannels = {
   removeMcp: "mate:remove-mcp",
   openMcpFile: "mate:open-mcp-file",
   checkMcp: "mate:check-mcp",
+  packagesList: "mate:packages-list",
+  packageInstall: "mate:package-install",
+  packageRemove: "mate:package-remove",
+  importList: "mate:import-list",
+  importSkill: "mate:import-skill",
   changed: "mate:changed",
 } as const;
 
@@ -200,6 +206,13 @@ export interface MateApi {
   openMcpFile(): Promise<void>;
   /** 서버마다 연결해 보고 결과를 받는다 (pi mcp list) */
   checkMcp(): Promise<McpCheckResult>;
+  /** Mate 홈에 설치한 Pi 패키지(확장) (DESIGN-APPS.md §3.5). 도구는 처음 쓸 때 허용을 묻는다 */
+  packagesList(): Promise<PackageView[]>;
+  packageInstall(source: string): Promise<PackageResult>;
+  packageRemove(source: string): Promise<PackageResult>;
+  /** 다른 앱(Pi Desktop·Agent)에서 가져올 수 있는 스킬·패키지 */
+  importList(): Promise<Importables>;
+  importSkill(from: AppId, name: string): Promise<void>;
   runNow(id: string): Promise<void>;
   setInbox(ids: string[], status: InboxStatus | undefined): Promise<void>;
   saveConfig(

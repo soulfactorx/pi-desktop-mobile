@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { appendChatQuestion, isMcpToolName, PERMISSION_OPTIONS, readBlocked } from "@pi-desktop/mate-kit";
+import { appendChatQuestion, EXT_GRANT_PREFIX, isExtToolGrant, isMcpToolName, isToolGrant, PERMISSION_OPTIONS, readBlocked } from "@pi-desktop/mate-kit";
 import type { MatePaths } from "./paths";
 import { CHAT_DUTY_ID, type Duty } from "./types";
 
@@ -14,22 +14,26 @@ export async function askPermission(paths: MatePaths, duty: Duty, runId: string,
   const granted = new Set(duty.grants ?? []);
   const examples = new Map<string, string>();
   for (const b of blocked) if (!granted.has(b.name) && !examples.has(b.name)) examples.set(b.name, b.command);
-  const bash = [...examples.keys()].filter((name) => !isMcpToolName(name)).sort();
-  // 질문이 길어지지 않게 MCP 도구는 한 번에 다섯 개까지 묻는다. 나머지는 다음 실행에서 다시 막히면 묻는다
-  const mcp = [...examples.keys()].filter(isMcpToolName).sort().slice(0, MAX_MCP_PER_QUESTION);
+  const bash = [...examples.keys()].filter((name) => !isToolGrant(name)).sort();
+  // 질문이 길어지지 않게 MCP·확장 도구는 한 번에 다섯 개까지 묻는다. 나머지는 다음 실행에서 다시 막히면 묻는다
+  const mcp = [...examples.keys()].filter(isToolGrant).sort().slice(0, MAX_MCP_PER_QUESTION);
   const commands = [...bash, ...mcp];
   if (commands.length === 0) return false;
   const lines = [`"${duty.name}"${duty.id === CHAT_DUTY_ID ? "가" : " 임무가"} 아직 허용하지 않은 것을 쓰려다 막혔어요.`];
   for (const name of bash) lines.push(`• ${name}: ${examples.get(name)!.split("\n")[0]!.slice(0, 160)}`);
   for (const name of mcp) {
-    const { server, tool } = splitMcpToolName(name);
     const description = examples.get(name)!.trim();
+    if (isExtToolGrant(name)) {
+      lines.push(`• 확장 · ${name.slice(EXT_GRANT_PREFIX.length)}${description ? `: ${description.slice(0, 160)}` : ""}`);
+      continue;
+    }
+    const { server, tool } = splitMcpToolName(name);
     lines.push(`• MCP ${server} · ${tool}${description ? `: ${description.slice(0, 160)}` : ""}`);
   }
   const where = duty.id === CHAT_DUTY_ID ? "대화에서" : "이 임무에서";
-  lines.push(`${where} ${commands.map((c) => (isMcpToolName(c) ? splitMcpToolName(c).tool : c)).join(", ")}을(를) 허용할까요?`);
+  lines.push(`${where} ${commands.map((c) => (isMcpToolName(c) ? splitMcpToolName(c).tool : isExtToolGrant(c) ? c.slice(EXT_GRANT_PREFIX.length) : c)).join(", ")}을(를) 허용할까요?`);
   if (bash.length) lines.push("명령은 허용해도 파일 쓰기·데이터 보내기를 여전히 막아요.");
-  if (mcp.length) lines.push("MCP 도구는 Mate가 읽기인지 쓰기인지 알 수 없으니 설명을 보고 정해 주세요. 허용한 도구만 다음부터 써요.");
+  if (mcp.length) lines.push("MCP·확장 도구는 Mate가 읽기인지 쓰기인지 알 수 없으니 설명을 보고 정해 주세요. 허용한 도구만 다음부터 써요.");
   return appendChatQuestion(
     paths.chat,
     {

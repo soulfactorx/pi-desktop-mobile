@@ -207,6 +207,12 @@ export function mateAppApi(ctx: MateAppContext): MateAppApi {
     mcpRemove: resources.mcpRemove,
     mcpEnsureFile: resources.mcpEnsureFile,
     mcpCheck: () => resources.mcpCheck(),
+    // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5)
+    packagesList: resources.packagesList,
+    packageInstall: (source: string) => resources.packageInstall(source),
+    packageRemove: (source: string) => resources.packageRemove(source),
+    importList: resources.importList,
+    importSkill: resources.importSkill,
 
     // Pi 준비 상태 (그 호스트의 Pi)
     piReadiness: () => piReadiness(),

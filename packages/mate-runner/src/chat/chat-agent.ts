@@ -1,7 +1,8 @@
+import { packageDirs, packageToolNames } from "@pi-desktop/pi-resources";
 import { watch, type FSWatcher } from "node:fs";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import { appendChat, appendChatQuestion, extensionEntries, isMcpToolName, PERMISSION_OPTIONS, readChat, readChatActions, readInbox, type ChatLine } from "@pi-desktop/mate-kit";
+import { appendChat, appendChatQuestion, extensionEntries, isToolGrant, PERMISSION_OPTIONS, readChat, readChatActions, readInbox, type ChatLine } from "@pi-desktop/mate-kit";
 import { delegateInboxItem } from "../delegate";
 import { isolationDirOf, runPi as defaultRunPi, type PiLaunch } from "../executor";
 import type { MatePaths } from "../paths";
@@ -259,7 +260,7 @@ export class ChatAgent {
       if (permission.mcpServers?.length) await enableWebSearch(paths, permission.mcpServers);
       const config = await loadConfig(paths);
       await saveConfig(paths, {
-        chatGrants: [...new Set([...config.chatGrants, ...permission.commands.filter(isMcpToolName)])],
+        chatGrants: [...new Set([...config.chatGrants, ...permission.commands.filter(isToolGrant)])],
         ...(permission.mcpServers?.length ? { chatMcpServers: [...new Set([...config.chatMcpServers, ...permission.mcpServers])] } : {}),
       });
       this.options.log(`chat permission granted chat tools=${permission.commands.join(",")} servers=${(permission.mcpServers ?? []).join(",")}`);
@@ -337,6 +338,8 @@ export class ChatAgent {
           model: config.model,
           blockedPath,
           extensions,
+          packages: packageDirs(paths.home),
+          packageTools: packageToolNames(paths.home),
           home: paths.home,
           isolationDir: isolationDirOf(this.options.kitDir),
           inboxPath: paths.inbox,

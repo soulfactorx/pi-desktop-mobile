@@ -157,6 +157,12 @@ function localOnly(what: string): void {
 }
 
 /** 로컬 개발 실행의 덮어쓰기 (저장소의 Pi, 격리된 Pi 설정, mock 프로바이더). 원격 호스트에는 넘기지 않는다 */
+/** pi 하위 명령(install·remove·list·mcp)에 쓸 덮어쓰기. 개발용 세션 인자(--provider 등)는 하위 명령 앞에 붙으면 안 되므로 뺀다 */
+function piCommandOverrides(): { piCliPath?: string; env?: Record<string, string> } {
+  const { piArgs: _sessionArgs, ...rest } = piOverrides();
+  return rest;
+}
+
 function piOverrides(): { piCliPath?: string; piArgs?: string[]; env?: Record<string, string> } {
   if (hostPaths?.remote) return {};
   const overrides = devSessionOverrides();
@@ -338,7 +344,13 @@ function registerIpc(conn: () => HostConnection): void {
     const error = await shell.openPath(path);
     if (error) throw new Error(error);
   });
-  ipcMain.handle(IpcChannels.checkMcp, () => agentCall<McpCheckResult>("mcpCheck", piOverrides()));
+  ipcMain.handle(IpcChannels.checkMcp, () => agentCall<McpCheckResult>("mcpCheck", piCommandOverrides()));
+  // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5). 설치는 그 호스트의 Pi로, 오래 걸릴 수 있다
+  forward(IpcChannels.packagesList, "packagesList");
+  ipcMain.handle(IpcChannels.packageInstall, (_event, source: string) => agentCallLong("packageInstall", source, piCommandOverrides()));
+  ipcMain.handle(IpcChannels.packageRemove, (_event, source: string) => agentCallLong("packageRemove", source, piCommandOverrides()));
+  forward(IpcChannels.importList, "importList");
+  forward(IpcChannels.importSkill, "importSkill");
   forward(IpcChannels.networkState, "networkState");
   forward(IpcChannels.setNetworkSettings, "setNetworkSettings");
   forward(IpcChannels.saveCard, "saveCard");
@@ -532,6 +544,12 @@ let taskWatcher: TaskWatcher | undefined;
 function agentCall<T = unknown>(name: string, ...args: unknown[]): Promise<T> {
   if (!connection) return Promise.reject(new Error("호스트에 아직 연결되지 않았습니다"));
   return connection.request<T>(Methods.agentCall, { name, args });
+}
+
+/** 오래 걸리는 데몬 호출 (패키지 설치 등). 기본 요청 시간 제한(2분) 대신 15분 */
+function agentCallLong<T = unknown>(name: string, ...args: unknown[]): Promise<T> {
+  if (!connection) return Promise.reject(new Error("호스트에 아직 연결되지 않았습니다"));
+  return connection.request<T>(Methods.agentCall, { name, args }, 15 * 60_000);
 }
 
 /** 끝난 작업 알림은 호스트마다 처음 읽은 것을 기준으로 삼는다 (호스트를 바꾸면 새로 시작) */

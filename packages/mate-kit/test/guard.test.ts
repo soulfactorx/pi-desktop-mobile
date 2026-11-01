@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { extToolGrant, isExtToolGrant, isToolGrant } from "../src/shared";
+import { isGrant } from "../src/guard";
 import { checkCommand } from "../src/guard";
 
 const ok = (c: string) => expect(checkCommand(c), c).toEqual({ allowed: true });
@@ -80,5 +82,18 @@ describe("checkCommand — 임무에 허용한 명령 (권한 요청)", () => {
     // 인터프리터는 허용 목록에 넣어도 통과하지 않는다
     expect(checkCommand("python -c 1", grants).allowed).toBe(false);
     expect(checkCommand("node -e 1", grants).allowed).toBe(false);
+  });
+});
+
+describe("도구 허용 이름 (MCP·확장)", () => {
+  it("확장 도구 허용 이름은 ext__로 bash 명령과 나눈다", () => {
+    expect(extToolGrant("web_search")).toBe("ext__web_search");
+    expect(isExtToolGrant("ext__web_search")).toBe(true);
+    expect(isExtToolGrant("web_search")).toBe(false);
+    expect(isToolGrant("ext__fetch_content")).toBe(true);
+    expect(isToolGrant("mcp__exa__web_search_exa")).toBe(true);
+    expect(isToolGrant("curl")).toBe(false);
+    // 임무에 저장할 수 있는 허용 이름이다
+    expect(isGrant("ext__web_search")).toBe(true);
   });
 });

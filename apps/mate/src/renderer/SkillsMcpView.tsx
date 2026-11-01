@@ -1,4 +1,4 @@
-import { emptySkillDraft, skillDraftReady, useMcp, useSkills } from "@pi-desktop/pi-resources/react";
+import { emptySkillDraft, skillDraftReady, useImports, useMcp, usePackages, useSkills } from "@pi-desktop/pi-resources/react";
 import type { Act } from "./App";
 
 /**
@@ -8,7 +8,7 @@ import type { Act } from "./App";
  */
 export function SkillsMcpView({ act }: { act: Act }) {
   const run = (job: () => Promise<void>) => void act(job);
-  const { skills, draft, setDraft, save, remove } = useSkills(
+  const { skills, draft, setDraft, save, remove, refresh: refreshSkills } = useSkills(
     { list: () => window.mate.skillsList(), save: (previous, input) => window.mate.skillSave(previous, input), remove: (name) => window.mate.skillDelete(name) },
     run,
   );
@@ -23,6 +23,18 @@ export function SkillsMcpView({ act }: { act: Act }) {
     run,
   );
   const { servers, keys, check, checking } = mcp;
+  const pkgs = usePackages(
+    { list: () => window.mate.packagesList(), install: (s) => window.mate.packageInstall(s), remove: (s) => window.mate.packageRemove(s) },
+    run,
+  );
+  const imports = useImports(
+    { list: () => window.mate.importList(), importSkill: (from, name) => window.mate.importSkill(from, name), installPackage: (s) => window.mate.packageInstall(s) },
+    run,
+    () => {
+      pkgs.refresh();
+      refreshSkills();
+    },
+  );
 
   return (
     <section>
@@ -160,6 +172,95 @@ export function SkillsMcpView({ act }: { act: Act }) {
           <pre>{check.output.trim() || "(출력 없음)"}</pre>
         </div>
       )}
+
+      <div className="section-head">
+        <h2>확장 (Pi 패키지)</h2>
+        <span className="muted">Mate 홈에 설치합니다. 확장이 더하는 도구는 처음 쓸 때 Mate가 허용을 묻습니다</span>
+      </div>
+      <form
+        className="row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          pkgs.install();
+        }}
+      >
+        <input className="grow" value={pkgs.source} onChange={(e) => pkgs.setSource(e.target.value)} placeholder="npm 패키지 이름 (예: pi-web-access) 또는 npm:·git:·https 주소" enterKeyHint="go" />{" "}
+        <button className="small primary" type="submit" disabled={!pkgs.source.trim() || Boolean(pkgs.busy)}>
+          설치
+        </button>
+      </form>
+      <div className="muted small-text">패키지는 코드를 실행합니다. 믿을 수 있는 것만 설치하세요. 설치에는 몇 분이 걸릴 수 있습니다.</div>
+      {pkgs.busy && <div className="small-text">{pkgs.busy} 중…</div>}
+      {pkgs.result && (
+        <div className="detail">
+          <div className={pkgs.result.ok ? "small-text" : "small-text bad-text"}>
+            {pkgs.result.action} {pkgs.result.ok ? "완료" : "실패"}
+          </div>
+          {!pkgs.result.ok && <pre>{pkgs.result.output.slice(-2000) || "(출력 없음)"}</pre>}
+        </div>
+      )}
+      {pkgs.packages && pkgs.packages.length === 0 && <div className="empty">아직 설치한 패키지가 없습니다.</div>}
+      <ul className="cards">
+        {pkgs.packages?.map((p) => (
+          <li key={p.source} className="card">
+            <div className="card-head">
+              <strong className="title">{p.name}</strong>
+              <span className="muted path" title={p.path ?? ""}>
+                {p.source}
+                {!p.path && " · 설치 폴더를 찾지 못함"}
+              </span>
+              <span className="right">
+                <button className="small" disabled={Boolean(pkgs.busy)} onClick={() => pkgs.remove(p.source, `${p.name} 패키지를 지울까요?`)}>
+                  지우기
+                </button>
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="section-head">
+        <h2>다른 앱에서 가져오기</h2>
+        <span className="muted">Pi Desktop·Agent의 스킬은 Mate로 복사하고, 패키지는 같은 것을 Mate에 새로 설치합니다. MCP는 위에서 새로 넣으세요</span>
+        <span className="right">
+          <button className="small" disabled={Boolean(imports.busy)} onClick={imports.load}>
+            {imports.items ? "다시 읽기" : "목록 보기"}
+          </button>
+        </span>
+      </div>
+      {imports.busy && <div className="small-text">{imports.busy} 가져오는 중…</div>}
+      {imports.message && <div className="small-text">{imports.message}</div>}
+      {imports.items && imports.items.skills.length + imports.items.packages.length === 0 && <div className="empty">가져올 것이 없습니다.</div>}
+      <ul className="cards">
+        {imports.items?.skills.map((s) => (
+          <li key={`s:${s.from}:${s.name}`} className="card">
+            <div className="card-head">
+              <strong className="title">{s.name}</strong>
+              <span className="chip">스킬 · {s.fromLabel}</span>
+              <span className="muted">{s.description}</span>
+              <span className="right">
+                <button className="small" disabled={s.exists || Boolean(imports.busy)} onClick={() => imports.importSkill(s.from, s.name)}>
+                  {s.exists ? "있음" : "가져오기"}
+                </button>
+              </span>
+            </div>
+          </li>
+        ))}
+        {imports.items?.packages.map((p) => (
+          <li key={`p:${p.from}:${p.source}`} className="card">
+            <div className="card-head">
+              <strong className="title">{p.name}</strong>
+              <span className="chip">패키지 · {p.fromLabel}</span>
+              <span className="muted path">{p.source}</span>
+              <span className="right">
+                <button className="small" disabled={p.exists || Boolean(imports.busy)} onClick={() => imports.importPackage(p.source)}>
+                  {p.exists ? "있음" : "설치"}
+                </button>
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

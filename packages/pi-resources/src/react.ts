@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SkillInput, SkillView } from "@pi-desktop/agent-kit/skill-types";
 import { WEB_SEARCH_PRESETS, type McpCheckResult, type McpPreset, type McpServerView } from "@pi-desktop/pi-isolation/mcp-presets";
+import type { AppId, Importables, PackageResult, PackageView } from "./types";
 
 /**
  * 스킬·MCP 관리 화면의 상태와 동작 (DESIGN-APPS.md §3.5). 세 앱이 같은 동작을 쓰고, 모양(마크업·CSS)만 앱마다 그린다.
@@ -123,6 +124,103 @@ export function useMcp(api: McpApi, run: Run) {
         } finally {
           setChecking(false);
         }
+      }),
+  };
+}
+
+export interface PackageApi {
+  list(): Promise<PackageView[]>;
+  install(source: string): Promise<PackageResult>;
+  remove(source: string): Promise<PackageResult>;
+}
+
+/** Pi 패키지(확장) 관리: 목록, 설치(오래 걸림), 제거. 마지막 명령 출력을 보여 줄 수 있게 남긴다 */
+export function usePackages(api: PackageApi, run: Run) {
+  const [packages, setPackages] = useState<PackageView[]>();
+  const [source, setSource] = useState("");
+  const [busy, setBusy] = useState<string>();
+  const [result, setResult] = useState<{ ok: boolean; output: string; action: string }>();
+  const [changed, setChanged] = useState(false);
+  const refresh = async () => setPackages(await api.list());
+  useEffect(() => run(refresh), []);
+  const act = (action: string, job: () => Promise<PackageResult>) =>
+    run(async () => {
+      setBusy(action);
+      setResult(undefined);
+      try {
+        const r = await job();
+        setPackages(r.packages);
+        setResult({ ok: r.ok, output: r.output, action });
+        if (r.ok) setChanged(true);
+      } finally {
+        setBusy(undefined);
+      }
+    });
+  return {
+    packages,
+    source,
+    setSource,
+    busy,
+    result,
+    changed,
+    refresh: () => run(refresh),
+    /** 입력한 출처(또는 주어진 출처)를 설치한다. npm 이름만 적으면 npm:을 붙인다 */
+    install: (given?: string) => {
+      const raw = (given ?? source).trim();
+      if (!raw) return;
+      const full = /^(npm:|git:|https:\/\/)/.test(raw) ? raw : `npm:${raw}`;
+      act(`설치: ${full}`, async () => {
+        const r = await api.install(full);
+        if (r.ok && given === undefined) setSource("");
+        return r;
+      });
+    },
+    remove: (pkg: string, question: string) => {
+      if (!confirm(question)) return;
+      act(`제거: ${pkg}`, () => api.remove(pkg));
+    },
+  };
+}
+
+export interface ImportApi {
+  list(): Promise<Importables>;
+  importSkill(from: AppId, name: string): Promise<void>;
+  installPackage(source: string): Promise<PackageResult>;
+}
+
+/** 다른 앱에서 가져오기 (복사). 열 때 목록을 읽고, 가져온 뒤 다시 읽는다 */
+export function useImports(api: ImportApi, run: Run, onImported?: () => void) {
+  const [items, setItems] = useState<Importables>();
+  const [busy, setBusy] = useState<string>();
+  const [message, setMessage] = useState<string>();
+  const load = async () => setItems(await api.list());
+  const job = (label: string, work: () => Promise<string>) =>
+    run(async () => {
+      setBusy(label);
+      setMessage(undefined);
+      try {
+        setMessage(await work());
+        await load();
+        onImported?.();
+      } finally {
+        setBusy(undefined);
+      }
+    });
+  return {
+    items,
+    busy,
+    message,
+    load: () => run(load),
+    importSkill: (from: AppId, name: string) =>
+      job(`${name} 스킬`, async () => {
+        await api.importSkill(from, name);
+        return `${name} 스킬을 가져왔습니다.`;
+      }),
+    importPackage: (source: string) =>
+      job(source, async () => {
+        const r = await api.installPackage(source);
+        if (!r.ok) throw new Error(`${source}를 설치하지 못했습니다\n${r.output.slice(-800)}`);
+        return `${source}를 설치했습니다.`;
       }),
   };
 }

@@ -58,6 +58,12 @@ export class RunnerConnection {
     return peer.request<T>("mate.call", { name, args }, this.options.requestTimeoutMs ?? 120_000);
   }
 
+  /** 오래 걸리는 함수 (패키지 설치 등). 기본 요청 시간 제한 대신 timeoutMs */
+  async callLong<T = unknown>(timeoutMs: number, name: string, ...args: unknown[]): Promise<T> {
+    const peer = await this.ready();
+    return peer.request<T>("mate.call", { name, args }, timeoutMs);
+  }
+
   private ready(timeoutMs = 20_000): Promise<JsonRpcPeer> {
     if (this.peer && this.state.status === "connected") return Promise.resolve(this.peer);
     return new Promise((resolve, reject) => {

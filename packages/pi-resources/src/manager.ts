@@ -5,6 +5,13 @@ import { deleteSkill, listSkillsIn, saveSkill } from "@pi-desktop/agent-kit/skil
 import type { SkillInput, SkillView } from "@pi-desktop/agent-kit/skill-types";
 import { readMcpFile, serverViews, updateMcpFile, withEnabled, withoutServer, withPreset } from "@pi-desktop/pi-isolation/mcp-file";
 import { WEB_SEARCH_PRESETS, type McpCheckResult, type McpServerView } from "@pi-desktop/pi-isolation/mcp-presets";
+import { appHomes, importSkill, listImportables } from "./imports";
+import { installPackage, listPackages, removePackage } from "./packages";
+import type { AppHome, AppId, Importables, PackageResult, PackageView } from "./types";
+
+export * from "./imports";
+export * from "./packages";
+export type * from "./types";
 
 /**
  * Pi의 확장 가능한 데이터를 관리하는 공용 코드 (설계 DESIGN-APPS.md §3.5 "관리 코드는 함께 쓴다").
@@ -30,6 +37,8 @@ export interface ResourceHomeOptions {
   skillsTrash?: string;
   /** 앱이 스킬을 지우는 방법을 따로 가질 때 (예: Mate는 자기 휴지통으로 옮긴다) */
   deleteSkill?: (name: string) => Promise<void>;
+  /** 가져올 수 있는 다른 앱 홈. 없으면 이 호스트의 세 앱 홈 (appHomes) */
+  others?: AppHome[];
   /** 연결 확인(pi mcp list)에 쓸 Pi. 인자는 앱이 넘긴 것을 그대로 준다 (Agent의 개발용 덮어쓰기 등) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pi: (overrides?: any) => Promise<PiRun>;
@@ -54,11 +63,22 @@ export interface ResourceHome {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mcpCheck(overrides?: any): Promise<McpCheckResult>;
+  /** 이 홈의 Pi 패키지 */
+  packagesList(): Promise<PackageView[]>;
+  /** pi install <출처>를 이 홈에 (오래 걸릴 수 있다) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  packageInstall(source: string, overrides?: any): Promise<PackageResult>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  packageRemove(source: string, overrides?: any): Promise<PackageResult>;
+  /** 다른 앱에서 가져올 수 있는 스킬·패키지 */
+  importList(): Promise<Importables>;
+  importSkill(from: AppId, name: string): Promise<void>;
 }
 
 export function resourceHome(options: ResourceHomeOptions): ResourceHome {
   const skills = join(options.home, "skills");
   const mcp = join(options.home, "mcp.json");
+  const others = () => options.others ?? appHomes();
   return {
     skillsList: () => listSkillsIn(skills),
     skillSave: async (previous, input) => void (await saveSkill(skills, input, previous)),
@@ -93,5 +113,11 @@ export function resourceHome(options: ResourceHomeOptions): ResourceHome {
         );
       });
     },
+
+    packagesList: () => listPackages(options.home),
+    packageInstall: async (source, overrides) => installPackage(await options.pi(overrides), options.home, source),
+    packageRemove: async (source, overrides) => removePackage(await options.pi(overrides), options.home, source),
+    importList: () => listImportables(options.home, others()),
+    importSkill: (from, name) => importSkill(options.home, others(), from, name),
   };
 }

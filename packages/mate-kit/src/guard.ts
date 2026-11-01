@@ -1,4 +1,4 @@
-import { isMcpToolName } from "./shared";
+import { isToolGrant } from "./shared";
 
 /**
  * observe·propose 단계에서 bash로 실행해도 되는 읽기 명령인지 판정한다 (설계 DESIGN-MATE.md §4).
@@ -141,9 +141,9 @@ const NEVER_GRANT = new Set([
   "python", "python3", "py", "ruby", "php", "osascript", "wscript", "cscript", "mshta",
 ]);
 
-/** 임무에 저장할 수 있는 허용 이름인지: bash 명령 이름 또는 MCP 도구 이름 */
+/** 임무에 저장할 수 있는 허용 이름인지: bash 명령 이름, MCP 도구 이름, 패키지 도구 허용 이름(ext__) */
 export function isGrant(name: string): boolean {
-  return isGrantableName(name) || isMcpToolName(name);
+  return isGrantableName(name) || isToolGrant(name);
 }
 
 /** 허용을 물을 수 있는 명령 이름인지 (경로·옵션이 아닌 이름이고, NEVER_GRANT가 아님) */

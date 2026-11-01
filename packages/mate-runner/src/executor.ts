@@ -26,6 +26,10 @@ export interface RunInput {
   model: string;
   /** mate-kit 확장 진입 파일들 */
   extensions: string[];
+  /** Mate 홈에 설치한 Pi 패키지 폴더들 (DESIGN-APPS.md §3.5) */
+  packages?: string[];
+  /** 그 패키지들이 더하는 도구 이름. --tools에 선언하고, mate-guard가 처음 쓸 때 허용을 묻는다 */
+  packageTools?: string[];
   /** Mate 홈. 스킬·프롬프트는 여기서만 올린다 (DESIGN-APPS.md §3.1) */
   home: string;
   /** pi-isolation 폴더 (isolationDirOf) */
@@ -112,12 +116,12 @@ export function piArgs(input: RunInput): string[] {
     ...isolationArgs({
       home: input.home,
       isolationDir: input.isolationDir,
-      extensions: input.extensions,
+      extensions: [...input.extensions, ...(input.packages ?? [])],
       mcp: servers.length > 0,
       ...(duty.skills ? { skills: duty.skills } : {}),
     }),
     // 고른 서버의 도구는 이름 패턴으로 선언한다. 처음 쓰는 도구는 mate-guard가 막고 허용을 묻는다
-    "--tools", [...profileTools(input.chat ? "chat" : duty.profile), ...servers.map(mcpToolPattern)].join(","),
+    "--tools", [...profileTools(input.chat ? "chat" : duty.profile), ...servers.map(mcpToolPattern), ...(input.packageTools ?? [])].join(","),
     // 모델을 정하지 않았으면 Pi 기본 모델(settings.json)을 따른다
     ...(input.model ? ["--model", input.model] : []),
     "--append-system-prompt", input.chat?.systemPrompt ?? mateSystemPrompt(duty, input.cause, input.installHints),
@@ -142,6 +146,7 @@ export function piEnv(input: RunInput, profile: MateProfile): Record<string, str
     // 대화(chat)는 대화용 임무에 허용한 MCP 도구만 들어 있다 (chat-agent가 설정의 chatGrants로 채움)
     ...(input.duty.grants?.length ? { [MATE_ENV.grants]: input.duty.grants.join(",") } : {}),
     ...(input.blockedPath ? { [MATE_ENV.blocked]: input.blockedPath } : {}),
+    ...(input.packageTools?.length ? { [MATE_ENV.packages]: input.packageTools.join(",") } : {}),
   };
 }
 

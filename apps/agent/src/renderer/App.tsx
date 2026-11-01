@@ -14,6 +14,7 @@ import { RulesPage } from "./RulesPage";
 import { UsagePage } from "./UsagePage";
 import { HistoryPage, type HistoryView } from "./HistoryPage";
 import { McpPage } from "./McpPage";
+import { PackagesPage } from "./PackagesPage";
 import { NetworkPage } from "./NetworkPage";
 import { SettingsPage } from "./SettingsPage";
 import { TasksPanel } from "./TasksPanel";
@@ -21,7 +22,7 @@ import { folderName, lastFolder, recentFolders, rememberFolder, setRecentScope }
 import { useAgentSession } from "./use-agent-session";
 
 /** 화면. 대화 말고는 메뉴바(보기)에서 연다 (main/app-menu.ts) */
-type Page = "chat" | "tasks" | "memory" | "skills" | "rules" | "usage" | "history" | "mcp" | "network" | "settings";
+type Page = "chat" | "tasks" | "memory" | "skills" | "rules" | "usage" | "history" | "mcp" | "packages" | "network" | "settings";
 
 /** 호스트 id를 사람이 읽는 이름으로 ("wsl:Ubuntu" → "WSL: Ubuntu") */
 export function hostLabel(id: string): string {
@@ -411,6 +412,7 @@ export function App() {
         {page === "rules" && <RulesPage onError={onError} />}
         {page === "usage" && <UsagePage onError={onError} />}
         {page === "mcp" && <McpPage onError={onError} />}
+        {page === "packages" && <PackagesPage onError={onError} />}
         {page === "network" && <NetworkPage onError={onError} pickFolder={pickFolder} />}
         {page === "history" && (
           <HistoryPage

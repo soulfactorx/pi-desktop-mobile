@@ -1,6 +1,7 @@
 import { join, posix } from "node:path";
 import type { SessionOpenParams } from "@pi-desktop/host-protocol";
 import { extensionEntries } from "@pi-desktop/agent-kit";
+import { packageDirs } from "@pi-desktop/pi-resources";
 import { AGENT_HOME_ENV } from "@pi-desktop/agent-kit/home";
 import { isolatedPaths, isolationArgs, isolationEnv } from "@pi-desktop/pi-isolation";
 import { remoteExtensionEntries, type HostPaths } from "./hosts";
@@ -37,7 +38,10 @@ export interface SessionParamsOptions {
 export async function sessionParamsFor(options: SessionParamsOptions): Promise<SessionOpenParams> {
   const { paths } = options;
   const overrides = options.overrides ?? {};
-  const extensions = paths.remote ? await remoteExtensionEntries(options.localKitDir, paths.kitDir) : await extensionEntries(paths.kitDir);
+  // 앱 홈에 설치한 Pi 패키지도 올린다 (DESIGN-APPS.md §3.5). 다른 호스트(WSL·SSH)는 그 호스트의 파일을 여기서 읽을 수 없어 아직 올리지 않는다
+  const extensions = paths.remote
+    ? await remoteExtensionEntries(options.localKitDir, paths.kitDir)
+    : [...(await extensionEntries(paths.kitDir)), ...packageDirs(paths.home)];
   const homeArgs = isolationArgs({
     home: paths.home,
     isolationDir: paths.isolationDir,
