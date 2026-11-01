@@ -102,3 +102,25 @@ export function attentionFor(
   if (before?.running && !after.running) return "done";
   return undefined;
 }
+
+/**
+ * 같은 세션을 보는 탭이 둘 이상이면 하나만 남기고 닫을 탭들을 돌려준다.
+ * 지금 보는 탭이 그중에 있으면 그 탭을, 아니면 왼쪽 탭을 남긴다.
+ * (알림·사이드바·활동 패널로 이미 다른 탭에 열린 세션을 다시 열면 같은 이름의 탭이 늘어나던 것을 막는다)
+ */
+export function duplicateSessionTabs(
+  state: TabsState,
+  statuses: Readonly<Record<string, { hostId: string; sessionId?: string } | undefined>>,
+): string[] {
+  const keep = new Map<string, string>();
+  const close: string[] = [];
+  const order = [state.active, ...state.ids.filter((id) => id !== state.active)].filter((id) => state.ids.includes(id));
+  for (const id of order) {
+    const status = statuses[id];
+    if (!status?.sessionId) continue;
+    const key = `${status.hostId}\u0000${status.sessionId}`;
+    if (keep.has(key)) close.push(id);
+    else keep.set(key, id);
+  }
+  return close;
+}

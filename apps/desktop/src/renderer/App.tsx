@@ -4,6 +4,7 @@ import {
   attentionFor,
   closeTab,
   cycleTab,
+  duplicateSessionTabs,
   loadTabs,
   saveTabs,
   type Attention,
@@ -83,6 +84,11 @@ export function App() {
       return rest;
     });
   }, []);
+
+  // 같은 세션을 두 탭이 보게 되면(이미 열린 세션을 다른 탭에서 다시 열면) 하나만 남긴다
+  useEffect(() => {
+    for (const id of duplicateSessionTabs(tabsRef.current, statuses)) close(id);
+  }, [statuses, tabs, close]);
 
   // 활동 패널: 탭들이 연결해 쓰는 호스트의 세션을 모은다.
   const activityHosts = useMemo(() => {

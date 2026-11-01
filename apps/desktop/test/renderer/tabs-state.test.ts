@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTab, attentionFor, closeTab, cycleTab, restorableTabIds } from "../../src/renderer/tabs-state";
+import { addTab, attentionFor, closeTab, cycleTab, restorableTabIds, duplicateSessionTabs } from "../../src/renderer/tabs-state";
 
 describe("탭 목록", () => {
   it("새 탭은 지금 탭 오른쪽에 열리고 활성화된다", () => {
@@ -47,5 +47,29 @@ describe("restorableTabIds", () => {
     const withSession = new Set(["t2"]);
     expect(restorableTabIds(["main", "t1", "t2"], "main", (id) => withSession.has(id))).toEqual(["main", "t2"]);
     expect(restorableTabIds(["main"], "main", () => false)).toEqual(["main"]);
+  });
+});
+
+describe("duplicateSessionTabs", () => {
+  const s = (hostId: string, sessionId?: string) => ({ hostId, sessionId });
+
+  it("같은 세션을 보는 탭은 지금 보는 탭만 남긴다", () => {
+    const state = { ids: ["main", "a", "b"], active: "b" };
+    expect(duplicateSessionTabs(state, { main: s("local", "x"), a: s("local", "x"), b: s("local", "x") })).toEqual(["main", "a"]);
+  });
+
+  it("지금 보는 탭이 아니면 왼쪽 탭을 남긴다", () => {
+    const state = { ids: ["main", "a", "b"], active: "main" };
+    expect(duplicateSessionTabs(state, { main: s("local", "y"), a: s("local", "x"), b: s("local", "x") })).toEqual(["b"]);
+  });
+
+  it("세션이 없거나 호스트가 다르면 겹치지 않는다", () => {
+    const state = { ids: ["main", "a", "b", "c"], active: "main" };
+    expect(duplicateSessionTabs(state, { main: s("local"), a: s("local"), b: s("ssh1", "x"), c: s("local", "x") })).toEqual([]);
+  });
+
+  it("목록에 없는 탭의 상태는 보지 않는다", () => {
+    const state = { ids: ["main"], active: "main" };
+    expect(duplicateSessionTabs(state, { main: s("local", "x"), gone: s("local", "x") })).toEqual([]);
   });
 });
