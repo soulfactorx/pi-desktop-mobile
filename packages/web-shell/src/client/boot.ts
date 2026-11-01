@@ -240,7 +240,8 @@ class ShellUi {
 
   /** 알림을 눌렀다고 서버에 알린다 (그 알림의 click 처리, 예: 그 대화로 가기) */
   clickNotification(id: string): void {
-    this.transport?.send(ShellChannels.notificationClick, id);
+    // 서버는 처리기(handle)로 받으므로 invoke로 보낸다 (send는 리스너에게만 가서 처리되지 않았다)
+    void this.transport?.invoke(ShellChannels.notificationClick, id).catch(() => undefined);
   }
 
   private toast(title: string, body?: string, level?: "info" | "error", clickId?: string): void {
