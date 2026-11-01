@@ -2631,10 +2631,24 @@ button .spinner {
 
 .resource-list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 10px;
+  gap: 6px 10px;
   padding: 8px 4px;
   border-bottom: 1px solid var(--border);
+}
+
+/* 단추는 글자를 접지 않는다. 자리가 모자라면 이름 아래 줄로 넘어간다 (휴대폰) */
+.resource-list li > button {
+  white-space: nowrap;
+  flex: none;
+}
+
+/* 좁은 화면(휴대폰)에서는 이름을 한 줄에 두고 단추를 모두 아래 줄에 모은다 */
+@media (max-width: 600px) {
+  .resource-list li > .resource-main {
+    flex-basis: 100%;
+  }
 }
 
 .resource-list li.disabled {
@@ -2642,7 +2656,8 @@ button .spinner {
 }
 
 .resource-main {
-  flex: 1;
+  /* 이름 칸이 좁아지면(220px 아래) 한 줄을 다 쓰고 단추는 다음 줄로 */
+  flex: 1 1 220px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2658,6 +2673,7 @@ button .spinner {
 }
 
 .resource-badge {
+  white-space: nowrap;
   font-size: 11px;
   font-weight: normal;
   color: var(--muted);
