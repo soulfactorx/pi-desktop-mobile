@@ -7,6 +7,8 @@ import { bootWebApp } from "@pi-desktop/web-shell/client";
 bootWebApp({
   title: "Pi Mate",
   urlCommand: "pi-web mate url",
+  // 첫 화면의 "Pi Desktop Mate" 옆에 웹앱 버전
+  versionTarget: ".top .brand",
   loadApp: async () => {
     await import("../../../mate/src/preload/index");
     await import("../../../mate/src/renderer/main");

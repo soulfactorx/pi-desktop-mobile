@@ -260,3 +260,10 @@
     font-size: 16px; /* 16px보다 작으면 입력할 때 화면이 확대된다 */
   }
 }
+
+/* ⋮ 메뉴 단추 안의 웹앱 버전 */
+.web-menu-version {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.6;
+}
