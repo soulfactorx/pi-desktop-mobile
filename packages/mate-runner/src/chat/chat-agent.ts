@@ -1,4 +1,4 @@
-import { packageDirs } from "@pi-desktop/pi-resources";
+import { packageDirs, packageToolNames } from "@pi-desktop/pi-resources";
 import { watch, type FSWatcher } from "node:fs";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
@@ -339,6 +339,7 @@ export class ChatAgent {
           blockedPath,
           extensions,
           packages: packageDirs(paths.home),
+          packageTools: packageToolNames(paths.home),
           home: paths.home,
           isolationDir: isolationDirOf(this.options.kitDir),
           inboxPath: paths.inbox,

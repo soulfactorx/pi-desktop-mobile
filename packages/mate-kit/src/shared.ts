@@ -21,7 +21,7 @@ export const MATE_ENV = {
   grants: "PI_DESKTOP_MATE_GRANTS",
   /** 허용 목록에 없어 막힌 명령을 남기는 파일(JSONL). 실행이 끝나면 실행기가 읽어 사용자에게 허용을 묻는다 */
   blocked: "PI_DESKTOP_MATE_BLOCKED",
-  /** Mate 홈에 설치한 Pi 패키지 폴더들 (경로 구분자 `\n`). mate-guard가 그 도구를 켜고, 처음 쓸 때 허용을 묻는다 */
+  /** Mate 홈에 설치한 Pi 패키지가 더하는 도구 이름들 (쉼표로 구분). mate-guard가 처음 쓸 때 허용을 묻는다 */
   packages: "PI_DESKTOP_MATE_PACKAGES",
 } as const;
 

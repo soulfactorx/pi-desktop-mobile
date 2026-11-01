@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { importSkill, listImportables } from "../src/imports";
 import type { AppHome } from "../src/types";
-import { listPackages, PACKAGE_PATHS_FILE, packageDirs, packageName, parsePiList, validPackageSource } from "../src/packages";
+import { listPackages, PACKAGE_PATHS_FILE, PACKAGE_TOOLS_FILE, packageDirs, packageName, packageToolNames, parsePiList, validPackageSource } from "../src/packages";
 
 describe("pi list 읽기", () => {
   it("사용자 패키지의 출처와 설치 폴더를 읽는다 (프로젝트 패키지는 뺀다)", () => {
@@ -50,12 +50,16 @@ describe("앱 홈의 패키지", () => {
     ]);
     // settings.json에서 빠진 것(removed)과 폴더가 없는 것(gone)은 세션에 올리지 않는다
     expect(packageDirs(home)).toEqual([installed]);
+    // 도구 이름도 settings.json에 남은 패키지 것만
+    writeFileSync(join(home, PACKAGE_TOOLS_FILE), JSON.stringify({ "npm:pi-web-access": ["web_search", "fetch_content"], "npm:removed": ["old_tool"] }));
+    expect(packageToolNames(home)).toEqual(["web_search", "fetch_content"]);
   });
 
   it("파일이 없으면 빈 목록", async () => {
     const home = mkdtempSync(join(tmpdir(), "pi-res-pkg-"));
     expect(await listPackages(home)).toEqual([]);
     expect(packageDirs(home)).toEqual([]);
+    expect(packageToolNames(home)).toEqual([]);
   });
 });
 

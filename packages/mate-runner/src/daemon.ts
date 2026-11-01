@@ -1,4 +1,4 @@
-import { packageDirs } from "@pi-desktop/pi-resources";
+import { packageDirs, packageToolNames } from "@pi-desktop/pi-resources";
 import { createHash } from "node:crypto";
 import { watch, type FSWatcher } from "node:fs";
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -160,6 +160,7 @@ export async function runDuty(
         model: record.model,
         extensions,
         packages: packageDirs(paths.home),
+        packageTools: packageToolNames(paths.home),
         home: paths.home,
         isolationDir: isolationDirOf(options.kitDir),
         ...(duty.profile !== "observe" ? { installHints: await installHints(paths).catch(() => []) } : {}),

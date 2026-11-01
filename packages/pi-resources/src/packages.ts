@@ -1,6 +1,8 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PiRun } from "./manager";
 import type { PackageResult, PackageView } from "./types";
@@ -17,6 +19,8 @@ import type { PackageResult, PackageView } from "./types";
  */
 
 export const PACKAGE_PATHS_FILE = "package-paths.json";
+/** 패키지마다 더하는 도구 이름 (출처 → 이름들). Mate는 --tools에 이름을 미리 적어야 해서 설치할 때 알아 둔다 */
+export const PACKAGE_TOOLS_FILE = "package-tools.json";
 
 /** `pi list` 출력에서 출처 → 설치 폴더를 읽는다 (사용자 패키지만) */
 export function parsePiList(output: string): Record<string, string> {
@@ -112,13 +116,71 @@ export function runPiInHome(run: PiRun, home: string, args: string[], timeoutMs 
   });
 }
 
-/** `pi list`로 설치 폴더를 다시 읽어 적어 둔다 */
+async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
+  const tmp = `${path}.${process.pid}.tmp`;
+  await writeFile(tmp, JSON.stringify(value, null, 2), "utf8");
+  await rename(tmp, path);
+}
+
+/** `pi list`로 설치 폴더를 다시 읽어 적고, 패키지마다 도구 이름을 알아 둔다 */
 export async function refreshPackagePaths(run: PiRun, home: string): Promise<void> {
   const listed = await runPiInHome(run, home, ["list"], 120_000);
   if (!listed.ok) return;
-  const tmp = join(home, `${PACKAGE_PATHS_FILE}.${process.pid}.tmp`);
-  await writeFile(tmp, JSON.stringify(parsePiList(listed.output), null, 2), "utf8");
-  await rename(tmp, join(home, PACKAGE_PATHS_FILE));
+  const paths = parsePiList(listed.output);
+  await writeJsonAtomic(join(home, PACKAGE_PATHS_FILE), paths);
+  const tools: Record<string, string[]> = {};
+  for (const [source, dir] of Object.entries(paths)) tools[source] = await discoverPackageTools(run, dir).catch(() => []);
+  await writeJsonAtomic(join(home, PACKAGE_TOOLS_FILE), tools);
+}
+
+/** 도구 목록을 파일로 남기는 작은 확장. Pi를 RPC로 띄워 세션이 시작될 때 한 번 쓰고, 부르는 쪽이 Pi를 끝낸다 (모델을 부르지 않는다) */
+const LISTER_SOURCE = `import { writeFileSync } from "node:fs";
+export default function (pi: any) {
+  pi.on("session_start", async () => {
+    const out = process.env.PI_RESOURCES_TOOLS_OUT;
+    if (out) writeFileSync(out, JSON.stringify(pi.getAllTools().map((t: any) => ({ name: t.name, path: t.sourceInfo?.path ?? "" }))));
+  });
+}
+`;
+
+/** 패키지 폴더 하나가 더하는 도구 이름들 */
+export async function discoverPackageTools(run: PiRun, dir: string, timeoutMs = 60_000): Promise<string[]> {
+  const work = join(tmpdir(), "pi-resources");
+  await mkdir(work, { recursive: true });
+  const lister = join(work, `lister-${createHash("sha256").update(LISTER_SOURCE).digest("hex").slice(0, 12)}.ts`);
+  if (!existsSync(lister)) await writeFile(lister, LISTER_SOURCE, "utf8");
+  const out = join(work, `tools-${process.pid}-${Date.now().toString(36)}.json`);
+  const child = spawn(run.command, [...run.args, "--mode", "rpc", "--no-session", "-ns", "-np", "-nc", "-ne", "-e", lister, "-e", dir], {
+    cwd: dir,
+    env: { ...run.env, PI_RESOURCES_TOOLS_OUT: out },
+    stdio: ["pipe", "ignore", "ignore"],
+    windowsHide: true,
+  });
+  try {
+    const started = Date.now();
+    while (!existsSync(out)) {
+      if (child.exitCode !== null || Date.now() - started > timeoutMs) return [];
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    await new Promise((r) => setTimeout(r, 100));
+    const listed = JSON.parse(await readFile(out, "utf8")) as Array<{ name: string; path: string }>;
+    const base = dir.replace(/\\/g, "/").replace(/\/+$/, "");
+    return listed.filter((t) => t.path.replace(/\\/g, "/").startsWith(`${base}/`)).map((t) => t.name);
+  } finally {
+    child.kill();
+    await rm(out, { force: true });
+  }
+}
+
+/** Mate가 --tools에 넣을 패키지 도구 이름들 (세션을 열 때 부르므로 적어 둔 파일만 읽는다) */
+export function packageToolNames(home: string): string[] {
+  try {
+    const sources = readSettingsPackages(readFileSync(join(home, "settings.json"), "utf8"));
+    const tools = JSON.parse(readFileSync(join(home, PACKAGE_TOOLS_FILE), "utf8")) as Record<string, unknown>;
+    return [...new Set(sources.flatMap((s) => (Array.isArray(tools[s]) ? (tools[s] as unknown[]).filter((t): t is string => typeof t === "string") : [])))];
+  } catch {
+    return [];
+  }
 }
 
 export async function installPackage(run: PiRun, home: string, source: string): Promise<PackageResult> {
