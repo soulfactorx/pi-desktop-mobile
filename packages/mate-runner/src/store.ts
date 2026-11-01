@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { isGrant, isMcpToolName, isProfile } from "@pi-desktop/mate-kit";
+import { isGrant, isProfile, isToolGrant } from "@pi-desktop/mate-kit";
 import type { MatePaths } from "./paths";
 import { parseTime } from "./schedule";
 import { pollCommandError } from "./watchers";
@@ -69,7 +69,7 @@ export async function loadConfig(paths: MatePaths): Promise<MateConfig> {
     observe: normalizeObserve(raw.observe),
     telegram: normalizeTelegram(raw.telegram),
     chatMcpServers: names(raw.chatMcpServers, isServerName),
-    chatGrants: names(raw.chatGrants, isMcpToolName),
+    chatGrants: names(raw.chatGrants, isToolGrant),
     desktopNotify: raw.desktopNotify !== false,
   };
 }

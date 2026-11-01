@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { appendBlocked } from "../../src/blocked";
 import { checkCommand, isGrantableName } from "../../src/guard";
-import { isGuardProfile, isMcpToolName, MATE_ENV, profileTools } from "../../src/shared";
+import { extToolGrant, isGuardProfile, isMcpToolName, MATE_ENV, profileTools } from "../../src/shared";
 import { writeScopeError } from "../../src/write-scope";
 
 /** Windows Git Bash 출력이 UTF-8로 오도록 (Pi Desktop bridge와 같은 처리, Mate는 bridge를 쓰지 않는다) */
@@ -27,7 +27,39 @@ export default function mateGuard(pi: ExtensionAPI): void {
   const grants = (process.env[MATE_ENV.grants] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const blockedPath = process.env[MATE_ENV.blocked];
 
+  // Mate 홈에 설치한 Pi 패키지의 도구 (DESIGN-APPS.md §3.5). --tools에는 이름을 미리 알 수 없어 넣지 못하므로
+  // 세션이 시작되면 여기서 켜고, MCP 도구처럼 사용자가 허용한 것만 쓰게 한다 (허용 이름은 ext__<도구>)
+  const packageDirs = (process.env[MATE_ENV.packages] ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+  const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+  const inPackage = (tool: { sourceInfo?: { path?: string; baseDir?: string } }) => {
+    const where = norm(tool.sourceInfo?.baseDir ?? tool.sourceInfo?.path ?? "");
+    return where !== "" && packageDirs.some((dir) => where === norm(dir) || where.startsWith(`${norm(dir)}/`));
+  };
+  const packageTools = () => (packageDirs.length === 0 ? [] : pi.getAllTools().filter(inPackage));
+  if (packageDirs.length > 0) {
+    pi.on("session_start", async () => {
+      const tools = packageTools().map((t) => t.name);
+      if (tools.length === 0) return;
+      const active = pi.getActiveTools().map((t: unknown) => (typeof t === "string" ? t : (t as { name: string }).name));
+      pi.setActiveTools([...new Set([...active, ...tools])]);
+    });
+  }
+
   pi.on("tool_call", async (event, ctx) => {
+    const fromPackage = packageDirs.length > 0 ? packageTools().find((t) => t.name === event.toolName) : undefined;
+    if (fromPackage) {
+      const grant = extToolGrant(event.toolName);
+      if (grants.includes(grant)) return undefined;
+      if (blockedPath) {
+        await appendBlocked(blockedPath, { name: grant, command: (fromPackage.description ?? "").split("\n")[0]!.slice(0, 200), at: Date.now() }).catch(() => undefined);
+      }
+      return {
+        block: true,
+        reason:
+          `${event.toolName}은(는) 사용자가 아직 허용하지 않은 확장 도구다.` +
+          (blockedPath ? " 사용자에게 허용을 요청해 두었다. 다른 방법으로 우회하지 말고, 할 수 있는 만큼만 하고 무엇이 막혔는지 요약에 적어라." : ""),
+      };
+    }
     if (isMcpToolName(event.toolName)) {
       if (grants.includes(event.toolName)) return undefined;
       if (blockedPath) {

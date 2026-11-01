@@ -7,7 +7,8 @@
   "license": "MIT",
   "exports": {
     ".": "./src/manager.ts",
-    "./react": "./src/react.ts"
+    "./react": "./src/react.ts",
+    "./types": "./src/types.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

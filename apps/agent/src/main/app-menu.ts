@@ -16,6 +16,7 @@ export type MenuCommand =
   | "page:usage"
   | "page:history"
   | "page:mcp"
+  | "page:packages"
   | "page:network"
   | "page:skills"
   | "page:settings";
@@ -61,6 +62,7 @@ export function appMenuTemplate(platform: NodeJS.Platform, isPackaged: boolean, 
         cmd("사용량", "page:usage", "CmdOrCtrl+5"),
         cmd("지난 대화", "page:history", "CmdOrCtrl+6"),
         cmd("웹 검색·MCP", "page:mcp", "CmdOrCtrl+7"),
+        cmd("확장·가져오기", "page:packages"),
         cmd("네트워크", "page:network", "CmdOrCtrl+8"),
         cmd("설정", "page:settings", "CmdOrCtrl+,"),
         { type: "separator" },

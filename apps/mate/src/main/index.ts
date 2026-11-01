@@ -90,6 +90,11 @@ const call = <T = unknown>(name: string, ...args: unknown[]): Promise<T> => {
   if (!connection) return Promise.reject(new Error("실행기에 아직 연결하지 않았습니다"));
   return connection.call<T>(name, ...args);
 };
+/** 오래 걸리는 실행기 함수 (패키지 설치). 15분까지 기다린다 */
+const callLong = <T = unknown>(name: string, ...args: unknown[]): Promise<T> => {
+  if (!connection) return Promise.reject(new Error("실행기에 아직 연결하지 않았습니다"));
+  return connection.callLong<T>(15 * 60_000, name, ...args);
+};
 
 /** 실행기에 붙기 전에도 쓰는 로컬 저장소 (연결 명령에 넘길 휴대폰 토큰을 읽는다) */
 const localStore: TelegramStore = {
@@ -334,6 +339,12 @@ function registerIpc(): void {
     if (error) throw new Error(error);
   });
   ipcMain.handle(IpcChannels.checkMcp, () => call<McpCheckResult>("mcpCheck"));
+  // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5). 설치는 실행기가 그 호스트의 Pi로 한다 (오래 걸릴 수 있다)
+  forward(IpcChannels.packagesList, "packagesList");
+  ipcMain.handle(IpcChannels.packageInstall, (_e, source: string) => callLong("packageInstall", source));
+  ipcMain.handle(IpcChannels.packageRemove, (_e, source: string) => callLong("packageRemove", source));
+  forward(IpcChannels.importList, "importList");
+  forward(IpcChannels.importSkill, "importSkill");
   forward(IpcChannels.runNow, "runNow");
   ipcMain.handle(IpcChannels.setInbox, (_e, ids: string[], status: InboxStatus | undefined) => call("setInbox", ids, status));
   ipcMain.handle(IpcChannels.saveConfig, (_e, patch: ConfigPatch) => saveConfigOnRunner(patch));

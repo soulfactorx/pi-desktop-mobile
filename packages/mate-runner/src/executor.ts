@@ -26,6 +26,8 @@ export interface RunInput {
   model: string;
   /** mate-kit 확장 진입 파일들 */
   extensions: string[];
+  /** Mate 홈에 설치한 Pi 패키지 폴더들 (DESIGN-APPS.md §3.5). 도구는 mate-guard가 켜고 처음 쓸 때 허용을 묻는다 */
+  packages?: string[];
   /** Mate 홈. 스킬·프롬프트는 여기서만 올린다 (DESIGN-APPS.md §3.1) */
   home: string;
   /** pi-isolation 폴더 (isolationDirOf) */
@@ -112,7 +114,7 @@ export function piArgs(input: RunInput): string[] {
     ...isolationArgs({
       home: input.home,
       isolationDir: input.isolationDir,
-      extensions: input.extensions,
+      extensions: [...input.extensions, ...(input.packages ?? [])],
       mcp: servers.length > 0,
       ...(duty.skills ? { skills: duty.skills } : {}),
     }),
@@ -142,6 +144,7 @@ export function piEnv(input: RunInput, profile: MateProfile): Record<string, str
     // 대화(chat)는 대화용 임무에 허용한 MCP 도구만 들어 있다 (chat-agent가 설정의 chatGrants로 채움)
     ...(input.duty.grants?.length ? { [MATE_ENV.grants]: input.duty.grants.join(",") } : {}),
     ...(input.blockedPath ? { [MATE_ENV.blocked]: input.blockedPath } : {}),
+    ...(input.packages?.length ? { [MATE_ENV.packages]: input.packages.join("\n") } : {}),
   };
 }
 

@@ -339,6 +339,12 @@ function registerIpc(conn: () => HostConnection): void {
     if (error) throw new Error(error);
   });
   ipcMain.handle(IpcChannels.checkMcp, () => agentCall<McpCheckResult>("mcpCheck", piOverrides()));
+  // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5). 설치는 그 호스트의 Pi로, 오래 걸릴 수 있다
+  forward(IpcChannels.packagesList, "packagesList");
+  ipcMain.handle(IpcChannels.packageInstall, (_event, source: string) => agentCallLong("packageInstall", source, piOverrides()));
+  ipcMain.handle(IpcChannels.packageRemove, (_event, source: string) => agentCallLong("packageRemove", source, piOverrides()));
+  forward(IpcChannels.importList, "importList");
+  forward(IpcChannels.importSkill, "importSkill");
   forward(IpcChannels.networkState, "networkState");
   forward(IpcChannels.setNetworkSettings, "setNetworkSettings");
   forward(IpcChannels.saveCard, "saveCard");
@@ -532,6 +538,12 @@ let taskWatcher: TaskWatcher | undefined;
 function agentCall<T = unknown>(name: string, ...args: unknown[]): Promise<T> {
   if (!connection) return Promise.reject(new Error("호스트에 아직 연결되지 않았습니다"));
   return connection.request<T>(Methods.agentCall, { name, args });
+}
+
+/** 오래 걸리는 데몬 호출 (패키지 설치 등). 기본 요청 시간 제한(2분) 대신 15분 */
+function agentCallLong<T = unknown>(name: string, ...args: unknown[]): Promise<T> {
+  if (!connection) return Promise.reject(new Error("호스트에 아직 연결되지 않았습니다"));
+  return connection.request<T>(Methods.agentCall, { name, args }, 15 * 60_000);
 }
 
 /** 끝난 작업 알림은 호스트마다 처음 읽은 것을 기준으로 삼는다 (호스트를 바꾸면 새로 시작) */

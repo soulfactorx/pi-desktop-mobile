@@ -21,6 +21,8 @@ export const MATE_ENV = {
   grants: "PI_DESKTOP_MATE_GRANTS",
   /** 허용 목록에 없어 막힌 명령을 남기는 파일(JSONL). 실행이 끝나면 실행기가 읽어 사용자에게 허용을 묻는다 */
   blocked: "PI_DESKTOP_MATE_BLOCKED",
+  /** Mate 홈에 설치한 Pi 패키지 폴더들 (경로 구분자 `\n`). mate-guard가 그 도구를 켜고, 처음 쓸 때 허용을 묻는다 */
+  packages: "PI_DESKTOP_MATE_PACKAGES",
 } as const;
 
 /**
@@ -29,6 +31,25 @@ export const MATE_ENV = {
  */
 export function isMcpToolName(name: string): boolean {
   return /^mcp__[A-Za-z0-9_]{1,64}__[A-Za-z0-9_.-]{1,128}$/.test(name);
+}
+
+/**
+ * Pi 패키지(확장) 도구의 허용 이름 (`ext__<도구>`). 도구 이름이 bash 명령 이름과 겹치지 않게 앞에 붙인다.
+ * MCP 도구처럼 읽기인지 쓰기인지 알 수 없어 도구마다 허용을 받는다 (DESIGN-APPS.md §3.5)
+ */
+export const EXT_GRANT_PREFIX = "ext__";
+
+export function isExtToolGrant(name: string): boolean {
+  return /^ext__[A-Za-z0-9_.-]{1,128}$/.test(name);
+}
+
+export function extToolGrant(tool: string): string {
+  return `${EXT_GRANT_PREFIX}${tool}`;
+}
+
+/** 도구마다 허용을 받는 이름인지 (MCP 도구 또는 패키지 도구). bash 명령 허용과 나눈다 */
+export function isToolGrant(name: string): boolean {
+  return isMcpToolName(name) || isExtToolGrant(name);
 }
 
 /** 막힌 명령의 허용을 묻는 질문의 선택지. 첫째가 허용이다 */
