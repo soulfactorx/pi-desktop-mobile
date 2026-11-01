@@ -291,7 +291,12 @@ export function registerHandlers(router: Router, deps: HandlerDeps): void {
     IpcChannels.sendCommand,
     (_event, hostId: string, sessionId: string, command: Record<string, unknown>) =>
       // `!` 셸 명령은 끝나야 응답이 오므로 시간 제한을 두지 않는다. 멈추려면 abort_bash를 보낸다.
-      conn(hostId).request<PiResponse>(Methods.sessionSend, { sessionId, command }, command.type === "bash" ? 0 : undefined),
+      // 트리 이동(/desktop:tree)은 요약하면 몇 분 걸릴 수 있다 (데몬이 10분에서 멈춘다).
+      conn(hostId).request<PiResponse>(
+        Methods.sessionSend,
+        { sessionId, command },
+        command.type === "bash" ? 0 : isTreePrompt(command) ? 11 * 60_000 : undefined,
+      ),
   );
   handle(
     IpcChannels.sendRecord,
@@ -578,4 +583,9 @@ export function registerHandlers(router: Router, deps: HandlerDeps): void {
     const target = hostPathForExplorer(hostId, cwd, path, WSL_PREFIX);
     return target ? deps.revealPath(target) : false;
   });
+}
+
+/** bridge 확장의 트리 이동 명령 (데몬 bridge.ts의 TREE_COMMAND) */
+function isTreePrompt(command: Record<string, unknown>): boolean {
+  return command.type === "prompt" && typeof command.message === "string" && command.message.startsWith("/desktop:tree ");
 }

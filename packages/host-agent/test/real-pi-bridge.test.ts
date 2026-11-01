@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Methods, type SessionOpenResult, type SessionSummary } from "@pi-desktop/host-protocol";
-import { BRIDGE_SOURCE, ENABLE_TOOLS_COMMAND, ensureBridge, RELOAD_COMMAND } from "../src/bridge";
+import { BRIDGE_SOURCE, ENABLE_TOOLS_COMMAND, ensureBridge, RELOAD_COMMAND, TREE_COMMAND } from "../src/bridge";
 import { isolatedEnv, TestClient } from "./helpers/agent-client";
 import { MOCK_MODEL_ARGS, PI_CLI, setupRealPi, type RealPiFixture } from "./helpers/real-pi";
 
@@ -24,6 +24,7 @@ describe("ensureBridge", () => {
     expect(await ensureBridge(dir)).toBe(path);
     expect(BRIDGE_SOURCE).toContain(`"${RELOAD_COMMAND}"`);
     expect(BRIDGE_SOURCE).toContain(`"${ENABLE_TOOLS_COMMAND}"`);
+    expect(BRIDGE_SOURCE).toContain(`"${TREE_COMMAND}"`);
   });
 });
 
@@ -117,6 +118,54 @@ describe("bridge 확장 (실제 Pi)", () => {
     expect(response.success).toBe(true);
     await ask("툴 켠 뒤");
     expect(toolNames()).toContain("late_tool");
+  });
+
+  it("/desktop:tree로 같은 세션의 이전 질문으로 옮기면 그 뒤가 대화에서 빠지고 질문이 입력창에 채워진다", async () => {
+    type Msg = { role: string; content?: unknown; summary?: string };
+    const messages = async () => (await send<{ data: { messages: Msg[] } }>({ type: "get_messages" })).data.messages;
+    const userTexts = (list: Msg[]) =>
+      list.filter((m) => m.role === "user").map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)));
+    const tree = await send<{ data: { tree: Array<{ entry: { id: string; type: string; message?: Msg }; children: unknown[] }> } }>({
+      type: "get_tree",
+    });
+    const flat: Array<{ entry: { id: string; type: string; message?: Msg }; children: unknown[] }> = [];
+    const walk = (nodes: typeof flat) => {
+      for (const node of nodes) {
+        flat.push(node);
+        walk(node.children as typeof flat);
+      }
+    };
+    walk(tree.data.tree);
+    const target = flat.find((n) => n.entry.type === "message" && n.entry.message?.role === "user" && JSON.stringify(n.entry.message.content).includes("다시 연 뒤"));
+    expect(target).toBeDefined();
+    expect(userTexts(await messages()).some((t) => t.includes("툴 켠 뒤"))).toBe(true);
+
+    const editorTexts = () =>
+      client.events
+        .map((n) => n.event as { type?: string; method?: string; text?: string })
+        .filter((e) => e.type === "extension_ui_request" && e.method === "set_editor_text")
+        .map((e) => e.text);
+    const requestsBefore = fixture.llm.requests.length;
+    const response = await send<{ success: boolean; data?: { disposition?: string } }>({
+      type: "prompt",
+      message: `/${TREE_COMMAND} ${JSON.stringify({ target: target!.entry.id })}`,
+    });
+    expect(response).toMatchObject({ success: true, data: { disposition: "handled" } });
+    // 요약하지 않으면 LLM을 부르지 않는다
+    expect(fixture.llm.requests.length).toBe(requestsBefore);
+    const after = userTexts(await messages());
+    expect(after.some((t) => t.includes("다시 연 뒤") || t.includes("툴 켠 뒤"))).toBe(false);
+    await waitUntil(() => editorTexts().some((t) => t?.includes("다시 연 뒤")));
+
+    // 요약하고 옮기면 떠나는 갈래의 요약이 새 위치에 남는다
+    const first = flat.find((n) => n.entry.type === "message" && n.entry.message?.role === "user");
+    const summarized = await send<{ success: boolean }>({
+      type: "prompt",
+      message: `/${TREE_COMMAND} ${JSON.stringify({ target: first!.entry.id, summarize: true, instructions: "짧게" })}`,
+    });
+    expect(summarized.success).toBe(true);
+    expect(fixture.llm.requests.length).toBeGreaterThan(requestsBefore);
+    expect((await messages()).some((m) => m.role === "branchSummary" && typeof m.summary === "string")).toBe(true);
   });
 
   // 한국어 Windows의 기본 명령은 CP949로 출력해 UTF-8로 읽으면 깨진다. bridge가 chcp 65001을 붙인다.

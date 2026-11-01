@@ -3934,3 +3934,59 @@ details > summary.settings-section {
 .rename-form {
   display: contents;
 }
+
+/* 트리 이동: 옮길 위치와 요약 지시 */
+.tree-move-target {
+  margin: 0 0 8px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-move-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tree-move-instructions textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  resize: vertical;
+}
+
+/* 컴팩션·갈래 요약: 눌러서 요약문을 펼친다 */
+.notice-detail > summary {
+  cursor: pointer;
+}
+
+.notice-detail[open] > summary {
+  margin-bottom: 6px;
+}
+
+.notice-detail-body {
+  white-space: normal;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+/* bash 툴: 실행한 명령 전체 */
+.shell-command {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2);
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.shell-prompt,
+.shell-timeout {
+  color: var(--muted);
+}
