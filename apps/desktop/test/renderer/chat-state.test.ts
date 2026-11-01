@@ -143,6 +143,13 @@ describe("applyEvent — 컴팩션·재시도 안내", () => {
     ]);
   });
 
+  it("컴팩션 요약문을 펼쳐 볼 내용으로 붙인다", () => {
+    const state = run([
+      { type: "compaction_end", reason: "manual", result: { tokensBefore: 1000, estimatedTokensAfter: 200, summary: "  ## 목표\n요약  " } },
+    ]);
+    expect(state.items[0]).toMatchObject({ kind: "notice", detail: "## 목표\n요약" });
+  });
+
   it("컴팩션 실패는 오류로, 중단은 안내로 보여준다", () => {
     const failed = run([{ type: "compaction_end", reason: "manual", aborted: false, errorMessage: "boom" }]);
     expect(failed.items[0]).toMatchObject({ kind: "notice", level: "error", text: "요약 실패: boom" });

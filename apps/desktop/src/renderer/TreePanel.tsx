@@ -7,6 +7,10 @@ interface Props {
   session: SessionSummary;
   disabled: boolean;
   onFork: (entryId: string) => void;
+  /** 같은 세션 안에서 이 위치로 옮긴다 (요약 방법은 부모가 묻는다) */
+  onNavigate: (entryId: string, text: string) => void;
+  /** 바뀌면 다시 읽는다 (옮긴 뒤) */
+  version: number;
   onClone: () => void;
   onClose: () => void;
 }
@@ -15,7 +19,7 @@ interface Props {
  * 세션 트리 패널 (설계 §4.1). Pi get_tree로 대화의 분기 구조를 보여준다.
  * 사용자 메시지에서 "여기서 분기"를 누르면 그 질문 직전에서 새 세션으로 갈라지고, 질문은 입력창에 채워진다.
  */
-export function TreePanel({ hostId, session, disabled, onFork, onClose, onClone }: Props) {
+export function TreePanel({ hostId, session, disabled, onFork, onNavigate, version, onClose, onClone }: Props) {
   const [rows, setRows] = useState<TreeRow[]>([]);
   const [error, setError] = useState<string | undefined>();
 
@@ -34,7 +38,7 @@ export function TreePanel({ hostId, session, disabled, onFork, onClose, onClone 
   // 세션 파일이 바뀌면(fork·clone) 다시 읽는다.
   useEffect(() => {
     void load();
-  }, [load, session.sessionFile]);
+  }, [load, session.sessionFile, version]);
 
   // 실행이 끝날 때마다 새 항목이 생기므로 다시 읽는다.
   useEffect(() => {
@@ -67,7 +71,10 @@ export function TreePanel({ hostId, session, disabled, onFork, onClose, onClone 
           </button>
         </div>
       </div>
-      <p className="tree-hint">질문에서 “여기서 분기”를 누르면 그 질문 직전에서 새 세션으로 갈라지고, 질문은 입력창에 채워집니다.</p>
+      <p className="tree-hint">
+        “여기로”는 이 세션 안에서 그 위치로 옮겨 이어 씁니다 (TUI /tree). 질문으로 옮기면 질문이 입력창에 채워집니다. “여기서 분기”는
+        그 질문 직전에서 새 세션으로 갈라집니다.
+      </p>
       {error && <p className="sidebar-error">{error}</p>}
       <ol className="tree">
         {rows.map((row) => (
@@ -81,6 +88,17 @@ export function TreePanel({ hostId, session, disabled, onFork, onClose, onClone 
               {row.text}
             </span>
             {row.isLeaf && <span className="tree-here">현재</span>}
+            {!row.isLeaf && (row.kind === "user" || row.kind === "assistant") && (
+              <button
+                type="button"
+                className="tree-fork"
+                disabled={disabled}
+                title="이 세션 안에서 이 위치로 옮깁니다"
+                onClick={() => onNavigate(row.id, row.text)}
+              >
+                여기로
+              </button>
+            )}
             {row.canFork && (
               <button type="button" className="tree-fork" disabled={disabled} onClick={() => onFork(row.id)}>
                 여기서 분기

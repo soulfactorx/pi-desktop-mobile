@@ -11,7 +11,7 @@ import { MarketplacePanel } from "./MarketplacePanel";
 import { CopyResourceDialog, type CopyItem } from "./CopyResourceDialog";
 import { ContextCopyDialog } from "./ContextCopyDialog";
 import { PackageCopyDialog } from "./PackageCopyDialog";
-import { ENABLE_TOOLS_COMMAND, hasReloadCommand, RELOAD_COMMAND } from "./resources-view";
+import { ENABLE_TOOLS_COMMAND, hasReloadCommand, RELOAD_COMMAND, type TreeMove } from "./resources-view";
 import { TerminalDock, type DockTerminal } from "./TerminalDock";
 import type { TerminalSpec } from "./TerminalView";
 import { updateState } from "./pi-manager-view";
@@ -106,6 +106,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
     respondDialog,
     openStored,
     branchSession,
+    navigateTree,
     follow,
     pendingOpen,
     cancelPendingOpen,
@@ -150,6 +151,10 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
   /** 값이 바뀌면 사이드바가 기록을 다시 읽는다 */
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [treeOpen, setTreeOpen] = useState(false);
+  /** 트리에서 옮길 위치를 고르고 요약 방법을 묻는 중 (custom: 요약 지시를 쓰는 중) */
+  const [treeMove, setTreeMove] = useState<{ target: string; text: string; custom?: boolean; instructions?: string }>();
+  /** 트리 패널을 다시 읽게 하는 값 (옮긴 뒤) */
+  const [treeVersion, setTreeVersion] = useState(0);
   const [piManagerOpen, setPiManagerOpen] = useState(false);
   const [piManagerTab, setPiManagerTab] = useState<"status" | "providers" | "settings">("status");
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
@@ -470,6 +475,20 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
       if (typeof data?.text === "string") {
         pendingDraft.current = data.text;
         setDraft(data.text);
+      }
+    });
+  }
+
+  /** 트리에서 고른 위치로 옮긴다 (같은 세션). 사용자 메시지로 옮기면 그 글이 입력창에 채워진다. */
+  function moveInTree(move: TreeMove) {
+    setTreeMove(undefined);
+    void guard(async () => {
+      setInfo(move.summarize || move.instructions ? "떠나는 갈래를 요약하고 옮기는 중..." : undefined);
+      try {
+        await navigateTree(move);
+      } finally {
+        setInfo(undefined);
+        setTreeVersion((v) => v + 1);
       }
     });
   }
@@ -1324,6 +1343,8 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
             session={session}
             disabled={!connected || Boolean(lost) || busy || chat.running}
             onFork={forkAt}
+            onNavigate={(target, text) => setTreeMove({ target, text })}
+            version={treeVersion}
             onClone={() => void guard(async () => void (await branchSession({ type: "clone" })))}
             onClose={() => setTreeOpen(false)}
           />
@@ -1335,6 +1356,48 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
           dialog={ui.dialogs[0]}
           onAnswer={(answer) => void guardQuiet(() => respondDialog(ui.dialogs[0]!, answer))}
         />
+      )}
+      {treeMove && !treeMove.custom && (
+        <ChoiceDialog
+          title="이 위치로 옮길까요?"
+          onCancel={() => setTreeMove(undefined)}
+          choices={[
+            { label: "요약 없이 옮기기", kind: "primary", onSelect: () => moveInTree({ target: treeMove.target }) },
+            { label: "요약하고 옮기기", onSelect: () => moveInTree({ target: treeMove.target, summarize: true }) },
+            { label: "지시해서 요약하고 옮기기", onSelect: () => setTreeMove({ ...treeMove, custom: true }) },
+          ]}
+        >
+          <p className="tree-move-target">“{treeMove.text}”</p>
+          지금 갈래를 떠나 이 위치에서 이어 씁니다. 떠나는 갈래는 트리에 남아 언제든 돌아올 수 있습니다. 요약하면 떠나는 갈래의 내용을
+          LLM이 요약해 옮긴 위치에 남겨, 이어지는 대화가 그 내용을 알 수 있습니다. 질문으로 옮기면 그 질문은 입력창에 채워집니다.
+        </ChoiceDialog>
+      )}
+      {treeMove?.custom && (
+        <ChoiceDialog
+          title="요약 지시"
+          onCancel={() => setTreeMove(undefined)}
+          choices={[
+            {
+              label: "요약하고 옮기기",
+              kind: "primary",
+              onSelect: () =>
+                moveInTree({
+                  target: treeMove.target,
+                  summarize: true,
+                  ...(treeMove.instructions?.trim() ? { instructions: treeMove.instructions.trim() } : {}),
+                }),
+            },
+          ]}
+        >
+          <label className="tree-move-instructions">
+            요약할 때 따를 지시 (예: 결정한 내용과 남은 할 일만)
+            <textarea
+              rows={4}
+              value={treeMove.instructions ?? ""}
+              onChange={(e) => setTreeMove({ ...treeMove, instructions: e.target.value })}
+            />
+          </label>
+        </ChoiceDialog>
       )}
       {pendingOpen && (
         <ChoiceDialog

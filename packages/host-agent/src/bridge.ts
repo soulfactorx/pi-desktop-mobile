@@ -30,6 +30,13 @@ export const RELOAD_COMMAND = "desktop:reload";
  */
 export const ENABLE_TOOLS_COMMAND = "desktop:enable-tools";
 
+/**
+ * 트리 이동 명령 (/desktop:tree {"target":"<항목 id>","summarize":true,"instructions":"…"}).
+ * TUI의 /tree와 같다: 같은 세션 파일 안에서 고른 항목으로 옮긴다. 떠나는 갈래는 요약을 붙일 수 있다
+ * (요약 없이 / 요약 / 지시를 주고 요약). 사용자 메시지를 고르면 그 글을 입력창에 채운다.
+ */
+export const TREE_COMMAND = "desktop:tree";
+
 /** Windows bash 명령 앞에 붙여 콘솔 출력을 UTF-8로 바꾸는 줄. 실행에만 붙고, 대화에 남는 명령(툴 인자·!명령)은 원래 것이다 */
 export const UTF8_PREFIX = "chcp.com 65001 > /dev/null 2>&1";
 
@@ -67,6 +74,40 @@ export default function (pi: any) {
       }
       // reload 뒤에는 예전 확장 런타임의 ctx를 쓰면 안 되므로 여기서 끝낸다.
       await ctx.reload();
+    },
+  });
+
+  pi.registerCommand("${TREE_COMMAND}", {
+    description: "Pi Desktop: 세션 트리의 다른 위치로 옮깁니다 (떠나는 갈래 요약 선택)",
+    handler: async (args: string, ctx: any) => {
+      if (!ctx.isIdle()) {
+        ctx.ui.notify("작업 중에는 옮길 수 없습니다. 끝난 뒤 다시 시도하세요", "warning");
+        return;
+      }
+      let input: any;
+      try {
+        input = JSON.parse(String(args ?? ""));
+      } catch {
+        ctx.ui.notify("옮길 위치를 읽지 못했습니다", "error");
+        return;
+      }
+      const target = String(input?.target ?? "");
+      if (!target) return;
+      // 사용자 메시지를 고르면 그 질문을 입력창에 채운다 (TUI와 같음)
+      const entry = ctx.sessionManager?.getEntry?.(target);
+      const content = entry?.type === "message" && entry.message?.role === "user" ? entry.message.content : undefined;
+      const userText = typeof content === "string" ? content : Array.isArray(content) ? content.filter((c: any) => c?.type === "text").map((c: any) => c.text).join("\\n") : undefined;
+      const instructions = typeof input.instructions === "string" && input.instructions.trim() ? input.instructions.trim() : undefined;
+      const result = await ctx.navigateTree(target, {
+        summarize: input.summarize === true || Boolean(instructions),
+        ...(instructions ? { customInstructions: instructions } : {}),
+      });
+      if (result?.cancelled || result?.aborted) {
+        ctx.ui.notify("옮기지 않았습니다", "info");
+        return;
+      }
+      const editorText = typeof result?.editorText === "string" ? result.editorText : userText;
+      if (editorText) ctx.ui.setEditorText(editorText);
     },
   });
 

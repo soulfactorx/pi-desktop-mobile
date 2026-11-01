@@ -8,7 +8,7 @@ import type {
   WriterState,
 } from "@pi-desktop/host-protocol/messages";
 import type { AttachResult, ConnectionState, HostDescriptor, OpenSessionRequest } from "../shared/api";
-import { ENABLE_TOOLS_COMMAND } from "./resources-view";
+import { ENABLE_TOOLS_COMMAND, TREE_COMMAND, type TreeMove } from "./resources-view";
 import { trustPlan, type TrustAnswer } from "./project-trust";
 import { addNotice, applyEvent, initialChatState, snapshotState, type ChatState } from "./chat-state";
 import {
@@ -668,6 +668,31 @@ export function useSession(tabId: string = MAIN_TAB) {
     [refreshSessions, restoreSnapshot],
   );
 
+  /**
+   * 같은 세션 안에서 트리의 다른 위치로 옮긴다 (TUI /tree와 같은 동작, bridge 확장의 /desktop:tree).
+   * 떠나는 갈래는 고른 방법에 따라 요약해 남긴다. 사용자 메시지로 옮기면 그 글이 입력창에 채워진다
+   * (확장의 set_editor_text). 옮긴 뒤 대화 화면을 스냅샷으로 다시 그린다.
+   * RPC에는 트리 이동 명령이 없어, bridge가 없는 세션(앱 업데이트 전에 연 세션)은 다시 시작해야 한다.
+   */
+  const navigateTree = useCallback(
+    async (move: TreeMove) => {
+      const current = sessionRef.current;
+      if (!current) return;
+      const listed = await api().sendCommand(hostRef.current, current.sessionId, { type: "get_commands" });
+      const names = ((listed.data as { commands?: Array<{ name?: string }> } | undefined)?.commands ?? []).map((c) => c.name);
+      if (!names.includes(TREE_COMMAND)) {
+        throw new Error("이 세션은 앱을 업데이트하기 전에 열려 트리 이동을 할 수 없습니다. 세션 메뉴에서 다시 시작하면 됩니다.");
+      }
+      const response = await api().sendCommand(hostRef.current, current.sessionId, {
+        type: "prompt",
+        message: `/${TREE_COMMAND} ${JSON.stringify(move)}`,
+      });
+      if (response.success !== true) throw new Error(`옮기지 못했습니다: ${String(response.error ?? "알 수 없는 오류")}`);
+      await restoreSnapshot(current);
+    },
+    [restoreSnapshot],
+  );
+
   /** 확장 다이얼로그에 답한다. 화면에서는 바로 닫고, 데몬이 다른 창에도 처리됨을 알린다. */
   const respondDialog = useCallback(
     async (dialog: DialogRequest, answer: { value?: string; confirmed?: boolean; cancelled?: boolean }) => {
@@ -820,6 +845,7 @@ export function useSession(tabId: string = MAIN_TAB) {
     respondDialog,
     openStored,
     branchSession,
+    navigateTree,
     follow,
     pendingOpen,
     cancelPendingOpen: () => setPendingOpen(undefined),

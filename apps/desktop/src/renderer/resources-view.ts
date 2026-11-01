@@ -133,6 +133,21 @@ export const RELOAD_COMMAND = "desktop:reload";
 /** bridge 확장의 확장 툴 켜기 명령 (데몬 bridge.ts와 같은 이름). 이어 연 세션에서 나중에 설치한 확장의 툴을 켠다 */
 export const ENABLE_TOOLS_COMMAND = "desktop:enable-tools";
 
+/** bridge 확장의 트리 이동 명령 (데몬 bridge.ts와 같은 이름). 인자는 TreeMove JSON */
+export const TREE_COMMAND = "desktop:tree";
+
+/**
+ * 트리 이동 방법 (TUI /tree의 "Summarize branch?" 세 가지)
+ * - summarize 없음: 요약 없이 옮긴다 (떠나는 갈래는 트리에 그대로 남는다)
+ * - summarize: 떠나는 갈래를 LLM이 요약해 옮긴 위치에 남긴다
+ * - instructions: 요약할 때 따를 지시 (주면 요약한다)
+ */
+export interface TreeMove {
+  target: string;
+  summarize?: boolean;
+  instructions?: string;
+}
+
 /**
  * 세션에 bridge가 들어 있는지. 앱 업데이트 전에 연 세션에는 없다.
  * 없는 세션에 "/desktop:reload"를 보내면 Pi가 일반 질문으로 LLM에 보내므로, 보내기 전에 꼭 확인한다.

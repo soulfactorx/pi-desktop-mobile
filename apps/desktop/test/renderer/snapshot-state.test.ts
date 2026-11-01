@@ -93,6 +93,21 @@ describe("snapshotState", () => {
     expect(applyEvent(snap, 30, { type: "agent_start" })).toBe(snap);
   });
 
+  it("컴팩션 요약과 떠난 갈래 요약은 펼쳐 볼 수 있는 안내가 된다", () => {
+    const items = snapshotState(
+      [
+        { role: "compactionSummary", summary: "이전 요약", tokensBefore: 120000, timestamp: 1 },
+        { role: "branchSummary", summary: "갈래 요약", fromId: "e1", timestamp: 2 },
+      ],
+      1,
+      false,
+    ).items;
+    expect(items).toMatchObject([
+      { kind: "notice", text: "이전 대화가 요약(컴팩션)되었습니다 (120k 토큰).", detail: "이전 요약" },
+      { kind: "notice", text: "떠난 갈래의 요약", detail: "갈래 요약" },
+    ]);
+  });
+
   it("모르는 role이나 잘못된 값은 건너뛴다", () => {
     expect(snapshotState([null, 3, { role: "custom", content: "x" }], 1, false).items).toEqual([]);
   });

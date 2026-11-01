@@ -94,7 +94,17 @@ function Item({
     case "notice":
       return (
         <div className={`notice ${item.level}`}>
-          {item.text}
+          {item.detail ? (
+            // TUI처럼 눌러서 요약 내용을 펼쳐 본다
+            <details className="notice-detail">
+              <summary>{item.text}</summary>
+              <div className="notice-detail-body">
+                <Markdown text={item.detail} />
+              </div>
+            </details>
+          ) : (
+            item.text
+          )}
           {onResend && <ResendButton onClick={onResend} />}
         </div>
       );

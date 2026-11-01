@@ -48,7 +48,14 @@ export type ChatItem =
       /** 툴별 부가 정보 (예: edit의 diff·patch). 툴 카드가 해석한다 */
       details?: unknown;
     }
-  | { kind: "notice"; key: string; level: "info" | "error"; text: string };
+  | {
+      kind: "notice";
+      key: string;
+      level: "info" | "error";
+      text: string;
+      /** 눌러서 펼쳐 보는 내용 (컴팩션·갈래 요약의 요약문, Markdown) */
+      detail?: string;
+    };
 
 /** Steer·Follow-up으로 보내 두고 아직 Pi가 처리하지 않은 메시지 (queue_update) */
 export interface PendingQueue {
@@ -205,13 +212,14 @@ export function applyEvent(state: ChatState, seq: number, raw: unknown): ChatSta
       return withNotice(next, `c${seq}`, "info", `컨텍스트를 요약(컴팩션)하는 중… (${COMPACTION_REASONS[String(event.reason)] ?? "요청"})`);
 
     case "compaction_end": {
-      const result = event.result as { tokensBefore?: number; estimatedTokensAfter?: number } | undefined;
+      const result = event.result as { tokensBefore?: number; estimatedTokensAfter?: number; summary?: unknown } | undefined;
       if (result) {
         return withNotice(
           next,
           `c${seq}`,
           "info",
           `요약 완료: ${formatTokens(result.tokensBefore)} → 약 ${formatTokens(result.estimatedTokensAfter)} 토큰`,
+          summaryText(result.summary),
         );
       }
       if (event.aborted === true) return withNotice(next, `c${seq}`, "info", "요약을 중단했습니다.");
@@ -279,8 +287,13 @@ const COMPACTION_REASONS: Record<string, string> = {
   overflow: "컨텍스트 초과",
 };
 
-function withNotice(state: ChatState, key: string, level: "info" | "error", text: string): ChatState {
-  return { ...state, items: [...state.items, { kind: "notice", key, level, text }] };
+function withNotice(state: ChatState, key: string, level: "info" | "error", text: string, detail?: string): ChatState {
+  return { ...state, items: [...state.items, { kind: "notice", key, level, text, ...(detail ? { detail } : {}) }] };
+}
+
+/** 요약문이 있으면 앞뒤 공백을 지워 돌려준다 */
+function summaryText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 /**
@@ -356,11 +369,20 @@ export function snapshotState(messages: unknown[], lastSeq: number, running: boo
           ...(typeof message.exitCode === "number" ? { exitCode: message.exitCode } : {}),
         });
         break;
-      case "compactionSummary":
-        items.push({ kind: "notice", key, level: "info", text: "이전 대화가 요약(컴팩션)되었습니다." });
+      case "compactionSummary": {
+        const detail = summaryText(message.summary);
+        const before = typeof message.tokensBefore === "number" ? ` (${formatTokens(message.tokensBefore)} 토큰)` : "";
+        items.push({ kind: "notice", key, level: "info", text: `이전 대화가 요약(컴팩션)되었습니다${before}.`, ...(detail ? { detail } : {}) });
         break;
+      }
+      case "branchSummary": {
+        // 트리에서 다른 위치로 옮기며 떠난 갈래의 요약
+        const detail = summaryText(message.summary);
+        items.push({ kind: "notice", key, level: "info", text: "떠난 갈래의 요약", ...(detail ? { detail } : {}) });
+        break;
+      }
       default:
-        // custom, branchSummary 등은 M1 후반에 표시 방법을 정한다.
+        // custom 등은 화면에 그리지 않는다.
         break;
     }
   });
