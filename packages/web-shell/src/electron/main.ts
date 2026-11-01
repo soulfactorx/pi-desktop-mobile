@@ -58,9 +58,8 @@ const MAX_NOTIFICATION_CLICKS = 50;
 
 /** 화면(띠·휴대폰 알림)에서 알림을 눌렀다 */
 export function clickNotification(id: string): void {
-  const click = notificationClicks.get(id);
-  notificationClicks.delete(id);
-  click?.();
+  // 지우지 않는다: 화면이 누른 뒤 곧 새로 읽히면(휴대폰이 탭을 다시 띄움) 같은 알림을 다시 보낸다 (최근 것만 둔다)
+  notificationClicks.get(id)?.();
 }
 
 /**

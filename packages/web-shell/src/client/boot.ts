@@ -54,6 +54,21 @@ function store(key: string, value: string): void {
   }
 }
 
+/** 서버에 닿기 전의 알림 누름 (탭 저장소). 화면이 새로 읽혀도 다시 보낸다 */
+const PENDING_CLICK_KEY = "ws-pending-click";
+const PENDING_CLICK_MS = 60_000;
+/** 서버가 받은 뒤 이만큼 화면이 살아 있으면 처리된 것으로 본다 */
+const PENDING_CLICK_SETTLE_MS = 4_000;
+
+function keepPendingClick(value: string | undefined): void {
+  try {
+    if (value === undefined) sessionStorage.removeItem(PENDING_CLICK_KEY);
+    else sessionStorage.setItem(PENDING_CLICK_KEY, value);
+  } catch {
+    // 탭 저장소를 못 쓰면 이번만 보낸다
+  }
+}
+
 /** 주소의 #token=…을 꺼내고 주소창에서 지운다 */
 function takeTokenFromUrl(): string | undefined {
   const match = /(?:^#|&)token=([^&]+)/.exec(location.hash);
@@ -144,6 +159,7 @@ async function start(options: BootOptions, token: string): Promise<void> {
   onNotificationOpen((open) => {
     if (open.startsWith(CLICK_OPEN)) shell.clickNotification(open.slice(CLICK_OPEN.length));
   });
+  shell.resumeNotificationClick();
   transport.watchPage();
   transport.connect();
   useTransport(transport);
@@ -240,8 +256,27 @@ class ShellUi {
 
   /** 알림을 눌렀다고 서버에 알린다 (그 알림의 click 처리, 예: 그 대화로 가기) */
   clickNotification(id: string): void {
+    // 오래 뒤에 둔 탭은 다시 붙을 때 서버가 세션을 버려 화면을 새로 읽는다. 그러면 보내던 요청이 사라지므로
+    // 서버가 받았다고 답할 때까지 탭 저장소에 맡겨 두고, 새로 읽힌 화면이 다시 보낸다 (resumeNotificationClick)
+    keepPendingClick(JSON.stringify({ id, at: Date.now() }));
     // 서버는 처리기(handle)로 받으므로 invoke로 보낸다 (send는 리스너에게만 가서 처리되지 않았다)
-    void this.transport?.invoke(ShellChannels.notificationClick, id).catch(() => undefined);
+    void this.transport
+      ?.invoke(ShellChannels.notificationClick, id)
+      // 답이 와도 바로 지우지 않는다: 그 직후 화면이 새로 읽히면 "그 대화 열기"가 사라지므로, 몇 초 버틴 뒤에 지운다
+      .then(() => setTimeout(() => keepPendingClick(undefined), PENDING_CLICK_SETTLE_MS))
+      .catch(() => undefined);
+  }
+
+  /** 새로 읽기 전에 서버에 닿지 못한 알림 누름을 다시 보낸다 */
+  resumeNotificationClick(): void {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(PENDING_CLICK_KEY) ?? "null") as { id?: unknown; at?: unknown } | null;
+      if (saved && typeof saved.id === "string" && typeof saved.at === "number" && Date.now() - saved.at < PENDING_CLICK_MS) {
+        this.clickNotification(saved.id);
+      } else sessionStorage.removeItem(PENDING_CLICK_KEY);
+    } catch {
+      // 탭 저장소를 못 쓰면 넘긴다
+    }
   }
 
   private toast(title: string, body?: string, level?: "info" | "error", clickId?: string): void {
