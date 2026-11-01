@@ -52,11 +52,26 @@ export async function describeInstall(install: InstallProposal, env: NodeJS.Proc
       if (content === undefined) return `${app}의 스킬 \`${install.name}\`을(를) 찾지 못했습니다 (${dir})`;
       return [`**${app}의 스킬 복사** \`${install.name}\``, `- 원본: ${dir} (원본은 그대로 둡니다)`, "", "```markdown", content.trim(), "```"].join("\n");
     }
+    case "prompt":
+      return [`**새 프롬프트** \`/${install.name}\` (Mate 홈 prompts/${install.name}.md)`, "", "```markdown", install.content.trim(), "```"].join("\n");
+    case "package":
+      return [
+        `**Pi 패키지 설치** \`${install.source}\``,
+        "- 패키지는 코드를 실행합니다. 무엇인지 확인하고 적용하세요",
+        "- Mate 홈에 설치되고, 패키지가 더하는 도구는 처음 쓸 때 다시 허용을 묻습니다",
+        "- 휴대폰 메시지로는 적용할 수 없고 앱에서 적용합니다",
+      ].join("\n");
   }
 }
 
 /** 인박스 항목의 설치를 적용하고, 사용자에게 보일 한 줄을 돌려준다 */
-export async function applyInstall(paths: MatePaths, itemId: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+export async function applyInstall(
+  paths: MatePaths,
+  itemId: string,
+  env: NodeJS.ProcessEnv = process.env,
+  /** Pi 패키지를 Mate 홈에 설치한다 (앱에서 적용할 때만 준다) */
+  installPackage?: (source: string) => Promise<{ ok: boolean; output: string }>,
+): Promise<string> {
   const item = (await readInbox(paths.inbox)).find((i) => i.id === itemId);
   if (!item?.install) throw new Error("적용할 설치 제안을 찾지 못했습니다");
   const install = item.install;
@@ -97,6 +112,21 @@ export async function applyInstall(paths: MatePaths, itemId: string, env: NodeJS
       message = `스킬 ${install.name}을(를) Mate로 복사했어요`;
       break;
     }
+    case "prompt": {
+      const file = join(paths.home, "prompts", `${install.name}.md`);
+      if (await exists(file)) throw new Error(`같은 이름의 프롬프트(${install.name})가 이미 있어 덮어쓰지 않았습니다`);
+      await mkdir(join(paths.home, "prompts"), { recursive: true });
+      await writeFile(file, `${install.content.trim()}\n`, "utf8");
+      message = `프롬프트 /${install.name}을(를) 넣었어요`;
+      break;
+    }
+    case "package": {
+      if (!installPackage) throw new Error("Pi 패키지 설치는 앱에서 적용해 주세요");
+      const result = await installPackage(install.source.trim());
+      if (!result.ok) throw new Error(`${install.source}를 설치하지 못했습니다\n${result.output.slice(-800)}`);
+      message = `Pi 패키지 ${install.source}를 설치했어요. 도구는 처음 쓸 때 허용을 물어요`;
+      break;
+    }
   }
   await setInboxStatus(paths, [itemId], "applied");
   return message;
@@ -125,6 +155,7 @@ export async function installHints(paths: MatePaths, env: NodeJS.ProcessEnv = pr
   const presets = MCP_PRESETS.filter((p) => !servers.has(p.name)).map((p) => `${p.id}(${p.label})`);
   const lines: string[] = [];
   if (presets.length) lines.push(`- 넣을 수 있는 MCP 서버 (install.kind=mcp의 preset): ${presets.join(", ")}. 이 목록 밖의 서버는 제안하지 마라.`);
+  lines.push("- 되풀이할 지시는 프롬프트(install.kind=prompt)로, 꼭 필요한 기능은 Pi 패키지(install.kind=package, npm:이름)로 제안할 수 있다. 패키지는 사용자가 원했거나 다른 방법이 없을 때만.");
   for (const from of ["pi-desktop", "agent"] as const) {
     const names = (await readdir(otherSkillsDir(from, env)).catch(() => [] as string[])).filter((n) => !mine.has(n) && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(n)).slice(0, 20);
     if (names.length) lines.push(`- ${from === "agent" ? "Agent" : "Pi Desktop"}에만 있는 스킬 (install.kind=copy, from=${from}): ${names.join(", ")}`);

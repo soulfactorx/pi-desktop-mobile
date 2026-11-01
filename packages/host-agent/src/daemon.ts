@@ -115,7 +115,7 @@ import {
 import { mergeSettings, readSettings, readSettingsSchema, settingsFileFor, writeSettingsRaw } from "./settings-store";
 import { listPackageResources, setPackageFilter, type PackageFilterSdk } from "./package-filters";
 import { isUpdateTarget, runPiUpdate } from "./pi-update";
-import { ensureBridge } from "./bridge";
+import { ensureBridge, ensureManage } from "./bridge";
 import { listDirectories, makeDirectory } from "./dir-list";
 import { listResources, type ResourceSdk } from "./resources";
 import { projectTrust, setProjectTrust, trustArgs, type TrustSdk } from "./trust";
@@ -570,6 +570,8 @@ export class AgentDaemon {
       const pi = await locatePi({ piCliPath: p.piCliPath, env: this.env });
       // 리소스 다시 불러오기용 bridge 확장을 넣는다 (설계 §5.3). 문제를 조사할 때는 PI_DESKTOP_NO_BRIDGE=1로 끈다.
       const bridge = this.env.PI_DESKTOP_NO_BRIDGE ? undefined : await ensureBridge(join(agentHome(this.env), "bridge"));
+      // 에이전트가 대화로 확장·스킬·MCP를 관리하는 툴 (DESIGN-APPS.md §3.5 3단계). 끄려면 PI_DESKTOP_NO_MANAGE=1
+      const manage = this.env.PI_DESKTOP_NO_MANAGE ? undefined : await ensureManage(join(agentHome(this.env), "bridge")).catch(() => undefined);
       const session = new AgentSession({
         cwd: p.cwd,
         pi,
@@ -577,7 +579,7 @@ export class AgentDaemon {
         nodePath: pi.nodePath ?? process.execPath,
         sessionFile: p.sessionFile,
         forkFrom: p.forkFrom,
-        piArgs: [...(p.piArgs ?? []), ...trustArgs(p.trust), ...(bridge ? ["-e", bridge] : [])],
+        piArgs: [...(p.piArgs ?? []), ...trustArgs(p.trust), ...(bridge ? ["-e", bridge] : []), ...(manage ? ["-e", manage] : [])],
         env: { ...this.env, ...pi.env, ...p.env },
         journalCapacity: this.options.journalCapacity ?? (Number(this.env.PI_DESKTOP_JOURNAL_CAPACITY) || undefined),
         files: this.files,

@@ -117,6 +117,11 @@ Agent와 같은 방식으로 Mate 홈에 따로 두고, Pi Desktop의 것은 섞
   - 설치 폴더는 설치·제거 뒤 `pi list`로 받아 `<앱 홈>/package-paths.json`에 적는다. 세션을 열 때는 이 파일만 읽어 폴더마다 `-e <폴더>`로 올린다 (`-ne`는 그대로라 Pi Desktop의 패키지는 섞이지 않는다).
   - Agent: 새 대화부터 올라간다. 다른 호스트(WSL·SSH)는 그 호스트의 파일을 앱이 읽을 수 없어 아직 올리지 않는다.
   - Mate: Pi는 `--tools`에 없는 도구를 아예 올리지 않으므로, 설치할 때 패키지마다 도구 이름을 알아 둔다(`<앱 홈>/package-tools.json`. 작은 확장을 넣어 Pi를 RPC로 띄우고 세션이 시작될 때 도구 목록만 받는다. 모델은 부르지 않는다). 실행·대화 때 그 이름을 `--tools`에 더하고 mate-guard에 알린다(`PI_DESKTOP_MATE_PACKAGES`). MCP 도구처럼 **처음 쓸 때 막고 허용을 묻는다.** 허용 이름은 `ext__<도구>`로 bash 명령 허용과 나눈다.
+- **에이전트로 관리하기** (3단계): 사람이 화면에서 하는 일을 에이전트에게 대화로 맡길 수 있다. 각 앱의 에이전트는 **자기 홈만** 고치고, 고치기 전에 승인을 받는다.
+  - Pi Desktop·Agent: `pi-resources/extensions/manage.ts` 확장 하나를 데몬이 `-e`로 넣는다(데몬 번들에 문자열로 들어 있다가 bridge처럼 파일로 써 둔다. node 내장 모듈과 typebox만 import). 툴은 `resources_list`(읽기), `resource_save`·`resource_delete`(스킬·프롬프트, 지운 것은 `<홈>/resources-trash/`), `mcp_server`(넣기·켜기·끄기·빼기, API 키는 받지 않음), `pi_package`(설치·제거, 지금 도는 Pi로 `PI_CODING_AGENT_DIR=<홈>`).
+  - 관리하는 홈: `PI_RESOURCES_HOME`. 없으면 Pi 설정 폴더(Pi Desktop). Agent는 앱 홈을 주고, 스킬 저장은 기존 `skill_save`가 맡는다(`PI_RESOURCES_NO_SKILL=1`).
+  - 승인: Pi Desktop은 확장이 `ctx.ui.confirm`으로 묻는다. Agent는 permissions 확장이 툴마다 묻으므로 확장은 묻지 않는다(`PI_RESOURCES_CONFIRM=0`). MCP·패키지는 매번 묻는다.
+  - Mate: 모델이 직접 쓰지 않고 `mate_propose`의 `install`로 제안한다(§3.4). 스킬·MCP 미리 설정·다른 앱 스킬 복사에 더해 **프롬프트**(`kind: prompt`)와 **Pi 패키지**(`kind: package`)를 제안할 수 있다. 패키지는 앱에서 적용할 때만 설치한다(휴대폰 메시지로는 적용하지 않음).
 - **다른 앱에서 가져오기** (2단계): 스킬은 폴더째 복사하고(같은 이름이 있으면 하지 않음), 패키지는 같은 출처를 이 앱에 새로 설치한다. MCP는 토큰이 섞일 수 있어 가져오지 않는다.
 - 단계: 1) 스킬·MCP를 이 패키지로 모은다 (Agent·Mate). 2) Agent·Mate에서 Pi 패키지(확장) 설치와 "다른 앱에서 가져오기". 3) 세 앱의 에이전트가 같은 관리 툴로 자기 홈을 관리한다 (고치기 전에 승인). 4) Mate의 웹 검색 켜기가 특정 서버(Exa)를 정해 넣지 않게 한다.
 

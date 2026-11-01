@@ -49,6 +49,15 @@ export async function sessionParamsFor(options: SessionParamsOptions): Promise<S
     sessionDir: sessionsDirFor(paths),
     remote: paths.remote,
   });
-  const env = { ...overrides.env, ...isolationEnv(paths.home), [AGENT_HOME_ENV]: paths.home, ...options.extraEnv };
+  const env = {
+    ...overrides.env,
+    ...isolationEnv(paths.home),
+    [AGENT_HOME_ENV]: paths.home,
+    // 확장 관리 툴(데몬이 -e로 넣음)이 Agent 홈을 관리하게 한다. 승인은 permissions 확장이 묻고, 스킬 저장은 skill_save가 맡는다
+    PI_RESOURCES_HOME: paths.home,
+    PI_RESOURCES_CONFIRM: "0",
+    PI_RESOURCES_NO_SKILL: "1",
+    ...options.extraEnv,
+  };
   return { ...overrides, cwd: options.cwd, piArgs: [...(overrides.piArgs ?? []), ...homeArgs], env };
 }
