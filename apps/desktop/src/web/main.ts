@@ -3,6 +3,7 @@ import { WebPaths } from "../shared/web-protocol";
 import { WsTransport, type LinkStatus } from "./ws-transport";
 import { checkNotifications, onNotificationOpen, reportVisibility, setupNotifications } from "@pi-desktop/web-shell/notify";
 import { watchSharedImages } from "@pi-desktop/web-shell/share";
+import { setupCompactHeader } from "@pi-desktop/web-shell/compact-header";
 import { OPEN_SESSION_EVENT, parseSessionOpen, type SessionTarget } from "../shared/web-files";
 import { createWebFiles } from "./web-files";
 import "@pi-desktop/web-shell/client.css";
@@ -126,6 +127,8 @@ async function start(token: string): Promise<void> {
   watchSharedImages();
   document.getElementById("root")!.innerHTML = "";
   await import("../renderer/main");
+  // 휴대폰: 대화 위 정보 줄(호스트·상태·모델·컨텍스트)을 접었다 편다. 키보드가 뜨면 저절로 접는다
+  setupCompactHeader({ hide: [".topbar", ".session-bar"], anchor: ".workspace", key: "pi-web-compact-header" });
   void setupNotifications(transport, "Pi Web").catch((error: unknown) => console.warn("알림을 준비하지 못했습니다", error));
 }
 

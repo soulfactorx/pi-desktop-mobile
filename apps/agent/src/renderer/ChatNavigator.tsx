@@ -22,6 +22,11 @@ export function ChatNavigator({
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<Range[]>([]);
   const [current, setCurrent] = useState(-1);
+  /** 접어 두면 작은 단추 하나만 보인다 (화면을 가리지 않게). 처음엔 접혀 있다 */
+  const [open, setOpen] = useState(false);
+  /** 지금 보고 있는 질문 (질문 목록에서 칠한다) */
+  const [currentTurn, setCurrentTurn] = useState(-1);
+  const turnList = useRef<HTMLOListElement>(null);
   const self = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
 
@@ -65,6 +70,7 @@ export function ChatNavigator({
     if (!target) return direction < 0 ? scrollTo(0) : scrollTo(el.scrollHeight);
     scrollTo(target.top);
     flash(target.t);
+    setCurrentTurn(tops.indexOf(target));
   };
 
   const openTurns = () => {
@@ -83,6 +89,7 @@ export function ChatNavigator({
     setPanel(undefined);
     scrollTo(topOf(target.getBoundingClientRect()));
     flash(target);
+    setCurrentTurn(index);
   };
 
   // 찾기: 스크롤 칸의 글자에서 찾는다 (이 도구 자신은 빼고)
@@ -122,19 +129,22 @@ export function ChatNavigator({
     setCurrent(index);
     paint(ranges, index);
     const range = ranges[index];
-    if (range) {
-      const el = scroller.current!;
-      scrollTo(topOf(range.getBoundingClientRect()) - el.clientHeight / 3);
-    }
+    const el = scroller.current;
+    if (!range || !el) return;
+    // 이미 보이는 곳이면 움직이지 않는다 (글자를 지우거나 고칠 때 화면이 튀지 않게)
+    const box = el.getBoundingClientRect();
+    const rect = range.getBoundingClientRect();
+    if (rect.top >= box.top + 8 && rect.bottom <= box.bottom - 56) return;
+    scrollTo(topOf(rect) - el.clientHeight / 3);
   };
 
   const search = (text: string) => {
     setQuery(text);
     const ranges = find(text);
-    // 지금 보는 곳 아래의 첫 결과부터
+    // 지금 보이는 곳의 첫 결과부터 (보이는 결과가 있으면 화면은 그대로)
     const el = scroller.current;
     const now = el ? el.scrollTop : 0;
-    const first = ranges.findIndex((r) => topOf(r.getBoundingClientRect()) >= now);
+    const first = ranges.findIndex((r) => topOf(r.getBoundingClientRect()) >= now - 2);
     show(ranges, ranges.length === 0 ? -1 : first === -1 ? 0 : first);
   };
 
@@ -156,6 +166,31 @@ export function ChatNavigator({
   useEffect(() => {
     if (panel === "search") searchInput.current?.focus();
   }, [panel]);
+
+  // 질문 목록이 열려 있으면 스크롤할 때마다 지금 보는 질문을 칠한다
+  useEffect(() => {
+    const el = scroller.current;
+    if (panel !== "turns" || !el) return;
+    const update = () => {
+      const now = el.scrollTop + 24;
+      const tops = turnElements().map((t) => topOf(t.getBoundingClientRect()));
+      let index = -1;
+      for (let i = 0; i < tops.length; i++) if (tops[i]! <= now) index = i;
+      setCurrentTurn(index === -1 && tops.length ? 0 : index);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    return () => el.removeEventListener("scroll", update);
+  }, [panel]);
+
+  // 칠한 질문이 목록에서 보이게. scrollIntoView는 대화 칸까지 움직이므로 목록만 직접 옮긴다
+  useEffect(() => {
+    const list = turnList.current;
+    const item = list?.querySelector<HTMLElement>(`[data-turn="${currentTurn}"]`);
+    if (!list || !item) return;
+    if (item.offsetTop < list.scrollTop) list.scrollTop = item.offsetTop;
+    else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight;
+  }, [currentTurn, panel]);
 
   // 화면을 떠나면 칠한 것을 지운다
   useEffect(() => () => paint([], -1), []);
@@ -193,9 +228,9 @@ export function ChatNavigator({
             {turns.length === 0 ? (
               <p className="chat-nav-empty">아직 질문이 없습니다</p>
             ) : (
-              <ol className="chat-nav-turns">
+              <ol className="chat-nav-turns" ref={turnList}>
                 {turns.map((t) => (
-                  <li key={t.index}>
+                  <li key={t.index} data-turn={t.index} className={t.index === currentTurn ? "current" : undefined}>
                     <button type="button" onClick={() => jumpToTurn(t.index)}>
                       <span className="chat-nav-turn-no">{t.index + 1}</span>
                       <span className="chat-nav-turn-text">{t.text}</span>
@@ -228,6 +263,13 @@ export function ChatNavigator({
             </button>
           </div>
         )}
+        {!open && !panel ? (
+          <div className="chat-nav-bar collapsed">
+            <button type="button" onClick={() => setOpen(true)} title="대화 이동 도구" aria-label="대화 이동 도구 펴기">
+              ⇅
+            </button>
+          </div>
+        ) : (
         <div className="chat-nav-bar">
           <button type="button" onClick={() => scrollTo(0)} title="맨 위로" aria-label="맨 위로">
             ⤒
@@ -253,7 +295,19 @@ export function ChatNavigator({
           >
             🔍
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              closePanel();
+              setOpen(false);
+            }}
+            title="접기"
+            aria-label="대화 이동 도구 접기"
+          >
+            ›
+          </button>
         </div>
+        )}
       </div>
     </div>
   );

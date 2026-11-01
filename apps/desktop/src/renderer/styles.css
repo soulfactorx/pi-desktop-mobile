@@ -3828,6 +3828,7 @@ details > summary.settings-section {
   color: var(--muted);
 }
 .chat-nav-turns {
+  position: relative;
   list-style: none;
   margin: 0;
   padding: 4px;
@@ -3863,4 +3864,11 @@ details > summary.settings-section {
 ::highlight(chat-search-current) {
   background: rgb(255 140 0 / 80%);
   color: #000;
+}
+.chat-nav-bar.collapsed {
+  opacity: 0.6;
+}
+.chat-nav-turns li.current button {
+  background: var(--panel-2);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
