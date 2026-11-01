@@ -140,8 +140,40 @@ export function App() {
     await refreshSessions();
   };
 
+  /** 알림 등으로 대화를 열라는 요청이 왔다 (그러면 아래의 "보던 대화 다시 열기"는 하지 않는다) */
+  const openRequested = useRef(false);
+  /** 보던 대화를 다시 열어 봤는지 (그 전에는 기억을 지우지 않는다) */
+  const restoreTried = useRef(false);
+
+  // 화면을 새로 읽어도 보던 대화로 돌아온다. 휴대폰(웹)은 오래 뒤에 두면 다시 붙으면서 화면을 새로 읽는다
+  useEffect(() => {
+    if (session) rememberCurrentChat(session.sessionId);
+    else if (restoreTried.current) rememberCurrentChat(undefined);
+  }, [session?.sessionId]);
+
+  useEffect(() => {
+    if (!connected || restoreTried.current) return;
+    const saved = currentChatSaved();
+    if (!saved || openRequested.current) {
+      restoreTried.current = true;
+      return;
+    }
+    void (async () => {
+      try {
+        const target = (await window.piAgent.listSessions()).find((s) => s.sessionId === saved);
+        // 그 사이 다른 대화를 열라는 요청이 왔으면 그쪽을 따른다
+        if (target && !openRequested.current) await agent.attachTo(target);
+      } catch {
+        // 다시 열지 못하면 처음 화면에 둔다
+      } finally {
+        restoreTried.current = true;
+      }
+    })();
+  }, [connected]);
+
   /** 알림을 누른 대화로 간다 (열린 대화 목록을 새로 읽어 찾는다) */
   const openChatById = async (sessionId: string) => {
+    openRequested.current = true;
     setPage("chat");
     if (sessionId === session?.sessionId) return;
     const open = await window.piAgent.listSessions();
@@ -450,4 +482,24 @@ export function App() {
       )}
     </div>
   );
+}
+
+/** 마지막으로 보던 대화. 화면을 새로 읽거나 앱을 다시 열어도 (아직 열려 있으면) 다시 연다 */
+const CURRENT_CHAT_KEY = "pi-agent:current-chat";
+
+function rememberCurrentChat(sessionId: string | undefined): void {
+  try {
+    if (sessionId) localStorage.setItem(CURRENT_CHAT_KEY, sessionId);
+    else localStorage.removeItem(CURRENT_CHAT_KEY);
+  } catch {
+    // 저장할 수 없으면 넘긴다
+  }
+}
+
+function currentChatSaved(): string | undefined {
+  try {
+    return localStorage.getItem(CURRENT_CHAT_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
