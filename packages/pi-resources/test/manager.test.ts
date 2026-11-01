@@ -56,4 +56,16 @@ describe("resourceHome", () => {
     expect(existsSync(path)).toBe(true);
     expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ mcpServers: {} });
   });
+
+  it("mcp.json 원문을 앱 안에서 읽고 고쳐 저장한다. 틀린 JSON은 저장하지 않는다", async () => {
+    const home = mkdtempSync(join(tmpdir(), "pi-resources-"));
+    const r = resourceHome({ home, skillsTrash: join(home, "trash"), pi: noPi });
+    const { path, text } = await r.mcpReadText();
+    expect(JSON.parse(text)).toEqual({ mcpServers: {} });
+    const views = await r.mcpWriteText(JSON.stringify({ mcpServers: { mine: { command: "npx", args: ["-y", "my-mcp"] } } }));
+    expect(views.map((v) => v.name)).toEqual(["mine"]);
+    await expect(r.mcpWriteText("{ 틀림")).rejects.toThrow("JSON 형식이 아닙니다");
+    await expect(r.mcpWriteText(JSON.stringify({ mcpServers: [] }))).rejects.toThrow("mcpServers");
+    expect(JSON.parse(readFileSync(path, "utf8")).mcpServers.mine.command).toBe("npx");
+  });
 });

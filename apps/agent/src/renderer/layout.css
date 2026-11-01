@@ -608,6 +608,8 @@ code.copy {
   display: flex;
   align-items: stretch;
   gap: 2px;
+  /* 세로 flex 안에 있어 창이 낮으면 줄어들어 막대가 사라지므로 높이를 지킨다 */
+  flex-shrink: 0;
   height: 160px;
   padding: 8px 0 0;
   margin-bottom: 16px;
@@ -901,8 +903,36 @@ code.copy {
   margin: 8px 0 12px;
 }
 
+.kb-filters {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* 찾기 칸은 좁으면 한 줄 전체를 쓰고, 선택·단추는 글자가 세로로 꺾이지 않게 한다 */
+.kb-filters input.grow {
+  flex: 1 1 220px;
+}
+
 .kb-filters select {
   max-width: 160px;
+}
+
+.kb-filters button,
+.kb-filters .check-row {
+  flex: none;
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+
+@media (max-width: 600px) {
+  .kb-filters input.grow {
+    flex-basis: 100%;
+  }
+  .kb-filters select {
+    flex: 1 1 calc(50% - 4px);
+    max-width: none;
+    min-width: 0;
+  }
 }
 
 .kb-bulk {
@@ -1040,4 +1070,19 @@ button.danger {
 /* 이름 바꾸기 form 은 배치에 영향을 주지 않는다 */
 .rename-form {
   display: contents;
+}
+
+/* mcp.json 앱 안 편집기 (웹·원격 호스트에서도 고칠 수 있게) */
+.mcp-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.mcp-editor-text {
+  width: 100%;
+  box-sizing: border-box;
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+  resize: vertical;
 }

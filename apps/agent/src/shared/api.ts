@@ -101,7 +101,8 @@ export const IpcChannels = {
   approvePeerTask: "agent:approve-peer-task",
   suggestCard: "agent:suggest-card",
   rejectPeerTask: "agent:reject-peer-task",
-  openMcpFile: "agent:open-mcp-file",
+  mcpReadText: "agent:mcp-read-text",
+  mcpWriteText: "agent:mcp-write-text",
   openSession: "agent:open-session",
   listHistory: "agent:list-history",
   searchHistory: "agent:search-history",
@@ -310,7 +311,10 @@ export interface AgentApi {
   rejectPeerTask(id: string): Promise<void>;
   /** 기억(사실·교훈)과 대화 이름으로 카드 소개·잘하는 것 초안을 만든다 (저장하지 않음) */
   suggestCard(current: CardDraft): Promise<Pick<CardDraft, "description" | "skills">>;
-  openMcpFile(): Promise<void>;
+  /** mcp.json 원문 (없으면 빈 설정을 만든다). 앱 안에서 고친다 (웹·원격 호스트에서도) */
+  mcpReadText(): Promise<{ path: string; text: string }>;
+  /** 고친 mcp.json 원문을 저장한다. JSON이 틀리면 오류 */
+  mcpWriteText(text: string): Promise<McpServerView[]>;
   /** agent-kit 확장을 올린 새 Pi 세션을 연다 */
   /** 새 세션을 연다. forkFrom(세션 파일)을 주면 그 대화를 이어 가는 분기 세션으로 연다 */
   openSession(cwd: string, from?: SessionSource): Promise<SessionSummary>;

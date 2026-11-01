@@ -19,6 +19,8 @@ export function SkillsMcpView({ act }: { act: Act }) {
       setEnabled: (name, on) => window.mate.setMcpEnabled(name, on),
       remove: (name) => window.mate.removeMcp(name),
       check: () => window.mate.checkMcp(),
+      readText: () => window.mate.mcpReadText(),
+      writeText: (text) => window.mate.mcpWriteText(text),
     },
     run,
   );
@@ -109,8 +111,8 @@ export function SkillsMcpView({ act }: { act: Act }) {
         <h2>MCP 서버</h2>
         <span className="muted">임무·대화가 쓸 외부 서비스. 임무마다 고르고(기본: 없음), 처음 쓰는 도구는 Mate가 허용을 묻습니다</span>
         <span className="right">
-          <button className="small" onClick={() => void act(() => window.mate.openMcpFile())} title="다른 서버는 mcp.json을 직접 고칩니다">
-            mcp.json 열기
+          <button className="small" disabled={Boolean(mcp.editor)} onClick={mcp.openEditor} title="다른 서버는 mcp.json을 직접 고칩니다">
+            mcp.json 고치기
           </button>{" "}
           <button
             className="small"
@@ -121,6 +123,21 @@ export function SkillsMcpView({ act }: { act: Act }) {
           </button>
         </span>
       </div>
+      {mcp.editor && (
+        <div className="card mcp-editor">
+          <div className="muted small">{mcp.editor.path}</div>
+          <textarea className="mcp-editor-text" spellCheck={false} rows={14} value={mcp.editor.text} onChange={(e) => mcp.setEditorText(e.target.value)} />
+          <div>
+            <button className="small primary" onClick={mcp.saveEditor}>
+              저장
+            </button>{" "}
+            <button className="small" onClick={mcp.closeEditor}>
+              닫기
+            </button>{" "}
+            <span className="muted small">키 값이 그대로 보이니 다른 사람에게 화면을 보여 줄 때 조심하세요.</span>
+          </div>
+        </div>
+      )}
       <ul className="cards">
         {mcp.presets.map((row) => {
           const { preset, added, needsKey } = row;

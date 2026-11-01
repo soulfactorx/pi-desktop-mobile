@@ -850,3 +850,18 @@ code.copy {
   background: var(--panel-2);
   box-shadow: inset 3px 0 0 var(--accent);
 }
+
+/* mcp.json 앱 안 편집기 (웹·원격 호스트에서도 고칠 수 있게) */
+.mcp-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.mcp-editor-text {
+  width: 100%;
+  box-sizing: border-box;
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+  resize: vertical;
+}

@@ -90,7 +90,7 @@ export const ShellChannels = {
   pushUnsubscribe: "web-shell:push-unsubscribe",
   /** 알림 시험: 모든 구독에 시험 알림을 보낸다 → { sent, total } */
   pushTest: "web-shell:push-test",
-  /** 알림(Notification)을 눌렀다 (send: clickId). 서버가 그 알림의 click 처리를 부른다 */
+  /** 알림(Notification)을 눌렀다 (invoke: clickId). 서버가 그 알림의 click 처리를 부른다 */
   notificationClick: "web-shell:notification-click",
 } as const;
 

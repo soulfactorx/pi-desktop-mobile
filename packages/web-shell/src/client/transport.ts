@@ -4,6 +4,9 @@ const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 10_000;
 const ACK_EVERY = 64;
 const ACK_DELAY_MS = 1000;
+/** 화면이 듣기 전에 온 이벤트를 맡겨 두는 시간과 개수 */
+const EARLY_KEEP_MS = 30_000;
+const EARLY_MAX = 20;
 
 export type LinkStatus = "connecting" | "open" | "closed";
 
@@ -43,6 +46,8 @@ export class ResumableTransport {
   /** 서버가 받았다고 하지 않은 메시지 */
   private unacked: Array<{ n: number; text: string }> = [];
   private readonly listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+  /** 듣는 쪽이 생기기 전에 온 이벤트 (화면이 뜨는 동안 잠시) */
+  private early: Array<{ channel: string; args: unknown[]; at: number }> = [];
   /** 받은 서버 메시지의 마지막 순번 */
   private received = 0;
   private toAck = 0;
@@ -118,6 +123,14 @@ export class ResumableTransport {
     let set = this.listeners.get(channel);
     if (!set) this.listeners.set(channel, (set = new Set()));
     set.add(listener);
+    // 화면이 듣기 전에 온 이벤트를 넘긴다 (예: 휴대폰 알림을 눌러 새로 연 탭에 서버가 보낸 "그 대화 열기")
+    const early = this.early.filter((e) => e.channel === channel && Date.now() - e.at < EARLY_KEEP_MS);
+    if (early.length > 0) {
+      this.early = this.early.filter((e) => e.channel !== channel);
+      queueMicrotask(() => {
+        for (const e of early) if (set.has(listener)) listener(...e.args);
+      });
+    }
     return () => set.delete(listener);
   }
 
@@ -188,7 +201,13 @@ export class ResumableTransport {
   }
 
   private emit(channel: string, ...args: unknown[]): void {
-    for (const listener of this.listeners.get(channel) ?? []) {
+    const listeners = this.listeners.get(channel);
+    if (!listeners?.size) {
+      // 아직 아무도 듣지 않는 채널: 화면이 뜨는 중일 수 있어 잠시 맡겨 둔다
+      this.early = [...this.early.filter((e) => Date.now() - e.at < EARLY_KEEP_MS), { channel, args, at: Date.now() }].slice(-EARLY_MAX);
+      return;
+    }
+    for (const listener of listeners) {
       try {
         listener(...args);
       } catch (error) {

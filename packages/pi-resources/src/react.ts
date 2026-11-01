@@ -69,6 +69,9 @@ export interface McpApi {
   setEnabled(name: string, enabled: boolean): Promise<McpServerView[]>;
   remove(name: string): Promise<McpServerView[]>;
   check(): Promise<McpCheckResult>;
+  /** mcp.json 원문 읽기·저장 (앱 안 편집기). 없으면 편집기를 보이지 않는다 */
+  readText?(): Promise<{ path: string; text: string }>;
+  writeText?(text: string): Promise<McpServerView[]>;
 }
 
 /** 미리 설정해 둔 서버 한 줄 */
@@ -86,6 +89,8 @@ export function useMcp(api: McpApi, run: Run) {
   const [check, setCheck] = useState<McpCheckResult>();
   const [checking, setChecking] = useState(false);
   const [changed, setChanged] = useState(false);
+  /** 앱 안에서 고치는 mcp.json 원문 (열려 있을 때만) */
+  const [editor, setEditor] = useState<{ path: string; text: string }>();
   useEffect(() => run(async () => setServers(await api.list())), []);
 
   const apply = (job: () => Promise<McpServerView[]>) =>
@@ -112,6 +117,21 @@ export function useMcp(api: McpApi, run: Run) {
     },
     setEnabled: (name: string, enabled: boolean) => apply(() => api.setEnabled(name, enabled)),
     remove: (name: string) => apply(() => api.remove(name)),
+    editor,
+    canEdit: Boolean(api.readText && api.writeText),
+    openEditor: () => run(async () => setEditor(await api.readText!())),
+    setEditorText: (text: string) => setEditor((prev) => (prev ? { ...prev, text } : prev)),
+    closeEditor: () => setEditor(undefined),
+    /** 저장하면 편집기를 닫는다. JSON이 틀리면 run이 오류를 보이고 편집기는 남는다 */
+    saveEditor: () => {
+      const text = editor?.text;
+      if (text === undefined) return;
+      apply(async () => {
+        const next = await api.writeText!(text);
+        setEditor(undefined);
+        return next;
+      });
+    },
     /** 이 화면에서 설정을 바꿨는지 (열린 대화는 다시 열어야 적용됨을 알릴 때) */
     changed,
     check,
