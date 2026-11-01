@@ -206,6 +206,8 @@ export function mateAppApi(ctx: MateAppContext): MateAppApi {
     mcpSetEnabled: resources.mcpSetEnabled,
     mcpRemove: resources.mcpRemove,
     mcpEnsureFile: resources.mcpEnsureFile,
+    mcpReadText: resources.mcpReadText,
+    mcpWriteText: resources.mcpWriteText,
     mcpCheck: () => resources.mcpCheck(),
     // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5)
     packagesList: resources.packagesList,

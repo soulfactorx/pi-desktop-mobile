@@ -332,12 +332,9 @@ function registerIpc(): void {
   forward(IpcChannels.addMcpPreset, "mcpAddPreset");
   forward(IpcChannels.setMcpEnabled, "mcpSetEnabled");
   forward(IpcChannels.removeMcp, "mcpRemove");
-  ipcMain.handle(IpcChannels.openMcpFile, async () => {
-    const path = await call<string>("mcpEnsureFile");
-    localOnly("mcp.json 열기");
-    const error = await shell.openPath(path);
-    if (error) throw new Error(error);
-  });
+  // mcp.json은 앱 안에서 고친다 (웹·원격 호스트에서는 파일을 프로그램으로 열 수 없다)
+  forward(IpcChannels.mcpReadText, "mcpReadText");
+  forward(IpcChannels.mcpWriteText, "mcpWriteText");
   ipcMain.handle(IpcChannels.checkMcp, () => call<McpCheckResult>("mcpCheck"));
   // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5). 설치는 실행기가 그 호스트의 Pi로 한다 (오래 걸릴 수 있다)
   forward(IpcChannels.packagesList, "packagesList");

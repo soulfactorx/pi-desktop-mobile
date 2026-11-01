@@ -37,7 +37,7 @@ export function HostSettings({ onError }: { onError: (message: string) => void }
       <h3>호스트</h3>
       <p className="muted small-text">
         대화를 어느 컴퓨터에서 돌릴지 고릅니다. WSL·SSH를 고르면 그 호스트의 Pi로 대화하고, 대화·지난 대화·휴지통과 기억·작업·스킬·승인·사용량·웹 검색·네트워크 화면 모두 그 호스트의 것을
-        씁니다. 스킬 폴더·mcp.json 열기는 이 PC에서만 됩니다.
+        씁니다. 스킬 폴더 열기는 이 PC에서만 됩니다 (mcp.json은 웹 검색·MCP 화면에서 고칩니다).
       </p>
       {!hosts || !current ? (
         <p className="muted">읽는 중…</p>

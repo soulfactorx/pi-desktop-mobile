@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { deleteSkill, listSkillsIn, saveSkill } from "@pi-desktop/agent-kit/skills";
 import type { SkillInput, SkillView } from "@pi-desktop/agent-kit/skill-types";
-import { readMcpFile, serverViews, updateMcpFile, withEnabled, withoutServer, withPreset } from "@pi-desktop/pi-isolation/mcp-file";
+import { readMcpFile, serverViews, updateMcpFile, withEnabled, withoutServer, withPreset, writeMcpFile } from "@pi-desktop/pi-isolation/mcp-file";
 import { WEB_SEARCH_PRESETS, type McpCheckResult, type McpServerView } from "@pi-desktop/pi-isolation/mcp-presets";
 import { appHomes, importSkill, listImportables } from "./imports";
 import { installPackage, listPackages, removePackage } from "./packages";
@@ -56,6 +56,10 @@ export interface ResourceHome {
   mcpRemove(name: string): Promise<McpServerView[]>;
   /** 없으면 빈 설정을 만들고 경로를 돌려준다 (로컬이면 앱이 연다) */
   mcpEnsureFile(): Promise<string>;
+  /** mcp.json 원문 (없으면 빈 설정을 만든다). 웹·원격처럼 파일을 프로그램으로 열 수 없을 때 앱 안에서 고친다 */
+  mcpReadText(): Promise<{ path: string; text: string }>;
+  /** mcp.json 원문을 저장한다. JSON이 아니거나 mcpServers가 객체가 아니면 저장하지 않고 오류 */
+  mcpWriteText(text: string): Promise<McpServerView[]>;
   /**
    * pi mcp list: 켜진 서버마다 연결해 상태·도구·오류를 찍고, 연결 안 된 것이 있으면 1로 끝난다.
    * pi mcp는 Pi 설정 폴더의 mcp.json만 읽으므로 이 실행에서만 설정 폴더를 이 홈으로 바꾼다.
@@ -101,6 +105,15 @@ export function resourceHome(options: ResourceHomeOptions): ResourceHome {
       await updateMcpFile(mcp, (file) => ({ mcpServers: {}, ...file }));
       return mcp;
     },
+    mcpReadText: async () => {
+      await updateMcpFile(mcp, (file) => ({ mcpServers: {}, ...file }));
+      return { path: mcp, text: await readFile(mcp, "utf8") };
+    },
+    mcpWriteText: async (text) => {
+      const file = parseMcpText(String(text ?? ""));
+      await writeMcpFile(mcp, file);
+      return serverViews(file);
+    },
     mcpCheck: async (overrides) => {
       const run = await options.pi(overrides);
       await mkdir(options.home, { recursive: true });
@@ -120,4 +133,20 @@ export function resourceHome(options: ResourceHomeOptions): ResourceHome {
     importList: () => listImportables(options.home, others()),
     importSkill: (from, name) => importSkill(options.home, others(), from, name),
   };
+}
+
+/** 사용자가 고친 mcp.json 원문을 확인한다. 잘못 저장하면 모든 MCP 서버가 사라지므로 엄격하게 본다 */
+export function parseMcpText(text: string): Parameters<typeof writeMcpFile>[1] {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`JSON 형식이 아닙니다: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("mcp.json은 { } 객체여야 합니다");
+  const servers = (value as { mcpServers?: unknown }).mcpServers;
+  if (servers !== undefined && (typeof servers !== "object" || servers === null || Array.isArray(servers))) {
+    throw new Error("mcpServers는 { 이름: 설정 } 객체여야 합니다");
+  }
+  return value as Parameters<typeof writeMcpFile>[1];
 }

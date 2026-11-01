@@ -14,6 +14,8 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
       setEnabled: (name, on) => window.piAgent.setMcpEnabled(name, on),
       remove: (name) => window.piAgent.removeMcp(name),
       check: () => window.piAgent.checkMcp(),
+      readText: () => window.piAgent.mcpReadText(),
+      writeText: (text) => window.piAgent.mcpWriteText(text),
     },
     run,
   );
@@ -66,8 +68,8 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
         <section className="card">
           <div className="row">
             <h3 className="grow">설정된 서버</h3>
-            <button className="small" onClick={() => void window.piAgent.openMcpFile()} title="다른 MCP 서버는 mcp.json을 직접 고치거나 pi mcp add로 넣습니다">
-              mcp.json 열기
+            <button className="small" disabled={Boolean(mcp.editor)} onClick={mcp.openEditor} title="다른 MCP 서버는 mcp.json을 직접 고쳐 넣습니다">
+              mcp.json 고치기
             </button>
             <button
               className="small"
@@ -77,6 +79,27 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
               {checking ? "확인 중…" : "연결 확인"}
             </button>
           </div>
+          {mcp.editor && (
+            <div className="mcp-editor">
+              <div className="muted small-text">{mcp.editor.path}</div>
+              <textarea
+                className="mcp-editor-text"
+                spellCheck={false}
+                rows={14}
+                value={mcp.editor.text}
+                onChange={(e) => mcp.setEditorText(e.target.value)}
+              />
+              <div className="row">
+                <button className="small primary" onClick={mcp.saveEditor}>
+                  저장
+                </button>
+                <button className="small" onClick={mcp.closeEditor}>
+                  닫기
+                </button>
+                <span className="muted small-text">키 값이 그대로 보이니 다른 사람에게 화면을 보여 줄 때 조심하세요.</span>
+              </div>
+            </div>
+          )}
           {!servers ? (
             <p className="muted">읽는 중…</p>
           ) : servers.length === 0 ? (

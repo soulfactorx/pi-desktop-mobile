@@ -100,7 +100,47 @@ let sessionFolders = new Map<string, string>();
  * 예약 작업을 돌리는 스케줄러 세션은 작업 알림(notifyTask)이 맡으므로 알리지 않는다. 누르면 창을 앞으로 가져오고 그 대화로 간다.
  */
 function notifySession(n: SessionEventNotification): void {
-  if (!Notification.isSupported() || mainWindow?.isFocused() || !sessionNote(n.event, "")) return;
+  if (!Notification.isSupported() || !sessionNote(n.event, "")) return;
+  if (mainWindow?.isFocused()) {
+    // 보고 있을 때 온 승인 요청·질문은 바로 알리지 않는다. 답하기 전에 창(휴대폰이면 앱)을 떠나면 그때 알린다
+    remindIfLeft(n);
+    return;
+  }
+  showSessionNote(n);
+}
+
+/** 보고 있을 때 온 대화상자 (세션:요청 id → 확인 타이머). 답하면(onUiResolved) 지운다 */
+const unansweredDialogs = new Map<string, ReturnType<typeof setInterval>>();
+/** 창을 떠났는지 보는 간격과, 그만 기다리는 시간 */
+const LEFT_CHECK_MS = 5_000;
+const LEFT_CHECK_LIMIT_MS = 30 * 60_000;
+
+function remindIfLeft(n: SessionEventNotification): void {
+  const id = (n.event as { type?: unknown; id?: unknown }).id;
+  if ((n.event as { type?: unknown }).type !== "extension_ui_request" || typeof id !== "string") return;
+  const key = `${n.sessionId}\n${id}`;
+  if (unansweredDialogs.has(key)) return;
+  const started = Date.now();
+  const timer = setInterval(() => {
+    if (Date.now() - started > LEFT_CHECK_LIMIT_MS) return forgetDialog(n.sessionId, id);
+    if (mainWindow?.isFocused()) return;
+    forgetDialog(n.sessionId, id);
+    showSessionNote(n);
+  }, LEFT_CHECK_MS);
+  timer.unref?.();
+  unansweredDialogs.set(key, timer);
+}
+
+function forgetDialog(sessionId: string, id?: string): void {
+  for (const [key, timer] of unansweredDialogs) {
+    if (id === undefined ? key.startsWith(`${sessionId}\n`) : key === `${sessionId}\n${id}`) {
+      clearInterval(timer);
+      unansweredDialogs.delete(key);
+    }
+  }
+}
+
+function showSessionNote(n: SessionEventNotification): void {
   void (async () => {
     if (!sessionFolders.has(n.sessionId) && connection) {
       const sessions = await connection.request<SessionSummary[]>(Methods.sessionList);
@@ -257,8 +297,14 @@ function createConnection(hostId: string, onConnected: () => void): HostConnecti
       sendToRenderer(IpcChannels.sessionEvent, n);
       notifySession(n);
     },
-    onSessionExit: (n) => sendToRenderer(IpcChannels.sessionExit, n),
-    onUiResolved: (n) => sendToRenderer(IpcChannels.uiResolved, n),
+    onSessionExit: (n) => {
+      forgetDialog(n.sessionId);
+      sendToRenderer(IpcChannels.sessionExit, n);
+    },
+    onUiResolved: (n) => {
+      forgetDialog(n.sessionId, n.id);
+      sendToRenderer(IpcChannels.uiResolved, n);
+    },
     // 아래는 Pi Desktop 전용 기능(팔로우·여러 앱 입력 권한·Playground 등)이라 P0에서는 쓰지 않는다.
     onStoredChanged: ignore,
     onExternalWrite: ignore,
@@ -337,13 +383,9 @@ function registerIpc(conn: () => HostConnection): void {
   forward(IpcChannels.addMcpPreset, "mcpAddPreset");
   forward(IpcChannels.setMcpEnabled, "mcpSetEnabled");
   forward(IpcChannels.removeMcp, "mcpRemove");
-  ipcMain.handle(IpcChannels.openMcpFile, async () => {
-    // 없으면 빈 설정을 만든다. 파일을 여는 것은 이 PC에서만 된다
-    const path = await agentCall<string>("mcpEnsureFile");
-    localOnly("mcp.json 열기");
-    const error = await shell.openPath(path);
-    if (error) throw new Error(error);
-  });
+  // mcp.json은 앱 안에서 고친다 (웹·원격 호스트에서는 파일을 프로그램으로 열 수 없다)
+  forward(IpcChannels.mcpReadText, "mcpReadText");
+  forward(IpcChannels.mcpWriteText, "mcpWriteText");
   ipcMain.handle(IpcChannels.checkMcp, () => agentCall<McpCheckResult>("mcpCheck", piCommandOverrides()));
   // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5). 설치는 그 호스트의 Pi로, 오래 걸릴 수 있다
   forward(IpcChannels.packagesList, "packagesList");

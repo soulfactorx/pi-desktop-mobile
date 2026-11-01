@@ -109,7 +109,8 @@ export const IpcChannels = {
   addMcpPreset: "mate:add-mcp-preset",
   setMcpEnabled: "mate:set-mcp-enabled",
   removeMcp: "mate:remove-mcp",
-  openMcpFile: "mate:open-mcp-file",
+  mcpReadText: "mate:mcp-read-text",
+  mcpWriteText: "mate:mcp-write-text",
   checkMcp: "mate:check-mcp",
   packagesList: "mate:packages-list",
   packageInstall: "mate:package-install",
@@ -203,7 +204,10 @@ export interface MateApi {
   addMcpPreset(id: string, key?: string): Promise<McpServerView[]>;
   setMcpEnabled(name: string, enabled: boolean): Promise<McpServerView[]>;
   removeMcp(name: string): Promise<McpServerView[]>;
-  openMcpFile(): Promise<void>;
+  /** mcp.json 원문 (없으면 빈 설정을 만든다). 앱 안에서 고친다 (웹·원격 호스트에서도) */
+  mcpReadText(): Promise<{ path: string; text: string }>;
+  /** 고친 mcp.json 원문을 저장한다. JSON이 틀리면 오류 */
+  mcpWriteText(text: string): Promise<McpServerView[]>;
   /** 서버마다 연결해 보고 결과를 받는다 (pi mcp list) */
   checkMcp(): Promise<McpCheckResult>;
   /** Mate 홈에 설치한 Pi 패키지(확장) (DESIGN-APPS.md §3.5). 도구는 처음 쓸 때 허용을 묻는다 */
