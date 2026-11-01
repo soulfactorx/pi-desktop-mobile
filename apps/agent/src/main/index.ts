@@ -99,8 +99,18 @@ let sessionFolders = new Map<string, string>();
  * 대화 소식(답이 끝남·승인 요청·답을 기다림)을 OS 알림으로 띄운다 (session-notify.ts). 창을 보고 있으면 띄우지 않는다.
  * 예약 작업을 돌리는 스케줄러 세션은 작업 알림(notifyTask)이 맡으므로 알리지 않는다. 누르면 창을 앞으로 가져오고 그 대화로 간다.
  */
+/** 이미 알린 대화상자 (세션·요청 id). 같은 요청을 두 번 알리지 않는다 (다시 붙을 때의 재생 등) */
+const notifiedDialogs = new Set<string>();
+
 function notifySession(n: SessionEventNotification): void {
   if (!Notification.isSupported() || !sessionNote(n.event, "")) return;
+  const dialogId = (n.event as { type?: unknown; id?: unknown }).type === "extension_ui_request" ? (n.event as { id?: unknown }).id : undefined;
+  if (typeof dialogId === "string") {
+    const key = `${n.sessionId}\n${dialogId}`;
+    if (notifiedDialogs.has(key)) return;
+    notifiedDialogs.add(key);
+    if (notifiedDialogs.size > 500) notifiedDialogs.delete(notifiedDialogs.values().next().value!);
+  }
   if (mainWindow?.isFocused()) {
     // 보고 있을 때 온 승인 요청·질문은 바로 알리지 않는다. 답하기 전에 창(휴대폰이면 앱)을 떠나면 그때 알린다
     remindIfLeft(n);
@@ -293,9 +303,10 @@ function createConnection(hostId: string, onConnected: () => void): HostConnecti
       if (state.status === "connected") onConnected();
     },
     onSessionEvent: (n) => {
-      replays.capture(n.sessionId, n);
+      // attach 중에 오는 것은 대부분 지난 이벤트의 재생이다 (이미 답한 승인 요청 등). 다시 알리지 않는다
+      const replayed = replays.capture(n.sessionId, n);
       sendToRenderer(IpcChannels.sessionEvent, n);
-      notifySession(n);
+      if (!replayed) notifySession(n);
     },
     onSessionExit: (n) => {
       forgetDialog(n.sessionId);
@@ -535,6 +546,8 @@ function registerIpc(conn: () => HostConnection): void {
     conn().request<PiResponse>(Methods.sessionSend, { sessionId, command }),
   );
   ipcMain.handle(IpcChannels.sendRecord, async (_event, sessionId: string, record: Record<string, unknown>) => {
+    // 대화상자에 답했으면 "떠나면 알리기"를 바로 그만둔다 (데몬의 처리 알림을 기다리지 않는다)
+    if (record.type === "extension_ui_response" && typeof record.id === "string") forgetDialog(sessionId, record.id);
     await conn().request(Methods.sessionSend, { sessionId, command: record, noResponse: true });
   });
 }

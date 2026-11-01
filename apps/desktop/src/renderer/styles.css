@@ -1124,6 +1124,17 @@ button.small {
   gap: 6px;
 }
 
+/* 트리를 내려 봐도 새로고침·복제·닫기 줄은 위에 붙어 있게 한다 (패널 위 여백 10px만큼 끌어올림) */
+.tree-panel .tree-head {
+  position: sticky;
+  top: -10px;
+  z-index: 2;
+  margin: -10px -8px 0;
+  padding: 10px 8px 6px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
 .sidebar .history {
   margin-top: 14px;
 }
