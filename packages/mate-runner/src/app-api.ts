@@ -1,10 +1,7 @@
-import { execFile } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { appendChat, readChat, readInbox } from "@pi-desktop/mate-kit";
-import { listSkillsIn, saveSkill, type SkillInput } from "@pi-desktop/agent-kit/skills";
-import { readMcpFile, serverViews, updateMcpFile, withEnabled, withoutServer, withPreset } from "@pi-desktop/pi-isolation/mcp-file";
-import { WEB_SEARCH_PRESETS } from "@pi-desktop/pi-isolation/mcp-presets";
+import { resourceHome } from "@pi-desktop/pi-resources";
 import { listDirectories, makeDirectory } from "../../host-agent/src/dir-list";
 import { addChatRequest, loadChatState } from "./chat/chat-agent";
 import { removeChatImages, saveChatImages } from "./chat/chat-images";
@@ -69,6 +66,14 @@ export type MateAppApi = Record<string, (...args: any[]) => Promise<unknown>>;
 
 export function mateAppApi(ctx: MateAppContext): MateAppApi {
   const { paths } = ctx;
+  const resources = resourceHome({
+    home: paths.home,
+    deleteSkill: (name) => deleteSkill(paths, name),
+    pi: async () => {
+      const pi = await ctx.locatePi();
+      return { command: pi.nodePath ?? process.execPath, args: [pi.cliPath], env: { ...process.env, ...pi.env } };
+    },
+  });
 
   async function overview(): Promise<Overview> {
     const [config, duties, state, requests, items, inboxState, runs, runner, trash] = await Promise.all([
@@ -192,39 +197,16 @@ export function mateAppApi(ctx: MateAppContext): MateAppApi {
       }
     },
 
-    // 스킬·MCP (Mate 홈의 skills/·mcp.json, Agent와 같은 코드)
-    skillsList: () => listSkillsIn(paths.skills),
-    skillSave: async (previous: string | undefined, input: SkillInput) => void (await saveSkill(paths.skills, input, previous)),
-    skillDelete: async (name: string) => void (await deleteSkill(paths, name)),
-    mcpList: async () => serverViews(await readMcpFile(paths.mcp)),
-    mcpAddPreset: (id: string, key?: string) => {
-      const preset = WEB_SEARCH_PRESETS.find((p) => p.id === id);
-      if (!preset) throw new Error(`목록에 없는 서버입니다: ${id}`);
-      return updateMcpFile(paths.mcp, (file) => withPreset(file, preset, key));
-    },
-    mcpSetEnabled: (name: string, enabled: boolean) => updateMcpFile(paths.mcp, (file) => withEnabled(file, name, enabled === true)),
-    mcpRemove: (name: string) => updateMcpFile(paths.mcp, (file) => withoutServer(file, name)),
-    /** 없으면 빈 설정을 만들고 경로를 돌려준다 (로컬이면 앱이 연다) */
-    mcpEnsureFile: async () => {
-      await updateMcpFile(paths.mcp, (file) => ({ mcpServers: {}, ...file }));
-      return paths.mcp;
-    },
-    /**
-     * MCP 연결 확인 (pi mcp list). pi mcp는 Pi 설정 폴더의 mcp.json만 읽으므로 이 실행에서만 설정 폴더를 Mate 홈으로 바꾼다.
-     * OAuth 서버는 로그인 안 됨으로 보일 수 있다 (Agent의 연결 확인과 같음)
-     */
-    mcpCheck: async () => {
-      const pi = await ctx.locatePi();
-      await mkdir(paths.home, { recursive: true });
-      return new Promise<{ ok: boolean; output: string }>((done) => {
-        execFile(
-          pi.nodePath ?? process.execPath,
-          [pi.cliPath, "mcp", "list"],
-          { cwd: paths.home, env: { ...process.env, ...pi.env, PI_CODING_AGENT_DIR: paths.home }, timeout: 120_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
-          (error, stdout, stderr) => done({ ok: !error, output: `${stdout}${stderr ? `\n${stderr}` : ""}` }),
-        );
-      });
-    },
+    // 스킬·MCP (Mate 홈의 skills/·mcp.json, 지운 스킬은 Mate 휴지통으로). 관리 코드는 세 앱이 함께 쓴다 (pi-resources)
+    skillsList: resources.skillsList,
+    skillSave: resources.skillSave,
+    skillDelete: resources.skillDelete,
+    mcpList: resources.mcpList,
+    mcpAddPreset: resources.mcpAddPreset,
+    mcpSetEnabled: resources.mcpSetEnabled,
+    mcpRemove: resources.mcpRemove,
+    mcpEnsureFile: resources.mcpEnsureFile,
+    mcpCheck: () => resources.mcpCheck(),
 
     // Pi 준비 상태 (그 호스트의 Pi)
     piReadiness: () => piReadiness(),

@@ -1,9 +1,7 @@
-import { execFile } from "node:child_process";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { readMcpFile, serverViews, updateMcpFile, withEnabled, withoutServer, withPreset } from "@pi-desktop/pi-isolation/mcp-file";
-import { WEB_SEARCH_PRESETS } from "@pi-desktop/pi-isolation/mcp-presets";
+import { resourceHome } from "@pi-desktop/pi-resources";
 import {
   bulkUpdate,
   createEntry,
@@ -21,7 +19,6 @@ import {
   type EntryInput,
 } from "../extensions/memory/store";
 import { buildKnowledgeSection } from "../extensions/memory/recall";
-import { deleteSkill, listSkillsIn, saveSkill, type SkillInput } from "../extensions/skills/store";
 import { loadAudit, loadRules, removeRule } from "../extensions/permissions/store";
 import type { Rule } from "../extensions/permissions/rules";
 import { loadElevationEnabled, saveElevationEnabled } from "../extensions/elevation/store";
@@ -65,10 +62,8 @@ export type AppApi = Record<string, (...args: any[]) => Promise<unknown>>;
 
 export function appApi(ctx: AppApiContext): AppApi {
   const kb = () => memoryDir(ctx.dataDir);
-  const skills = () => join(ctx.home, "skills");
   const schedules = () => schedulesPath(ctx.dataDir);
   const sessions = () => join(ctx.home, "sessions");
-  const mcp = () => join(ctx.home, "mcp.json");
   /** 그 호스트의 Pi를 띄우는 명령 (node + cli.js) */
   const pi = async (overrides: PiOverrides = {}) => {
     if (!ctx.locatePi) throw new Error("Pi를 찾을 수 없는 곳입니다");
@@ -79,6 +74,7 @@ export function appApi(ctx: AppApiContext): AppApi {
       env: { ...process.env, ...found.env, ...overrides.env } as NodeJS.ProcessEnv,
     };
   };
+  const resources = resourceHome({ home: ctx.home, skillsTrash: join(ctx.dataDir, "skills-trash"), pi: (overrides?: PiOverrides) => pi(overrides) });
   return {
     // 지식베이스
     kbList: (includeArchived?: boolean) => loadEntries(kb(), { includeArchived: includeArchived === true }),
@@ -105,11 +101,8 @@ export function appApi(ctx: AppApiContext): AppApi {
     getAutoLearn: () => loadAutoLearn(kb()),
     setAutoLearn: async (on: boolean) => void (await saveAutoLearn(kb(), on === true)),
 
-    // 스킬 (앱 홈의 skills/. 지운 것은 상태 폴더의 skills-trash/로)
-    skillsList: () => listSkillsIn(skills()),
-    skillSave: async (previous: string | undefined, input: SkillInput) => void (await saveSkill(skills(), input, previous)),
-    skillDelete: async (name: string) => void (await deleteSkill(skills(), name, join(ctx.dataDir, "skills-trash"))),
-    skillsDir: async () => skills(),
+    // 스킬·MCP (앱 홈의 skills/·mcp.json, 지운 스킬은 상태 폴더의 skills-trash/로). 관리 코드는 세 앱이 함께 쓴다 (pi-resources)
+    ...resources,
 
     // 승인 규칙·판단 기록, 관리자 권한
     listRules: () => loadRules(ctx.dataDir),
@@ -141,37 +134,6 @@ export function appApi(ctx: AppApiContext): AppApi {
         return rel !== "" && !rel.startsWith("..") && !/^[a-zA-Z]:/.test(rel);
       });
       return searchSessions(inside, query, (path) => readFile(path, "utf8"));
-    },
-
-    // MCP (앱 홈의 mcp.json, pi-isolation과 같은 코드)
-    mcpList: async () => serverViews(await readMcpFile(mcp())),
-    mcpAddPreset: (id: string, key?: string) => {
-      const preset = WEB_SEARCH_PRESETS.find((p) => p.id === id);
-      if (!preset) throw new Error(`모르는 서버입니다: ${id}`);
-      return updateMcpFile(mcp(), (file) => withPreset(file, preset, key));
-    },
-    mcpSetEnabled: (name: string, enabled: boolean) => updateMcpFile(mcp(), (file) => withEnabled(file, name, enabled === true)),
-    mcpRemove: (name: string) => updateMcpFile(mcp(), (file) => withoutServer(file, name)),
-    /** 없으면 빈 설정을 만들고 경로를 돌려준다 (로컬이면 앱이 연다) */
-    mcpEnsureFile: async () => {
-      await updateMcpFile(mcp(), (file) => ({ mcpServers: {}, ...file }));
-      return mcp();
-    },
-    /**
-     * pi mcp list: 켜진 서버마다 연결해 상태·도구·오류를 찍고, 연결 안 된 것이 있으면 1로 끝난다.
-     * pi mcp는 Pi 설정 폴더의 mcp.json만 읽으므로 이 실행에서만 설정 폴더를 앱 홈으로 바꾼다.
-     * 그래서 OAuth 로그인이 필요한 서버는 로그인 안 됨으로 보일 수 있다 (세션은 Pi의 mcp-auth.json을 쓴다, pi-isolation 참고)
-     */
-    mcpCheck: async (overrides?: PiOverrides) => {
-      const run = await pi(overrides);
-      return new Promise<{ ok: boolean; output: string }>((done) => {
-        execFile(
-          run.command,
-          [...run.args, "mcp", "list"],
-          { cwd: ctx.home, env: { ...run.env, PI_CODING_AGENT_DIR: ctx.home }, timeout: 120_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
-          (error, stdout, stderr) => done({ ok: !error, output: `${stdout}${stderr ? `\n${stderr}` : ""}` }),
-        );
-      });
     },
 
     // 내 카드 초안: 그 호스트의 Pi를 한 번(--print, 도구·확장 없음) 불러 만든다. 재료는 사실·교훈 기억과 대화 이름뿐

@@ -39,6 +39,7 @@
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "@pi-desktop/pi-resources": "*",
     "electron-updater": "^6.8.9"
   }
 }

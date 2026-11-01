@@ -1,39 +1,28 @@
-import { useEffect, useState } from "react";
-import { WEB_SEARCH_PRESETS as MCP_PRESETS } from "@pi-desktop/pi-isolation/mcp-presets";
-import type { McpCheckResult, McpServerView, SkillInput, SkillView } from "../shared/api";
+import { emptySkillDraft, skillDraftReady, useMcp, useSkills } from "@pi-desktop/pi-resources/react";
 import type { Act } from "./App";
-
-/** 편집 중인 스킬. previous가 없으면 새 스킬 */
-interface Draft extends SkillInput {
-  previous?: string;
-}
-
-const emptyDraft = (): Draft => ({ name: "", description: "", instructions: "", modelInvocation: true });
 
 /**
  * 스킬·MCP (설계 DESIGN-APPS.md §3.4). Mate 홈의 skills/·mcp.json을 Agent의 스킬·MCP 화면과 같은 방식으로 다룬다.
  * 임무마다 이 중에서 쓸 스킬·서버를 고른다 (임무 고치기). Pi Desktop·Agent의 것과 섞이지 않는다.
+ * 상태와 동작은 세 앱이 함께 쓰는 pi-resources의 것이고, 여기서는 모양만 그린다 (DESIGN-APPS.md §3.5).
  */
 export function SkillsMcpView({ act }: { act: Act }) {
-  const [skills, setSkills] = useState<SkillView[]>();
-  const [servers, setServers] = useState<McpServerView[]>();
-  const [draft, setDraft] = useState<Draft>();
-  const [keys, setKeys] = useState<Record<string, string>>({});
-  const [check, setCheck] = useState<McpCheckResult>();
-  const [checking, setChecking] = useState(false);
-
-  const load = async () => {
-    const [s, m] = await Promise.all([window.mate.skillsList(), window.mate.listMcp()]);
-    setSkills(s);
-    setServers(m);
-  };
-  useEffect(() => void act(load), []);
-
-  const mcp = (job: () => Promise<McpServerView[]>) =>
-    void act(async () => {
-      setServers(await job());
-      setCheck(undefined);
-    });
+  const run = (job: () => Promise<void>) => void act(job);
+  const { skills, draft, setDraft, save, remove } = useSkills(
+    { list: () => window.mate.skillsList(), save: (previous, input) => window.mate.skillSave(previous, input), remove: (name) => window.mate.skillDelete(name) },
+    run,
+  );
+  const mcp = useMcp(
+    {
+      list: () => window.mate.listMcp(),
+      addPreset: (id, key) => window.mate.addMcpPreset(id, key),
+      setEnabled: (name, on) => window.mate.setMcpEnabled(name, on),
+      remove: (name) => window.mate.removeMcp(name),
+      check: () => window.mate.checkMcp(),
+    },
+    run,
+  );
+  const { servers, keys, check, checking } = mcp;
 
   return (
     <section>
@@ -41,7 +30,7 @@ export function SkillsMcpView({ act }: { act: Act }) {
         <h2>스킬</h2>
         <span className="muted">임무 지시에 쓸 작업 방법 (Pi 스킬). 임무마다 쓸 스킬을 고릅니다 (기본: 전부)</span>
         <span className="right">
-          <button className="small primary" onClick={() => setDraft(emptyDraft())}>
+          <button className="small primary" onClick={() => setDraft(emptySkillDraft())}>
             + 새 스킬
           </button>{" "}
           <button className="small" onClick={() => void act(() => window.mate.skillOpenFolder())} title="스크립트·참고 파일을 함께 두려면 폴더에서 직접 넣으세요">
@@ -71,15 +60,8 @@ export function SkillsMcpView({ act }: { act: Act }) {
             <button onClick={() => setDraft(undefined)}>취소</button>
             <button
               className="primary"
-              disabled={!draft.name.trim() || !draft.description.trim() || !draft.instructions.trim()}
-              onClick={() =>
-                void act(async () => {
-                  const { previous, ...input } = draft;
-                  await window.mate.skillSave(previous, input);
-                  setDraft(undefined);
-                  await load();
-                })
-              }
+              disabled={!skillDraftReady(draft)}
+              onClick={() => save()}
             >
               저장
             </button>
@@ -100,9 +82,7 @@ export function SkillsMcpView({ act }: { act: Act }) {
                 </button>{" "}
                 <button
                   className="small"
-                  onClick={() => {
-                    if (confirm(`${s.name} 스킬을 지울까요? 휴지통으로 옮겨져 되살릴 수 있습니다.`)) void act(async () => (await window.mate.skillDelete(s.name), await load()));
-                  }}
+                  onClick={() => remove(s.name, `${s.name} 스킬을 지울까요? 휴지통으로 옮겨져 되살릴 수 있습니다.`)}
                 >
                   지우기
                 </button>
@@ -123,44 +103,24 @@ export function SkillsMcpView({ act }: { act: Act }) {
           <button
             className="small"
             disabled={checking || !servers?.length}
-            onClick={() =>
-              void act(async () => {
-                setChecking(true);
-                try {
-                  setCheck(await window.mate.checkMcp());
-                } finally {
-                  setChecking(false);
-                }
-              })
-            }
+            onClick={mcp.runCheck}
           >
             {checking ? "확인 중…" : "연결 확인"}
           </button>
         </span>
       </div>
       <ul className="cards">
-        {MCP_PRESETS.map((preset) => {
-          const server = servers?.find((s) => s.name === preset.name);
-          const added = !!server;
+        {mcp.presets.map((row) => {
+          const { preset, added, needsKey } = row;
           // Mate의 제안으로 키 없이(꺼진 채) 넣은 서버는 키를 넣으면 켜진다
-          const needsKey = !!preset.keyEnv && (!server || !server.hasSecrets);
           return (
             <li key={preset.id} className="card">
               <div className="card-head">
                 <strong className="title">{preset.label}</strong>
                 <span className="muted">{preset.detail}</span>
                 <span className="right">
-                  {needsKey && (
-                    <input type="password" placeholder={preset.keyEnv} value={keys[preset.id] ?? ""} onChange={(e) => setKeys((prev) => ({ ...prev, [preset.id]: e.target.value }))} />
-                  )}{" "}
-                  <button
-                    className={added && !needsKey ? "small" : "small primary"}
-                    disabled={(added && !needsKey) || (!!preset.keyEnv && !keys[preset.id]?.trim())}
-                    onClick={() => {
-                      mcp(() => window.mate.addMcpPreset(preset.id, keys[preset.id]));
-                      setKeys((prev) => ({ ...prev, [preset.id]: "" }));
-                    }}
-                  >
+                  {needsKey && <input type="password" placeholder={preset.keyEnv} value={keys[preset.id] ?? ""} onChange={(e) => mcp.setKey(preset.id, e.target.value)} />}{" "}
+                  <button className={added && !needsKey ? "small" : "small primary"} disabled={(added && !needsKey) || !mcp.canAdd(row)} onClick={() => mcp.addPreset(preset.id)}>
                     {added ? (needsKey ? "키 넣고 켜기" : "넣음") : "넣기"}
                   </button>
                 </span>
@@ -176,7 +136,7 @@ export function SkillsMcpView({ act }: { act: Act }) {
           <li key={s.name} className={`card${s.enabled ? "" : " disabled"}`}>
             <div className="card-head">
               <label className="switch" title={s.enabled ? "끄기" : "켜기"}>
-                <input type="checkbox" checked={s.enabled} onChange={(e) => mcp(() => window.mate.setMcpEnabled(s.name, e.target.checked))} />
+                <input type="checkbox" checked={s.enabled} onChange={(e) => mcp.setEnabled(s.name, e.target.checked)} />
               </label>
               <strong className="title">{s.name}</strong>
               {s.hasSecrets && <span className="chip">키 있음</span>}
@@ -185,7 +145,7 @@ export function SkillsMcpView({ act }: { act: Act }) {
                 {s.target}
               </span>
               <span className="right">
-                <button className="small" onClick={() => mcp(() => window.mate.removeMcp(s.name))}>
+                <button className="small" onClick={() => mcp.remove(s.name)}>
                   빼기
                 </button>
               </span>

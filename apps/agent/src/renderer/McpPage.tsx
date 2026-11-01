@@ -1,26 +1,23 @@
-import { useEffect, useState } from "react";
-import { WEB_SEARCH_PRESETS, type McpCheckResult, type McpServerView } from "@pi-desktop/pi-isolation/mcp-presets";
+import { useMcp } from "@pi-desktop/pi-resources/react";
 
 /**
  * 웹 검색·MCP (설계 DESIGN-AGENT.md §4 "웹 페이지 읽기, 웹 검색"). 앱 홈의 MCP 설정(mcp.json)을 보여 주고,
  * 웹 검색 서버를 골라 넣거나 켜고 끈다. 바꾼 설정은 새 대화부터 적용된다(열린 대화는 Pi를 다시 띄워야 함).
- * 연결 확인은 `pi mcp list`로 한다.
+ * 연결 확인은 `pi mcp list`로 한다. 상태와 동작은 세 앱이 함께 쓰는 pi-resources의 것이다 (DESIGN-APPS.md §3.5).
  */
 export function McpPage({ onError }: { onError: (message: string) => void }) {
-  const [servers, setServers] = useState<McpServerView[]>();
-  const [keys, setKeys] = useState<Record<string, string>>({});
-  const [check, setCheck] = useState<McpCheckResult>();
-  const [checking, setChecking] = useState(false);
-  const [changed, setChanged] = useState(false);
-
-  const run = (action: () => Promise<void>) => action().catch((error: unknown) => onError(error instanceof Error ? error.message : String(error)));
-  const apply = (next: McpServerView[]) => {
-    setServers(next);
-    setChanged(true);
-    setCheck(undefined);
-  };
-
-  useEffect(() => void run(async () => setServers(await window.piAgent.listMcp())), []);
+  const run = (action: () => Promise<void>) => void action().catch((error: unknown) => onError(error instanceof Error ? error.message : String(error)));
+  const mcp = useMcp(
+    {
+      list: () => window.piAgent.listMcp(),
+      addPreset: (id, key) => window.piAgent.addMcpPreset(id, key),
+      setEnabled: (name, on) => window.piAgent.setMcpEnabled(name, on),
+      remove: (name) => window.piAgent.removeMcp(name),
+      check: () => window.piAgent.checkMcp(),
+    },
+    run,
+  );
+  const { servers, keys, check, checking, changed } = mcp;
 
   return (
     <div className="page">
@@ -34,8 +31,8 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
         <section className="card">
           <h3>웹 검색 서버 넣기</h3>
           <ul className="list">
-            {WEB_SEARCH_PRESETS.map((preset) => {
-              const added = servers?.some((s) => s.name === preset.name);
+            {mcp.presets.map((row) => {
+              const { preset, added } = row;
               return (
                 <li key={preset.id} className="mcp-preset">
                   <div className="grow">
@@ -48,7 +45,7 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
                       className="mcp-key"
                       placeholder={`${preset.keyEnv}`}
                       value={keys[preset.id] ?? ""}
-                      onChange={(e) => setKeys((prev) => ({ ...prev, [preset.id]: e.target.value }))}
+                      onChange={(e) => mcp.setKey(preset.id, e.target.value)}
                     />
                   )}
                   {preset.keyUrl && !added && (
@@ -56,16 +53,7 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
                       키 받기
                     </button>
                   )}
-                  <button
-                    className={added ? "small" : "small primary"}
-                    disabled={added || (!!preset.keyEnv && !keys[preset.id]?.trim())}
-                    onClick={() =>
-                      run(async () => {
-                        apply(await window.piAgent.addMcpPreset(preset.id, keys[preset.id]));
-                        setKeys((prev) => ({ ...prev, [preset.id]: "" }));
-                      })
-                    }
-                  >
+                  <button className={added ? "small" : "small primary"} disabled={added || !mcp.canAdd(row)} onClick={() => mcp.addPreset(preset.id)}>
                     {added ? "넣음" : "넣기"}
                   </button>
                 </li>
@@ -84,16 +72,7 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
             <button
               className="small"
               disabled={checking || !servers?.length}
-              onClick={() =>
-                run(async () => {
-                  setChecking(true);
-                  try {
-                    setCheck(await window.piAgent.checkMcp());
-                  } finally {
-                    setChecking(false);
-                  }
-                })
-              }
+              onClick={mcp.runCheck}
             >
               {checking ? "확인 중…" : "연결 확인"}
             </button>
@@ -110,10 +89,7 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
                     <input
                       type="checkbox"
                       checked={s.enabled}
-                      onChange={(e) => {
-                        const on = e.target.checked;
-                        run(async () => apply(await window.piAgent.setMcpEnabled(s.name, on)));
-                      }}
+                      onChange={(e) => mcp.setEnabled(s.name, e.target.checked)}
                     />
                   </label>
                   <div className="grow">
@@ -125,7 +101,7 @@ export function McpPage({ onError }: { onError: (message: string) => void }) {
                     </div>
                     {s.description && <div className="muted small-text">{s.description}</div>}
                   </div>
-                  <button className="small" onClick={() => run(async () => apply(await window.piAgent.removeMcp(s.name)))}>
+                  <button className="small" onClick={() => mcp.remove(s.name)}>
                     빼기
                   </button>
                 </li>
