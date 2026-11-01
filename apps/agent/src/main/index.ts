@@ -157,6 +157,12 @@ function localOnly(what: string): void {
 }
 
 /** 로컬 개발 실행의 덮어쓰기 (저장소의 Pi, 격리된 Pi 설정, mock 프로바이더). 원격 호스트에는 넘기지 않는다 */
+/** pi 하위 명령(install·remove·list·mcp)에 쓸 덮어쓰기. 개발용 세션 인자(--provider 등)는 하위 명령 앞에 붙으면 안 되므로 뺀다 */
+function piCommandOverrides(): { piCliPath?: string; env?: Record<string, string> } {
+  const { piArgs: _sessionArgs, ...rest } = piOverrides();
+  return rest;
+}
+
 function piOverrides(): { piCliPath?: string; piArgs?: string[]; env?: Record<string, string> } {
   if (hostPaths?.remote) return {};
   const overrides = devSessionOverrides();
@@ -338,11 +344,11 @@ function registerIpc(conn: () => HostConnection): void {
     const error = await shell.openPath(path);
     if (error) throw new Error(error);
   });
-  ipcMain.handle(IpcChannels.checkMcp, () => agentCall<McpCheckResult>("mcpCheck", piOverrides()));
+  ipcMain.handle(IpcChannels.checkMcp, () => agentCall<McpCheckResult>("mcpCheck", piCommandOverrides()));
   // Pi 패키지(확장)와 다른 앱에서 가져오기 (DESIGN-APPS.md §3.5). 설치는 그 호스트의 Pi로, 오래 걸릴 수 있다
   forward(IpcChannels.packagesList, "packagesList");
-  ipcMain.handle(IpcChannels.packageInstall, (_event, source: string) => agentCallLong("packageInstall", source, piOverrides()));
-  ipcMain.handle(IpcChannels.packageRemove, (_event, source: string) => agentCallLong("packageRemove", source, piOverrides()));
+  ipcMain.handle(IpcChannels.packageInstall, (_event, source: string) => agentCallLong("packageInstall", source, piCommandOverrides()));
+  ipcMain.handle(IpcChannels.packageRemove, (_event, source: string) => agentCallLong("packageRemove", source, piCommandOverrides()));
   forward(IpcChannels.importList, "importList");
   forward(IpcChannels.importSkill, "importSkill");
   forward(IpcChannels.networkState, "networkState");
