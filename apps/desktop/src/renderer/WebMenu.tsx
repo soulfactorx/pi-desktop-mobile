@@ -45,6 +45,8 @@ export function WebMenu({ onCommand }: { onCommand: (id: string) => void }) {
         onClick={() => setOpen((v) => !v)}
       >
         ⋮ 메뉴
+        {/* 웹앱 버전: 업데이트가 됐는지 한눈에 */}
+        {window.piWeb?.version && <span className="web-menu-version">v{window.piWeb.version.replace(/^v/, "")}</span>}
       </button>
       {open && (
         <div className="web-menu-backdrop" onClick={() => setOpen(false)}>

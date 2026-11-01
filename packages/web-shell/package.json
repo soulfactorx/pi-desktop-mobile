@@ -16,6 +16,7 @@
     "./notify": "./src/client/notify.ts",
     "./share": "./src/client/share.ts",
     "./compact-header": "./src/client/compact-header.ts",
+    "./version": "./src/client/version.ts",
     "./share-inbox": "./src/server/share-inbox.ts",
     "./push": "./src/server/push.ts",
     "./service-worker": "./src/server/service-worker.ts",

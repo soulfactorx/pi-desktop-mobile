@@ -2,6 +2,7 @@ import { CLICK_OPEN, ShellChannels, WebPaths, type Control, type DialogRequest, 
 import { useTransport } from "./electron-renderer";
 import { checkNotifications, onNotificationOpen, reportVisibility, setupNotifications } from "./notify";
 import { watchSharedImages } from "./share";
+import { showVersion } from "./version";
 import { ResumableTransport, type LinkStatus } from "./transport";
 import "./shell.css";
 
@@ -31,6 +32,8 @@ export interface BootOptions {
     /** 서랍 안에서 눌러도 서랍을 닫지 않을 것 (하위 메뉴를 여는 단추 등) */
     keepOpen?: string;
   };
+  /** 웹앱 버전을 붙일 자리 (첫 화면의 앱 이름 등). 서랍 띠의 이름 옆에는 늘 붙인다 */
+  versionTarget?: string;
 }
 
 const TOKEN_KEY = "pi-web-token";
@@ -105,9 +108,11 @@ function showTokenForm(options: BootOptions, message: string): void {
 
 async function start(options: BootOptions, token: string): Promise<void> {
   let ok: boolean;
+  let version: string | undefined;
   try {
     const response = await fetch(WebPaths.auth, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
     ok = response.ok;
+    version = ok ? ((await response.json().catch(() => ({}))) as { version?: string }).version : undefined;
   } catch {
     showTokenForm(options, "서버에 닿지 않습니다. Termux에서 서버가 실행 중인지 확인하세요.");
     return;
@@ -146,6 +151,7 @@ async function start(options: BootOptions, token: string): Promise<void> {
   document.getElementById("root")!.replaceChildren();
   await options.loadApp();
   if (options.drawer) installDrawer(options.title, options.drawer);
+  showVersion(version, [".ws-bar-title", options.versionTarget].filter(Boolean).join(", "));
   void setupNotifications(transport, options.title).catch((error: unknown) => console.warn("알림을 준비하지 못했습니다", error));
 }
 

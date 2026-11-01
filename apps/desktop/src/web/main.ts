@@ -45,8 +45,12 @@ function takeTokenFromUrl(): string | undefined {
   return decodeURIComponent(match[1]!);
 }
 
+/** 서버가 알려 준 웹앱 버전 (토큰 확인 응답) */
+let serverVersion: string | undefined;
+
 async function tokenWorks(token: string): Promise<boolean> {
   const response = await fetch(WebPaths.auth, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  if (response.ok) serverVersion = ((await response.json().catch(() => ({}))) as { version?: string }).version;
   return response.ok;
 }
 
@@ -109,6 +113,7 @@ async function start(token: string): Promise<void> {
   let appReady = false;
   window.piWeb = {
     files: createWebFiles((channel, ...args) => transport.invoke(channel, ...args)),
+    version: serverVersion,
     checkNotifications: () => checkNotifications(transport),
     takeOpenSession: () => {
       appReady = true;
