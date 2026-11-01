@@ -1,39 +1,23 @@
-import { useEffect, useState } from "react";
-import type { SkillInput, SkillView } from "@pi-desktop/agent-kit/skill-types";
-
-/** 편집 중인 스킬. previous가 없으면 새 스킬 */
-interface Draft extends SkillInput {
-  previous?: string;
-}
-
-const emptyDraft = (): Draft => ({ name: "", description: "", instructions: "", modelInvocation: true });
-const toDraft = (s: SkillView): Draft => ({ previous: s.name, name: s.name, description: s.description, instructions: s.instructions, modelInvocation: s.modelInvocation });
+import { useState } from "react";
+import type { SkillView } from "@pi-desktop/agent-kit/skill-types";
+import { emptySkillDraft, skillDraftOf, skillDraftReady, useSkills } from "@pi-desktop/pi-resources/react";
 
 /**
  * 스킬 (설계 DESIGN-AGENT.md §4 "스킬"). Pi 스킬(SKILL.md)을 보고 만들고 고친다.
  * 모델은 스킬의 이름·설명을 보고 필요할 때 지시를 읽고, 사람은 /skill:이름으로 부른다. 대화에서 "스킬로 만들어"라고 해도 저장된다.
  * 스킬은 앱 홈의 skills/(~/.pi-desktop-agent/skills)에 있다. Pi Desktop·터미널 pi의 스킬과 섞이지 않는다 (DESIGN-APPS.md §3).
+ * 상태와 동작은 세 앱이 함께 쓰는 pi-resources의 것이고, 여기서는 모양만 그린다 (DESIGN-APPS.md §3.5).
  */
 export function SkillsPage({ onUse, onError }: { onUse: (name: string) => void; onError: (message: string) => void }) {
-  const [skills, setSkills] = useState<SkillView[]>();
-  const [draft, setDraft] = useState<Draft>();
   const [selected, setSelected] = useState<SkillView>();
 
   const run = (action: () => Promise<unknown>) =>
-    action().catch((error: unknown) => onError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(error)));
-  const refresh = async () => setSkills(await window.piAgent.skillsList());
-
-  useEffect(() => void run(refresh), []);
-
-  const save = () =>
-    run(async () => {
-      if (!draft) return;
-      const { previous, ...input } = draft;
-      await window.piAgent.skillSave(previous, input);
-      await refresh();
-      setDraft(undefined);
-      setSelected(undefined);
-    });
+    void action().catch((error: unknown) => onError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(error)));
+  const { skills, draft, setDraft, save: saveDraft, remove } = useSkills(
+    { list: () => window.piAgent.skillsList(), save: (previous, input) => window.piAgent.skillSave(previous, input), remove: (name) => window.piAgent.skillDelete(name) },
+    run,
+  );
+  const save = () => saveDraft(() => setSelected(undefined));
 
   const user = skills ?? [];
 
@@ -71,7 +55,7 @@ export function SkillsPage({ onUse, onError }: { onUse: (name: string) => void; 
       </header>
       <div className="page-body">
         <div className="row">
-          <button className="small primary" onClick={() => (setDraft(emptyDraft()), setSelected(undefined))}>
+          <button className="small primary" onClick={() => (setDraft(emptySkillDraft()), setSelected(undefined))}>
             + 새 스킬
           </button>
           <button className="small" onClick={() => run(async () => window.piAgent.skillOpenFolder())} title="스크립트·참고 파일을 함께 두려면 폴더에서 직접 넣으세요">
@@ -104,19 +88,12 @@ export function SkillsPage({ onUse, onError }: { onUse: (name: string) => void; 
                 <button className="small primary" onClick={() => onUse(selected.name)}>
                   대화에서 쓰기
                 </button>
-                <button className="small" onClick={() => setDraft(toDraft(selected))}>
+                <button className="small" onClick={() => setDraft(skillDraftOf(selected))}>
                   고치기
                 </button>
                 <button
                   className="small danger"
-                  onClick={() =>
-                    run(async () => {
-                      if (!confirm(`${selected.name} 스킬을 지울까요? (휴지통 폴더로 옮겨져 되돌릴 수 있습니다)`)) return;
-                      await window.piAgent.skillDelete(selected.name);
-                      setSelected(undefined);
-                      await refresh();
-                    })
-                  }
+                  onClick={() => remove(selected.name, `${selected.name} 스킬을 지울까요? (휴지통 폴더로 옮겨져 되돌릴 수 있습니다)`, () => setSelected(undefined))}
                 >
                   지우기
                 </button>
@@ -152,7 +129,7 @@ export function SkillsPage({ onUse, onError }: { onUse: (name: string) => void; 
                 placeholder={"지시 (Markdown)\n# 주간 보고\n1. 지난 7일의 커밋을 본다\n2. 기능·수정·문서로 나눠 세 줄씩 정리한다"}
               />
               <div className="row">
-                <button className="small primary" disabled={!draft.name.trim() || !draft.description.trim() || !draft.instructions.trim()} onClick={save}>
+                <button className="small primary" disabled={!skillDraftReady(draft)} onClick={save}>
                   저장
                 </button>
                 <button className="small link-button" onClick={() => setDraft(undefined)}>

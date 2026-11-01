@@ -1,0 +1,20 @@
+{
+  "name": "@pi-desktop/pi-resources",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Pi의 확장 가능한 데이터(스킬·MCP, 이어서 프롬프트·패키지)를 관리하는 공용 코드. 세 앱이 같은 코드로 각자의 홈을 관리한다 (데이터는 앱마다 따로)",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/manager.ts",
+    "./react": "./src/react.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pi-desktop/agent-kit": "*",
+    "@pi-desktop/pi-isolation": "*"
+  }
+}
