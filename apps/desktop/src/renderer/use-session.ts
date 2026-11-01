@@ -431,7 +431,7 @@ export function useSession(tabId: string = MAIN_TAB) {
       }
       if (mode === "auto") {
         const info = await api().inspectStored(hostRef.current, stored.path);
-        if (!info.ownedBy && Date.now() - info.modified < RECENTLY_WRITTEN_MS) {
+        if (!info.ownedBy && !info.closedHere && Date.now() - info.modified < RECENTLY_WRITTEN_MS) {
           setPendingOpen(stored);
           return;
         }

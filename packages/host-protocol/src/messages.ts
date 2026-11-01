@@ -945,6 +945,8 @@ export interface StoredInspectResult {
   modified: number;
   /** 이 데몬의 실행 중인 세션이 이 파일을 쓰고 있으면 그 세션 id */
   ownedBy?: string;
+  /** 이 데몬의 세션이 마지막으로 쓰고 닫은 파일이고, 그 뒤 다른 곳에서 바뀌지 않았으면 true */
+  closedHere?: boolean;
 }
 
 /** 세션 파일을 지운 결과. 파일이 아직 없었으면(첫 메시지 전) backup이 없다 */
