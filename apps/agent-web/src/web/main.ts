@@ -15,6 +15,13 @@ bootWebApp({
     // 앱 화면 CSS 뒤에 두어야 같은 선택자를 덮는다
     await import("./web.css");
     // 휴대폰: 대화 위 정보 줄(대화 이름·폴더·모델)을 접었다 편다. 키보드가 뜨면 저절로 접는다
-    setupCompactHeader({ hide: [".chat-page .page-head"], anchor: ".chat-page", key: "pi-agent-compact-header" });
+    setupCompactHeader({
+      hide: [".chat-page .page-head"],
+      anchor: ".chat-page",
+      key: "pi-agent-compact-header",
+      // 대화가 열린 화면에서만, 대화상자·메뉴·서랍이 덮으면 숨긴다
+      when: ".chat-page .composer textarea:not(:disabled)",
+      blockers: ".modal-backdrop, .ws-backdrop, body.ws-drawer-open",
+    });
   },
 });

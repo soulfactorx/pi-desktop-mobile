@@ -128,7 +128,14 @@ async function start(token: string): Promise<void> {
   document.getElementById("root")!.innerHTML = "";
   await import("../renderer/main");
   // 휴대폰: 대화 위 정보 줄(호스트·상태·모델·컨텍스트)을 접었다 편다. 키보드가 뜨면 저절로 접는다
-  setupCompactHeader({ hide: [".topbar", ".session-bar"], anchor: ".workspace", key: "pi-web-compact-header" });
+  setupCompactHeader({
+    hide: [".topbar", ".session-bar"],
+    anchor: ".workspace",
+    key: "pi-web-compact-header",
+    // 세션이 열린 대화창(입력창이 켜진 화면)에서만, 대화상자·메뉴·세션 서랍·파일 관리자가 덮으면 숨긴다
+    when: ".composer textarea:not(:disabled)",
+    blockers: ".modal-backdrop, .file-sheet-backdrop, .web-menu-backdrop, .palette-backdrop, .workspace.drawer-open .sidebar, .file-manager",
+  });
   void setupNotifications(transport, "Pi Web").catch((error: unknown) => console.warn("알림을 준비하지 못했습니다", error));
 }
 
