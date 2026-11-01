@@ -3872,3 +3872,44 @@ details > summary.settings-section {
   background: var(--panel-2);
   box-shadow: inset 3px 0 0 var(--accent);
 }
+
+/* 터치 화면(마우스 오버가 없음): 세션 줄의 ✎·🗑·📦·✕와 트리의 분기 단추를 늘 보이고, 손가락으로 누르기 좋게 키운다.
+   단추가 이름·시각 글자를 가리지 않게 줄 오른쪽을 비운다 */
+@media (hover: none) {
+  .rename-button,
+  .close-session-button,
+  .delete-session-button,
+  .archive-session-button {
+    opacity: 1;
+    top: 50%;
+    transform: translateY(-50%);
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    font-size: 14px;
+  }
+  .close-session-button {
+    right: 2px;
+  }
+  .delete-session-button {
+    right: 34px;
+  }
+  .rename-button {
+    right: 66px;
+  }
+  .history-row .delete-session-button {
+    right: 2px;
+  }
+  .archive-session-button {
+    right: 34px;
+  }
+  .session-row .session-item {
+    padding-right: 100px;
+  }
+  .history-row .session-item {
+    padding-right: 68px;
+  }
+  .tree-fork {
+    visibility: visible;
+  }
+}
