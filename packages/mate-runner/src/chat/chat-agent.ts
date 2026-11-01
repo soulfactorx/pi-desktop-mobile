@@ -8,7 +8,7 @@ import { isolationDirOf, runPi as defaultRunPi, type PiLaunch } from "../executo
 import type { MatePaths } from "../paths";
 import { folderAlias, parseCommand } from "../remote/messages";
 import { addRequest, dutyIdFrom, listDuties, listRuns, loadConfig, readJson, saveConfig, saveDuty, setInboxStatus, writeJsonAtomic } from "../store";
-import { enableWebSearch, WEB_SEARCH, webSearchOn } from "./web-search";
+import { enableWebSearch, webChoices, webSearchOn, webSetup } from "./web-search";
 import { localDateKey } from "../schedule";
 import { CHAT_DUTY_ID, type Duty } from "../types";
 import { askPermission } from "../permission";
@@ -243,9 +243,13 @@ export class ChatAgent {
     const permission = question?.permission;
     if (!question || !permission) return false;
     const text = request.text.trim();
-    const allow = text === PERMISSION_OPTIONS[0] || /^(예|네|응|허용(?!하지|\s*안)|(yes|y|ok)(\s|$))/i.test(text);
+    // 선택지가 여럿인 질문(웹 검색을 어떤 방법으로 켤지)은 고른 것만 허용한다. 번호로 답해도 된다
+    const choices = permission.choices ?? [];
+    const picked = choices.find((c) => c.label === text) ?? (/^\d+$/.test(text) ? choices[Number(text) - 1] : undefined);
+    const allow = choices.length ? Boolean(picked) : text === PERMISSION_OPTIONS[0] || /^(예|네|응|허용(?!하지|\s*안)|(yes|y|ok)(\s|$))/i.test(text);
     const deny = text === PERMISSION_OPTIONS[1] || /^(아니|아뇨|거절|허용하지|허용\s*안|(no|n)(\s|$))/i.test(text);
     if (!allow && !deny) return false;
+    if (picked) Object.assign(permission, { commands: picked.commands, ...(picked.mcpServers ? { mcpServers: picked.mcpServers } : {}) });
     // 버튼을 두 번 눌렀거나 앱·휴대폰에서 함께 답했으면 처음 답만 따른다
     if (lines.filter((l) => l.answerTo === question.id && l.role === "user").length > 1) {
       await this.say(request.source, "이미 답한 질문이에요.", "notice");
@@ -264,7 +268,7 @@ export class ChatAgent {
         ...(permission.mcpServers?.length ? { chatMcpServers: [...new Set([...config.chatMcpServers, ...permission.mcpServers])] } : {}),
       });
       this.options.log(`chat permission granted chat tools=${permission.commands.join(",")} servers=${(permission.mcpServers ?? []).join(",")}`);
-      const done = permission.mcpServers?.length ? "✅ 웹 검색을 켰어요." : `✅ 대화에서 ${permission.commands.join(", ")}을(를) 허용했어요.`;
+      const done = permission.mcpServers?.length || picked ? "✅ 웹 검색을 켰어요." : `✅ 대화에서 ${permission.commands.join(", ")}을(를) 허용했어요.`;
       if (!permission.retry) {
         await this.say(request.source, `${done} 다시 말씀해 주시면 써 볼게요.`, "notice");
         return true;
@@ -415,26 +419,34 @@ export class ChatAgent {
       }
       case "enable_web": {
         if (await webSearchOn(paths)) return "🌐 웹 검색은 이미 켜져 있어요.";
+        // 특정 서비스를 정해 넣지 않는다: 이미 있는 것부터 고르게 하고, 다른 방법은 알린다 (DESIGN-APPS.md §3.5 4단계)
+        const choices = await webChoices(paths);
+        const retry = this.currentRequest ? { retry: this.currentRequest } : {};
+        const text = [
+          choices.length > 1 ? "이 일에는 인터넷 검색이 필요해요. 어떤 방법으로 웹 검색을 켤까요?" : "이 일에는 인터넷 검색이 필요해요. 웹 검색을 켤까요?",
+          ...choices.map((c) => `• ${c.label}: ${c.detail}`),
+          "다른 방법: 스킬·MCP 탭에서 키가 필요한 검색 서버(Brave·Tavily)를 넣거나, 웹 검색 확장(예: pi-web-access)을 설치할 수 있어요.",
+          "켜면 대화와 임무에서 날씨·뉴스·검색을 쓸 수 있어요. 설정 탭에서 언제든 끌 수 있어요.",
+        ].join("\n");
+        const one = choices.length === 1 ? choices[0]! : undefined;
         const asked = await appendChatQuestion(
           paths.chat,
-          {
-            text: [
-              "이 일에는 인터넷 검색이 필요해요. 웹 검색을 켤까요?",
-              `• ${WEB_SEARCH.label}: 검색어와 읽을 웹 페이지 주소가 ${WEB_SEARCH.host}로 나가요. 파일이나 대화 내용은 보내지 않아요.`,
-              "켜면 대화와 임무에서 날씨·뉴스·검색을 쓸 수 있어요. 설정 탭에서 언제든 끌 수 있어요.",
-            ].join("\n"),
-            options: [...PERMISSION_OPTIONS],
-            dutyId: CHAT_DUTY_ID,
-            permission: {
-              dutyId: CHAT_DUTY_ID,
-              commands: WEB_SEARCH.tools,
-              mcpServers: [WEB_SEARCH.server],
-              ...(this.currentRequest ? { retry: this.currentRequest } : {}),
-            },
-          },
+          one
+            ? {
+                text,
+                options: [...PERMISSION_OPTIONS],
+                dutyId: CHAT_DUTY_ID,
+                permission: { dutyId: CHAT_DUTY_ID, commands: one.commands, ...(one.mcpServers ? { mcpServers: one.mcpServers } : {}), ...retry },
+              }
+            : {
+                text,
+                options: [...choices.map((c) => c.label), PERMISSION_OPTIONS[1]],
+                dutyId: CHAT_DUTY_ID,
+                permission: { dutyId: CHAT_DUTY_ID, commands: [], choices: choices.map((c) => ({ label: c.label, commands: c.commands, ...(c.mcpServers ? { mcpServers: c.mcpServers } : {}) })), ...retry },
+              },
           this.now(),
         );
-        return asked ? "🌐 웹 검색을 켤지 위의 질문에서 골라 주세요." : "🌐 웹 검색을 켤지 묻는 질문이 이미 있어요. 위에서 골라 주세요.";
+        return asked ? "🌐 웹 검색을 어떻게 켤지 위의 질문에서 골라 주세요." : "🌐 웹 검색을 켤지 묻는 질문이 이미 있어요. 위에서 골라 주세요.";
       }
       case "create_duty": {
         const config = await loadConfig(paths);
@@ -442,9 +454,13 @@ export class ChatAgent {
         const folder = str("folder") ? await this.resolveFolder(str("folder")) : await this.workspace();
         if (!folder) return `⚠️ 폴더 "${str("folder")}"을(를) 모르겠어요. 경로를 알려 주세요.`;
         const web = action.web === true;
-        if (web) await enableWebSearch(paths, [WEB_SEARCH.server]);
-        // 대화에서 이미 웹 검색을 허용했으면 임무에도 허용해 둔다 (같은 것을 두 번 묻지 않게)
-        const webGrants = web ? WEB_SEARCH.tools.filter((t) => config.chatGrants.includes(t)) : [];
+        // 대화에서 켠 웹 검색(서버·확장 도구)을 임무에도 쓴다. 허용한 도구도 함께 (같은 것을 두 번 묻지 않게)
+        const setup = web ? await webSetup(paths) : undefined;
+        if (web && !setup) {
+          const asked = await this.doAction({ action: "enable_web" }, source);
+          return `⚠️ 웹 검색이 아직 켜져 있지 않아 임무를 만들지 않았어요. ${asked} 켠 뒤 다시 말씀해 주세요.`;
+        }
+        const webGrants = setup?.grants ?? [];
         const trigger = parseSchedulePhrase(str("schedule"));
         if (!trigger) return `⚠️ 실행 시점 "${str("schedule")}"을(를) 이해하지 못했어요.`;
         const name = str("name") || str("prompt").slice(0, 40);
@@ -458,12 +474,12 @@ export class ChatAgent {
           prompt: str("prompt"),
           profile,
           trigger,
-          ...(web ? { mcpServers: [WEB_SEARCH.server] } : {}),
+          ...(setup?.mcpServers.length ? { mcpServers: setup.mcpServers } : {}),
           ...(webGrants.length ? { grants: webGrants } : {}),
           createdAt: this.now(),
         });
         const where = str("folder") ? ` (${folderAlias(duty.cwd)})` : "";
-        const webNote = web && webGrants.length < WEB_SEARCH.tools.length ? " 처음 실행할 때 웹 검색을 허용할지 물어요." : "";
+        const webNote = web && webGrants.length === 0 ? " 처음 실행할 때 웹 검색을 허용할지 물어요." : "";
         return `🗓 임무를 만들었어요: ${duty.name}${where}.${webNote} 임무 탭에서 고칠 수 있어요.`;
       }
       case "pause":
