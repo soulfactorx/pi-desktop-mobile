@@ -11,7 +11,7 @@ import { MarketplacePanel } from "./MarketplacePanel";
 import { CopyResourceDialog, type CopyItem } from "./CopyResourceDialog";
 import { ContextCopyDialog } from "./ContextCopyDialog";
 import { PackageCopyDialog } from "./PackageCopyDialog";
-import { hasReloadCommand, RELOAD_COMMAND } from "./resources-view";
+import { ENABLE_TOOLS_COMMAND, hasReloadCommand, RELOAD_COMMAND } from "./resources-view";
 import { TerminalDock, type DockTerminal } from "./TerminalDock";
 import type { TerminalSpec } from "./TerminalView";
 import { updateState } from "./pi-manager-view";
@@ -352,6 +352,10 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
     if (chat.running) throw new Error("작업 중에는 반영할 수 없습니다. 끝난 뒤 다시 누르세요.");
     const response = await window.piDesktop.sendCommand(hostId, sessionId, { type: "prompt", message: `/${RELOAD_COMMAND}` });
     if (response.success !== true) throw new Error(`반영하지 못했습니다: ${String(response.error ?? "알 수 없는 오류")}`);
+    // 이어 연 세션은 기록된 툴 목록을 지키므로, 나중에 설치한 확장의 툴은 다시 불러와도 꺼져 있다. 그 툴들을 켠다.
+    if (list.some((c) => c.name === ENABLE_TOOLS_COMMAND)) {
+      await window.piDesktop.sendCommand(hostId, sessionId, { type: "prompt", message: `/${ENABLE_TOOLS_COMMAND}` }).catch(() => undefined);
+    }
     // 새로 만든 프롬프트·스킬이 / 자동완성에 보이도록 명령 목록을 다시 읽게 한다.
     setCommands(undefined);
   }, [hostId, sessionId, chat.running]);
@@ -645,7 +649,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
       {
         id: "session-restart",
         group: "세션",
-        title: "세션 새로고침 (Pi를 다시 띄워 모델·인증을 새로 읽기)",
+        title: "세션 새로고침 (Pi를 다시 띄워 모델·인증·확장을 새로 읽기)",
         keywords: "restart refresh reload login model auth",
         disabled: !ready || chat.running || readOnly,
         run: () => void guard(restartSession),
@@ -780,7 +784,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
         return;
       case "reload":
         await reloadSessionResources();
-        setInfo("확장·스킬·프롬프트·컨텍스트를 다시 불러왔습니다.");
+        setInfo("확장·스킬·프롬프트·컨텍스트를 다시 불러왔습니다. 꺼져 있던 확장 툴이 있으면 함께 켰습니다.");
         return;
       case "settings":
         setPiManagerTab("settings");
@@ -1521,8 +1525,13 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
           onRunPi={(args, title, projectCwd, onSuccess) =>
             runPi(args, title, projectCwd, () => {
               onSuccess?.();
-              // 확장이 더하는 툴은 이미 대화가 있는 세션을 이어 열어도 생기지 않을 수 있다 (기록된 툴 목록을 지키는 확장)
-              setInfo("설치했습니다. 새 확장의 툴은 새 세션에서 쓰세요. 이미 대화가 있는 세션은 다시 열어도 예전 툴 목록 그대로일 수 있습니다.");
+              // 보고 있는 세션에 바로 불러오고 새 확장의 툴을 켠다 (다시 불러오기). 못 하면 방법을 알린다.
+              const tip = "보고 있는 세션에 쓰려면 /reload (리소스 › 다시 불러오기)를 하세요. 새 확장의 툴도 켜집니다.";
+              if (session && !lost && !readOnly && !chat.running && (projectCwd === undefined || projectCwd === session.cwd)) {
+                void reloadSessionResources()
+                  .then(() => setInfo("설치한 확장을 이 세션에 불러왔습니다. 새 확장의 툴도 켰습니다."))
+                  .catch(() => setInfo(`설치했습니다. ${tip}`));
+              } else setInfo(`설치했습니다. ${tip}`);
             })
           }
           onClose={() => setMarketOpen(false)}

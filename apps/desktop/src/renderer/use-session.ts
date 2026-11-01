@@ -8,6 +8,7 @@ import type {
   WriterState,
 } from "@pi-desktop/host-protocol/messages";
 import type { AttachResult, ConnectionState, HostDescriptor, OpenSessionRequest } from "../shared/api";
+import { ENABLE_TOOLS_COMMAND } from "./resources-view";
 import { trustPlan, type TrustAnswer } from "./project-trust";
 import { addNotice, applyEvent, initialChatState, snapshotState, type ChatState } from "./chat-state";
 import {
@@ -605,8 +606,15 @@ export function useSession(tabId: string = MAIN_TAB) {
         exists && current.sessionFile ? { cwd: current.cwd, sessionFile: current.sessionFile } : { cwd: current.cwd },
       );
       await refreshSessions();
-      if (created) await switchTo(created);
-      else {
+      if (created) {
+        await switchTo(created);
+        // 이어 연 세션은 기록된 툴 목록을 지켜, 나중에 설치한 확장의 툴이 꺼져 있다. bridge로 켠다.
+        const listed = await api().sendCommand(hostRef.current, created.sessionId, { type: "get_commands" }).catch(() => undefined);
+        const names = ((listed?.data as { commands?: Array<{ name: string }> } | undefined)?.commands ?? []).map((c) => c.name);
+        if (names.includes(ENABLE_TOOLS_COMMAND)) {
+          await api().sendCommand(hostRef.current, created.sessionId, { type: "prompt", message: `/${ENABLE_TOOLS_COMMAND}` }).catch(() => undefined);
+        }
+      } else {
         sessionRef.current = undefined;
         setSession(undefined);
         dispatch({ type: "reset" });

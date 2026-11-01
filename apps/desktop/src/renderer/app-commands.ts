@@ -32,7 +32,7 @@ export const APP_SLASH_COMMANDS: AppSlashCommand[] = [
   { name: "clone", description: "지금 위치까지를 새 세션으로 복제" },
   { name: "copy", description: "마지막 답변 복사" },
   { name: "export", description: "HTML로 내보내기" },
-  { name: "reload", description: "확장·스킬·프롬프트·컨텍스트 다시 불러오기" },
+  { name: "reload", description: "확장·스킬·프롬프트·컨텍스트 다시 불러오기 (설치한 확장의 툴도 켬)" },
   { name: "settings", description: "설정 (Pi 관리 → 설정)" },
   { name: "login", args: "[provider]", description: "프로바이더 로그인 (Pi 관리 → 프로바이더)" },
   { name: "logout", description: "자격 증명 지우기 (Pi 관리 → 프로바이더)" },
