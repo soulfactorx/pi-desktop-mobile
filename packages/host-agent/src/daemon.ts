@@ -176,6 +176,8 @@ export class AgentDaemon {
   private readonly startedAt = Date.now();
   private readonly clients = new Set<Client>();
   private readonly sessions = new Map<string, AgentSession>();
+  /** 이 데몬의 세션이 쓰다 닫은 세션 파일 → 닫은 뒤의 수정 시각. 곧바로 다시 열 때 "다른 곳에서 쓰는 중"으로 묻지 않게 한다 */
+  private readonly closedFiles = new Map<string, number>();
   /** 세션별 입력 권한(writer)을 가진 연결 id (설계 §3.4). 없으면 아무도 없다 */
   private readonly writers = new Map<string, number>();
   private readonly files = new FileWatcher();
@@ -610,6 +612,7 @@ export class AgentDaemon {
         modified: info?.mtimeMs ?? 0,
       };
       if (owner) result.ownedBy = owner.id;
+      else if (info && this.closedFiles.has(path) && info.mtimeMs <= this.closedFiles.get(path)!) result.closedHere = true;
       return result;
     });
 
@@ -795,9 +798,11 @@ export class AgentDaemon {
       const session = this.requireSession((params as SessionRef)?.sessionId);
       // 닫으면 Pi가 끝나 다른 앱의 작업도 끝나므로 입력 권한이 있어야 한다.
       this.requireWriter(client, session.id);
+      const file = session.summary().sessionFile;
       this.sessions.delete(session.id);
       this.writers.delete(session.id);
       await session.stop();
+      await this.rememberClosed(file);
       for (const c of this.clients) c.attached.delete(session.id);
       this.log(`세션 닫음 ${session.id}`);
       this.scheduleIdleCheck();
@@ -1020,12 +1025,22 @@ export class AgentDaemon {
     });
     session.onExit((exit) => {
       this.log(`Pi 종료 ${session.id} code=${exit.exitCode} signal=${exit.signal}`);
+      void this.rememberClosed(session.summary().sessionFile);
       const notification: SessionExitNotification = { sessionId: session.id, ...exit };
       for (const client of this.clients) {
         if (client.attached.has(session.id)) client.peer.notify(Notifications.sessionExit, notification);
       }
       this.scheduleIdleCheck();
     });
+  }
+
+  /** 이 데몬의 세션이 쓰다 닫은 파일과 그때의 수정 시각을 기억한다 */
+  private async rememberClosed(file: string | undefined): Promise<void> {
+    if (!file) return;
+    const info = await stat(file).catch(() => undefined);
+    if (!info) return;
+    this.closedFiles.set(file, info.mtimeMs);
+    if (this.closedFiles.size > 200) this.closedFiles.delete(this.closedFiles.keys().next().value!);
   }
 
   private requireSession(sessionId: string | undefined): AgentSession {

@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { appendFile, stat, utimes } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   Methods,
@@ -108,6 +108,18 @@ describe("TUI와 병행 사용 (외부 Pi 프로세스)", () => {
 
     const owned = await client.request<StoredInspectResult>(Methods.storedInspect, { path: session.sessionFile });
     expect(owned.ownedBy).toBe(session.sessionId);
+
+    // 이 데몬이 쓰다 닫은 파일은 곧바로 다시 열어도 "다른 곳에서 쓰는 중"이 아니다
+    await client.request(Methods.sessionClose, { sessionId: session.sessionId });
+    const closed = await client.request<StoredInspectResult>(Methods.storedInspect, { path: session.sessionFile });
+    expect(closed.ownedBy).toBeUndefined();
+    expect(closed.closedHere).toBe(true);
+    // 닫은 뒤 다른 곳에서 바뀌면 다시 묻는다
+    await new Promise((r) => setTimeout(r, 20));
+    await appendFile(session.sessionFile!, "");
+    await utimes(session.sessionFile!, new Date(), new Date(Date.now() + 5000));
+    const touched = await client.request<StoredInspectResult>(Methods.storedInspect, { path: session.sessionFile });
+    expect(touched.closedHere).toBeUndefined();
   });
 
   it("sessionFile과 forkFrom을 함께 주면 거부한다", async () => {

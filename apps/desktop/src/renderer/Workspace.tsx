@@ -1518,7 +1518,13 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
           hostId={hostId}
           hostLabel={hostLabel}
           {...(resourcesCwd ? { cwd: resourcesCwd } : {})}
-          onRunPi={runPi}
+          onRunPi={(args, title, projectCwd, onSuccess) =>
+            runPi(args, title, projectCwd, () => {
+              onSuccess?.();
+              // 확장이 더하는 툴은 이미 대화가 있는 세션을 이어 열어도 생기지 않을 수 있다 (기록된 툴 목록을 지키는 확장)
+              setInfo("설치했습니다. 새 확장의 툴은 새 세션에서 쓰세요. 이미 대화가 있는 세션은 다시 열어도 예전 툴 목록 그대로일 수 있습니다.");
+            })
+          }
           onClose={() => setMarketOpen(false)}
         />
       )}
