@@ -46,7 +46,7 @@ describe("Electron 대체 모듈 (web-shell)", () => {
     expect(app.getVersion()).toBe("1.0.0");
   });
 
-  it("Notification: 보는 탭이 없으면 click id와 함께 웹 푸시로 보내고, 누르면 click 처리를 한 번 부른다", () => {
+  it("Notification: 보는 탭이 없으면 click id와 함께 웹 푸시로 보내고, 누를 때마다 click 처리를 부른다 (새로 읽힌 화면이 다시 보낼 수 있다)", () => {
     const sent: Array<{ title: string; clickId?: string }> = [];
     onBackgroundNotify((note) => sent.push(note));
     const controls: unknown[] = [];
@@ -60,8 +60,11 @@ describe("Electron 대체 모듈 (web-shell)", () => {
     expect(id).toBeTruthy();
     expect(controls[0]).toMatchObject({ kind: "notify", title: "답이 끝났습니다", clickId: id });
     clickNotification(id);
-    clickNotification(id);
     expect(clicked).toBe(1);
+    clickNotification(id);
+    expect(clicked).toBe(2);
+    clickNotification("unknown");
+    expect(clicked).toBe(2);
     // click이 없으면 id도 없다
     new Notification({ title: "t" }).show();
     expect(sent[1]!.clickId).toBeUndefined();
