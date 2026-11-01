@@ -4,6 +4,7 @@ import { StatusLine, Widgets } from "../vendor/renderer/ExtensionUi";
 import { acceptsImages, MAX_IMAGE_BYTES, splitAttachments, withAttachments } from "./attachments";
 import { canReadClipboard, enterHint, isSendKey, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages, submitOnEnterUp } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
+import { ComposerGrip, useComposerSize } from "./composer-size";
 import type { ImageAttachment } from "../shared/api";
 import { EXAMPLES } from "./examples";
 import { FolderMenu } from "./FolderMenu";
@@ -60,6 +61,7 @@ export function ChatPage({
   useDraftImages(session ? `agent:${session.sessionId}` : undefined, images, setImages);
   const [attachNote, setAttachNote] = useState<string>();
   const input = useRef<HTMLTextAreaElement>(null);
+  const { gripProps } = useComposerSize(input, draft, "pi-agent:composer-height");
   const imageInput = useRef<HTMLInputElement>(null);
   const [pasteBox, setPasteBox] = useState(false);
 
@@ -312,15 +314,18 @@ export function ChatPage({
         />
       )}
       <div className="composer">
-        <textarea
-          ref={input}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-          disabled={!session || !connected}
-          placeholder={session ? enterHint("메시지 입력 (Enter 전송, Shift+Enter 줄바꿈, 이미지는 붙여 넣기도 됩니다)") : "먼저 새 대화를 여세요"}
-        />
+        <div className="composer-field">
+          <ComposerGrip {...gripProps} />
+          <textarea
+            ref={input}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            disabled={!session || !connected}
+            placeholder={session ? enterHint("메시지 입력 (Enter 전송, Shift+Enter 줄바꿈, 이미지는 붙여 넣기도 됩니다)") : "먼저 새 대화를 여세요"}
+          />
+        </div>
         <div className="actions">
           {chat.running && <button onClick={() => guard(agent.abort)}>중지</button>}
           <button
