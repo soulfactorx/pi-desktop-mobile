@@ -1036,3 +1036,8 @@ button.danger {
     padding: 4px 6px;
   }
 }
+
+/* 이름 바꾸기 form 은 배치에 영향을 주지 않는다 */
+.rename-form {
+  display: contents;
+}

@@ -3,6 +3,7 @@ import type { SessionSummary, StoredSession } from "@pi-desktop/host-protocol/me
 import { baseName, formatRelative } from "./format";
 import { matchesQuery, normalizeSessionName } from "./session-search";
 import { visibleHistory, type BinTab } from "./session-bin";
+import { submitOnEnterUp } from "./clipboard-images";
 
 type Scope = "folder" | "all";
 const SCOPE_KEY = "pi-desktop.historyScope";
@@ -148,9 +149,8 @@ export function Sidebar(props: Props) {
     if (name && onRename) await onRename(name);
   };
   const onRenameKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === "Enter") void commitRename(e.currentTarget.value);
-    else if (e.key === "Escape") setEditing(undefined);
+    // Enter 는 form 제출로 처리한다: 휴대폰 한글 키보드는 조합 중 Enter 를 keydown 으로 주지 않는다
+    if (!e.nativeEvent.isComposing && e.key === "Escape") setEditing(undefined);
   };
 
   return (
@@ -177,15 +177,27 @@ export function Sidebar(props: Props) {
           if (isCurrent && editing !== undefined) {
             return (
               <div key={s.sessionId} className="session-item current editing">
-                <input
-                  className="rename-input"
-                  defaultValue={editing}
-                  autoFocus
-                  aria-label="세션 이름"
-                  onKeyDown={onRenameKey}
-                  onBlur={(e) => void commitRename(e.currentTarget.value)}
-                  onFocus={(e) => e.currentTarget.select()}
-                />
+                <form
+                  className="rename-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.elements.namedItem("name");
+                    if (input instanceof HTMLInputElement) void commitRename(input.value);
+                  }}
+                >
+                  <input
+                    name="name"
+                    className="rename-input"
+                    defaultValue={editing}
+                    autoFocus
+                    enterKeyHint="done"
+                    onKeyUp={submitOnEnterUp}
+                    aria-label="세션 이름"
+                    onKeyDown={onRenameKey}
+                    onBlur={(e) => void commitRename(e.currentTarget.value)}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </form>
                 <span className="session-meta-line">Enter 저장 · Esc 취소</span>
               </div>
             );

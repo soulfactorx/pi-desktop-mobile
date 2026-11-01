@@ -161,3 +161,12 @@ export function enterHint(text: string): string {
   if (!touchTyping()) return text;
   return text.replace(/Enter (전송|보내기), Shift\+Enter 줄바꿈/, "Enter 줄바꿈, 보내기 버튼으로 전송");
 }
+
+/**
+ * 한 줄 입력창(이름 바꾸기 등)을 form 안에 두고 onKeyUp 에 단다.
+ * 휴대폰 한글 키보드는 조합 중 누른 Enter 를 keydown 으로 주지 않거나 조합 중으로 표시해 keydown 처리만으로는 저장되지 않는다.
+ * keyup 은 조합이 끝난 뒤 오므로 여기서 form 을 제출한다 (keydown 으로 이미 제출됐으면 입력창이 사라져 다시 오지 않는다).
+ */
+export function submitOnEnterUp(e: { key: string; keyCode?: number; nativeEvent: { isComposing?: boolean }; currentTarget: HTMLInputElement }): void {
+  if ((e.key === "Enter" || e.keyCode === 13) && !e.nativeEvent.isComposing) e.currentTarget.form?.requestSubmit();
+}
