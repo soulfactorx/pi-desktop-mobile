@@ -84,3 +84,23 @@ describe("설치 제안 적용", () => {
     await expect(applyInstall(paths, await propose({ kind: "copy", from: "pi-desktop", name: "none" }), env)).rejects.toThrow(/찾지 못했습니다/);
   });
 });
+
+describe("프롬프트·패키지 설치 제안", () => {
+  it("프롬프트는 prompts/<이름>.md로 넣고 같은 이름은 덮어쓰지 않는다", async () => {
+    const { paths, propose } = await setup();
+    const content = "---\ndescription: 하루 정리\n---\n오늘 한 일을 정리해";
+    expect(await applyInstall(paths, await propose({ kind: "prompt", name: "daily", content }))).toContain("/daily");
+    expect(readFileSync(join(paths.home, "prompts", "daily.md"), "utf8")).toContain("오늘 한 일");
+    await expect(applyInstall(paths, await propose({ kind: "prompt", name: "daily", content }))).rejects.toThrow(/덮어쓰지/);
+  });
+
+  it("패키지는 앱이 준 설치 함수로 설치하고, 없으면(휴대폰 메시지) 앱에서 적용하라고 한다", async () => {
+    const { paths, env, propose } = await setup();
+    const installed: string[] = [];
+    const id = await propose({ kind: "package", source: "npm:pi-web-access" });
+    await expect(applyInstall(paths, id, env)).rejects.toThrow(/앱에서 적용/);
+    expect(await applyInstall(paths, id, env, async (source) => (installed.push(source), { ok: true, output: "" }))).toContain("pi-web-access");
+    expect(installed).toEqual(["npm:pi-web-access"]);
+    expect(await describeInstall({ kind: "package", source: "npm:pi-web-access" })).toContain("코드를 실행");
+  });
+});

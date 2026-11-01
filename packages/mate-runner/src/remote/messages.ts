@@ -58,7 +58,17 @@ export function itemText(item: InboxItem, dutyName: string): string {
   }
   if (item.followUp) lines.push("", `맡길 일: ${safe(item.followUp.prompt, 300)}`);
   if (item.install) {
-    const what = item.install.kind === "skill" ? `새 스킬 ${item.install.name}` : item.install.kind === "mcp" ? `MCP 서버 ${item.install.preset}` : `${item.install.from === "agent" ? "Agent" : "Pi Desktop"} 스킬 ${item.install.name} 복사`;
+    const install = item.install;
+    const what =
+      install.kind === "skill"
+        ? `새 스킬 ${install.name}`
+        : install.kind === "mcp"
+          ? `MCP 서버 ${install.preset}`
+          : install.kind === "copy"
+            ? `${install.from === "agent" ? "Agent" : "Pi Desktop"} 스킬 ${install.name} 복사`
+            : install.kind === "prompt"
+              ? `새 프롬프트 /${install.name}`
+              : `Pi 패키지 ${install.source} (앱에서 적용)`;
     lines.push("", `설치 제안: ${safe(what, 120)}. 적용하면 Mate에 넣습니다 ("자세히"로 내용 확인)`);
   }
   return lines.join("\n");

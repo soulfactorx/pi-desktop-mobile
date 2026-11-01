@@ -158,7 +158,11 @@ export interface ChangeInfo {
 export type InstallProposal =
   | { kind: "skill"; name: string; content: string }
   | { kind: "mcp"; preset: string }
-  | { kind: "copy"; from: "pi-desktop" | "agent"; name: string };
+  | { kind: "copy"; from: "pi-desktop" | "agent"; name: string }
+  /** 프롬프트 템플릿 (Mate 홈 prompts/<이름>.md 전체: frontmatter description + 본문) */
+  | { kind: "prompt"; name: string; content: string }
+  /** Pi 패키지 설치 (npm:이름, git:주소, https 주소). 도구는 처음 쓸 때 다시 허용을 묻는다 */
+  | { kind: "package"; source: string };
 
 /** inbox.jsonl 한 줄. 한 번 쓰면 바꾸지 않는다 (상태는 inbox-state.json) */
 export interface InboxItem {

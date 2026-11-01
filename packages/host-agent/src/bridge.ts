@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * pi-desktop-bridge 확장 (설계 §5.3).
@@ -97,6 +98,31 @@ export async function ensureBridge(dir: string): Promise<string> {
   await mkdir(dir, { recursive: true });
   const tmp = `${path}.${process.pid}.tmp`;
   await writeFile(tmp, BRIDGE_SOURCE, "utf8");
+  await rename(tmp, path);
+  return path;
+}
+
+/**
+ * 확장 관리 툴 (resources_list·resource_save·mcp_server·pi_package 등, DESIGN-APPS.md §3.5 3단계).
+ * 소스는 packages/pi-resources/extensions/manage.ts 하나이고, 번들할 때 문자열로 넣는다 (데몬은 파일 하나만 싣는다).
+ * 개발·시험에서는 번들 전이라 워크스페이스의 파일을 읽는다.
+ */
+declare const __MANAGE_EXTENSION_SOURCE__: string | undefined;
+
+export function manageSource(): string {
+  if (typeof __MANAGE_EXTENSION_SOURCE__ === "string") return __MANAGE_EXTENSION_SOURCE__;
+  return readFileSync(fileURLToPath(new URL("../../pi-resources/extensions/manage.ts", import.meta.url)), "utf8");
+}
+
+/** 내용 해시를 이름에 넣은 관리 확장 파일을 dir에 두고 그 경로를 돌려준다 */
+export async function ensureManage(dir: string): Promise<string> {
+  const source = manageSource();
+  const hash = createHash("sha256").update(source).digest("hex").slice(0, 12);
+  const path = join(dir, `pi-desktop-manage-${hash}.ts`);
+  if (existsSync(path)) return path;
+  await mkdir(dir, { recursive: true });
+  const tmp = `${path}.${process.pid}.tmp`;
+  await writeFile(tmp, source, "utf8");
   await rename(tmp, path);
   return path;
 }

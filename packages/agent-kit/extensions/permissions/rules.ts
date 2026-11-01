@@ -101,6 +101,20 @@ export function classify(toolName: string, input: Record<string, unknown>): Clas
     const target = `${userSkillsDir().replace(/\\/g, "/")}/${name}/SKILL.md`;
     return { risk: "write", request: { toolName, risk: "write", summary: input.replace ? "스킬 고치기" : "스킬 저장", target, pattern: `${userSkillsDir().replace(/\\/g, "/")}/**` } };
   }
+  // 확장 관리 툴 (pi-resources manage 확장, DESIGN-APPS.md §3.5). 앱 홈의 설정을 바꾸므로 쓰기로 묻는다
+  if (toolName === "resources_list") return { risk: "read" };
+  if (toolName === "resource_save" || toolName === "resource_delete") {
+    const kind = input.kind === "skill" ? "스킬" : "프롬프트";
+    const summary = toolName === "resource_delete" ? `${kind} 지우기` : input.replace ? `${kind} 고치기` : `${kind} 저장`;
+    return { risk: "write", request: { toolName, risk: "write", summary, target: `${String(input.name ?? "")}\n${String(input.content ?? "").slice(0, 400)}`, pattern: `${toolName}:*` } };
+  }
+  if (toolName === "mcp_server") {
+    const target = input.action === "add" ? `${String(input.name ?? "")} (${String(input.url ?? [input.command, ...((input.args as unknown[]) ?? [])].join(" "))})` : `${String(input.action)} ${String(input.name ?? "")}`;
+    return { risk: "write", request: { toolName, risk: "write", summary: "MCP 서버 바꾸기", target, pattern: "", onceOnly: true } };
+  }
+  if (toolName === "pi_package") {
+    return { risk: "exec", request: { toolName, risk: "exec", summary: input.action === "remove" ? "Pi 패키지 제거" : "Pi 패키지 설치", target: String(input.source ?? ""), pattern: "", onceOnly: true } };
+  }
   if (toolName === "delegate_to_peer") {
     const peer = String(input.peer ?? "");
     return {

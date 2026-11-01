@@ -161,7 +161,7 @@ export function mateAppApi(ctx: MateAppContext): MateAppApi {
       await delegateInboxItem(paths, String(itemId));
       ctx.wake();
     },
-    applyInstall: (itemId: string) => applyInstall(paths, itemId),
+    applyInstall: (itemId: string) => applyInstall(paths, itemId, process.env, (source) => resources.packageInstall(source)),
     describeInstall: async (itemId: string) => {
       const item = (await readInbox(paths.inbox)).find((i) => i.id === itemId);
       if (!item?.install) throw new Error("설치 제안을 찾지 못했습니다");

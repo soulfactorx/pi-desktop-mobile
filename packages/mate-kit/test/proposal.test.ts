@@ -37,5 +37,9 @@ describe("설치 제안 검사", () => {
     expect(installError({ kind: "mcp", preset: "../x" })).toMatch(/목록/);
     expect(installError({ kind: "copy", from: "agent", name: "weekly-report" })).toBeUndefined();
     expect(installError({ kind: "copy", from: "other" as "agent", name: "a" })).toMatch(/from/);
+    expect(installError({ kind: "prompt", name: "daily", content: "---\ndescription: 하루 정리\n---\n정리해" })).toBeUndefined();
+    expect(installError({ kind: "prompt", name: "Daily", content: "x" })).toMatch(/이름/);
+    expect(installError({ kind: "package", source: "npm:pi-web-access" })).toBeUndefined();
+    expect(installError({ kind: "package", source: "./local; rm -rf /" })).toMatch(/source/);
   });
 });

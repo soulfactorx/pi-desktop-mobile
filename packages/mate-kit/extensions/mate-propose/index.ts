@@ -21,7 +21,7 @@ export default function mateProposeExtension(pi: ExtensionAPI): void {
       description:
         "사용자에게 알릴 발견이나 제안할 다음 행동을 인박스에 남긴다. 사용자는 나중에 읽고 받아들이거나 버린다. " +
         "알릴 만한 것이 있을 때만, 하나의 주제당 한 번 쓴다. 파일을 바꾸거나 명령을 실행하지 않는다. " +
-        "임무에 필요한 스킬이나 MCP 서버가 없으면 install을 붙여 설치를 제안할 수 있다. 사용자가 적용해야 들어간다.",
+        "임무에 필요한 스킬·프롬프트·MCP 서버·Pi 패키지가 없으면 install을 붙여 설치를 제안할 수 있다. 사용자가 적용해야 들어간다.",
       parameters: Type.Object({
         title: Type.String({ description: "한 줄 제목 (예: CI 실패: unit-tests)" }),
         summary: Type.String({ description: "무엇을 발견했고 무엇을 하면 좋은지 2~3문장" }),
@@ -50,8 +50,17 @@ export default function mateProposeExtension(pi: ExtensionAPI): void {
                 from: Type.Union([Type.Literal("pi-desktop"), Type.Literal("agent")]),
                 name: Type.String({ description: "시스템 안내에 적힌 다른 앱의 스킬 이름" }),
               }),
+              Type.Object({
+                kind: Type.Literal("prompt"),
+                name: Type.String({ description: "프롬프트 이름 (영어 소문자·숫자·하이픈, /이름으로 부른다)" }),
+                content: Type.String({ description: "prompts/<이름>.md 전체: ---로 감싼 description 다음에 지시(Markdown)" }),
+              }),
+              Type.Object({
+                kind: Type.Literal("package"),
+                source: Type.String({ description: "Pi 패키지 (npm:이름, git:주소, https 주소). 사용자가 원했거나 꼭 필요할 때만. 코드를 실행하므로 무엇인지 summary에 밝힌다" }),
+              }),
             ],
-            { description: "설치 제안: 새 스킬 초안, 목록의 MCP 서버 추가, 다른 앱 스킬 복사 중 하나" },
+            { description: "설치 제안: 새 스킬 초안, 목록의 MCP 서버 추가, 다른 앱 스킬 복사, 프롬프트, Pi 패키지 중 하나" },
           ),
         ),
       }),

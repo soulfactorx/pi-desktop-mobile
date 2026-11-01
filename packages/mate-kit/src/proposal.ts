@@ -29,6 +29,18 @@ export function installError(install: InstallProposal): string | undefined {
     case "copy":
       if (install.from !== "pi-desktop" && install.from !== "agent") return "from은 pi-desktop 또는 agent다";
       return skillName(install.name) ? undefined : "복사할 스킬 이름이 올바르지 않다";
+    case "prompt":
+      if (!skillName(install.name)) return "프롬프트 이름은 영어 소문자·숫자·하이픈만 쓴다 (예: weekly-report)";
+      if (!install.content.trim()) return "content가 비어 있다";
+      if (install.content.length > 20_000) return "프롬프트가 너무 길다 (20,000자까지)";
+      return undefined;
+    case "package": {
+      const source = install.source.trim();
+      const ok =
+        !source.includes("..") &&
+        /^(npm:(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*(@[\w.^~<>=*-]+)?|git:[a-z0-9][\w.-]*\/[\w./-]+(@[\w./-]+)?|https:\/\/[a-z0-9][\w.-]*\/[\w./-]+(@[\w./-]+)?)$/i.test(source);
+      return ok ? undefined : "source는 npm:이름, git:주소, https 주소다";
+    }
   }
 }
 

@@ -15,6 +15,10 @@ await build({
   format: "esm",
   target: "node22",
   sourcemap: "linked",
-  define: { __AGENT_VERSION__: JSON.stringify(pkg.version) },
+  define: {
+    __AGENT_VERSION__: JSON.stringify(pkg.version),
+    // 확장 관리 툴의 소스 (Pi가 -e로 불러오도록 데몬이 파일로 써 둔다)
+    __MANAGE_EXTENSION_SOURCE__: JSON.stringify(await readFile(at("../../pi-resources/extensions/manage.ts"), "utf8")),
+  },
   logLevel: "warning",
 });
