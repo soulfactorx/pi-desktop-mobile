@@ -3221,3 +3221,14 @@ details > summary.settings-section {
   padding: 2px 6px;
   font-size: 12px;
 }
+
+/* 터치 화면(마우스 오버가 없음): 줄에 올려야 보이던 단추를 늘 보인다 */
+@media (hover: none) {
+  .rename-button,
+  .close-session-button {
+    opacity: 1;
+  }
+  .tree-fork {
+    visibility: visible;
+  }
+}
