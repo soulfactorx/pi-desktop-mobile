@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } 
 import { ChatView } from "../vendor/renderer/ChatView";
 import { StatusLine, Widgets } from "../vendor/renderer/ExtensionUi";
 import { acceptsImages, MAX_IMAGE_BYTES, splitAttachments, withAttachments } from "./attachments";
-import { canReadClipboard, enterHint, isSendKey, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
+import { canReadClipboard, enterHint, isSendKey, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages, submitOnEnterUp } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import type { ImageAttachment } from "../shared/api";
 import { EXAMPLES } from "./examples";
@@ -188,18 +188,28 @@ export function ChatPage({
           <>
             <div className="chat-title">
               {renaming !== undefined ? (
-                <input
-                  autoFocus
-                  className="rename-input"
-                  value={renaming}
-                  placeholder="대화 이름"
-                  onChange={(e) => setRenaming(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.nativeEvent.isComposing) saveName(renaming);
-                    if (e.key === "Escape") setRenaming(undefined);
+                // Enter 는 form 제출로 처리한다: 휴대폰 한글 키보드는 조합 중 Enter 를 keydown 으로 주지 않는다
+                <form
+                  className="rename-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    saveName(renaming);
                   }}
-                  onBlur={() => saveName(renaming)}
-                />
+                >
+                  <input
+                    autoFocus
+                    className="rename-input"
+                    value={renaming}
+                    placeholder="대화 이름"
+                    enterKeyHint="done"
+                    onKeyUp={submitOnEnterUp}
+                    onChange={(e) => setRenaming(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape" && !e.nativeEvent.isComposing) setRenaming(undefined);
+                    }}
+                    onBlur={() => saveName(renaming)}
+                  />
+                </form>
               ) : (
                 <span className="chat-name">
                   <strong>{title}</strong>
