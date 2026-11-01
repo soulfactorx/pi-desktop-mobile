@@ -5,7 +5,15 @@
  * - 키보드가 열려 있는 동안은 저절로 접고, 닫히면 사용자가 고른 상태로 돌아간다. 키보드가 열린 채 펴면 그대로 둔다
  * 앱 화면을 고치지 않고 웹에서만 덧붙인다.
  */
-export function setupCompactHeader(options: { hide: string[]; anchor: string; key: string }): void {
+export function setupCompactHeader(options: {
+  hide: string[];
+  anchor: string;
+  key: string;
+  /** 이 요소가 보일 때(대화창)만 단추를 보인다 */
+  when: string;
+  /** 이 요소가 보이면(대화상자·메뉴·서랍이 덮으면) 단추를 숨긴다 */
+  blockers?: string;
+}): void {
   const style = document.createElement("style");
   style.textContent = `
 .ws-compact-toggle {
@@ -58,7 +66,14 @@ export function setupCompactHeader(options: { hide: string[]; anchor: string; ke
   };
   /** 펴 있으면 정보 줄 바로 아래, 접혀 있으면 anchor(정보 줄을 담은 화면) 맨 위에 둔다 */
   const place = () => {
-    const visible = (el: HTMLElement) => el.offsetParent !== null;
+    // position: fixed인 요소는 offsetParent가 없으므로 그려진 상자가 있는지로 본다
+    const visible = (el: Element) => el === document.body || el.getClientRects().length > 0;
+    const shown = [...document.querySelectorAll(options.when)].some(visible);
+    const blocked = options.blockers ? [...document.querySelectorAll(options.blockers)].some(visible) : false;
+    if (!shown || blocked) {
+      button.hidden = true;
+      return;
+    }
     const headers = options.hide.flatMap((sel) => [...document.querySelectorAll<HTMLElement>(sel)]).filter(visible);
     const anchor = [...document.querySelectorAll<HTMLElement>(options.anchor)].find(visible);
     let top: number;
@@ -111,7 +126,8 @@ export function setupCompactHeader(options: { hide: string[]; anchor: string; ke
 
   // 화면이 바뀌면(세션을 열거나 닫으면) 단추 자리를 다시 잡는다
   new ResizeObserver(place).observe(document.body);
-  new MutationObserver(() => requestAnimationFrame(place)).observe(document.body, { childList: true, subtree: true });
+  // 서랍·메뉴는 class로 열고 닫으므로 class 바뀜도 본다
+  new MutationObserver(() => requestAnimationFrame(place)).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
   render();
 }
 
