@@ -98,8 +98,19 @@ export function ChatNavigator({
     const needle = text.trim().toLowerCase();
     if (!root || !needle) return [];
     const found: Range[] = [];
+    // 숨긴 요소(display: none 등) 안의 글자는 찾지 않는다. 접힌 칸(details) 안은 찾고, 그리로 갈 때 편다
+    const hidden = new Map<Element, boolean>();
+    const isHidden = (el: Element | null): boolean => {
+      if (!el || el === root) return false;
+      const known = hidden.get(el);
+      if (known !== undefined) return known;
+      const style = getComputedStyle(el);
+      const result = style.display === "none" || style.visibility === "hidden" || isHidden(el.parentElement);
+      hidden.set(el, result);
+      return result;
+    };
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (node) => (self.current?.contains(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+      acceptNode: (node) => (self.current?.contains(node) || isHidden(node.parentElement) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
     });
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const value = (node.nodeValue ?? "").toLowerCase();
@@ -124,6 +135,21 @@ export function ChatNavigator({
     if (ranges[index]) highlights.set("chat-search-current", new HighlightCtor(ranges[index]));
   };
 
+  /** 찾은 곳이 접힌 칸(details) 안이면 펴고, 옆으로 스크롤되는 칸(코드 등) 안이면 옆으로 옮겨 보이게 한다 */
+  const reveal = (range: Range) => {
+    const el = scroller.current;
+    let node: Node | null = range.startContainer;
+    for (; node && node !== el; node = node.parentNode) {
+      if (node instanceof HTMLDetailsElement && !node.open && !node.querySelector(":scope > summary")?.contains(range.startContainer)) node.open = true;
+    }
+    for (let box = range.startContainer.parentElement; box && box !== el; box = box.parentElement) {
+      if (box.scrollWidth <= box.clientWidth + 1) continue;
+      const outer = box.getBoundingClientRect();
+      const rect = range.getBoundingClientRect();
+      if (rect.left < outer.left || rect.right > outer.right) box.scrollLeft += rect.left - outer.left - box.clientWidth / 3;
+    }
+  };
+
   const show = (ranges: Range[], index: number) => {
     setMatches(ranges);
     setCurrent(index);
@@ -131,6 +157,7 @@ export function ChatNavigator({
     const range = ranges[index];
     const el = scroller.current;
     if (!range || !el) return;
+    reveal(range);
     // 이미 보이는 곳이면 움직이지 않는다 (글자를 지우거나 고칠 때 화면이 튀지 않게)
     const box = el.getBoundingClientRect();
     const rect = range.getBoundingClientRect();
