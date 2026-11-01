@@ -249,6 +249,55 @@ describe("ChatAgent", () => {
     expect(duty).toMatchObject({ cwd: join(paths.home, "workspace"), profile: "observe", mcpServers: ["exa"], grants: WEB_SEARCH.tools, trigger: { kind: "daily", time: "07:00" } });
   });
 
+  it("웹 검색은 정해 둔 서비스를 넣지 않고, 설치한 확장이 있으면 그것부터 고르게 한다", async () => {
+    // Mate 홈에 웹 도구가 있는 패키지가 설치되어 있다
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    await mkdir(paths.home, { recursive: true });
+    await writeFile(join(paths.home, "settings.json"), JSON.stringify({ packages: ["npm:pi-web-access"] }));
+    await writeFile(join(paths.home, "package-tools.json"), JSON.stringify({ "npm:pi-web-access": ["web_search", "fetch_content", "source_check"] }));
+    agent = new ChatAgent({
+      paths,
+      kitDir,
+      locatePi: async () => ({ cliPath: "pi" }),
+      exec: noGit,
+      log: () => {},
+      runPi: (async (_l: unknown, input: RunInput) => {
+        calls.push(input);
+        if (calls.length === 1) await appendChatAction(input.chat!.actionsPath, { action: "enable_web" });
+        return { status: "done", costUsd: 0, tokens: 1, proposals: 0, summary: calls.length === 1 ? "웹 검색이 필요해요" : "서울은 맑아요" };
+      }) as never,
+    });
+    // 웹 검색이 꺼져 있으면 임무를 만들지 않고 켤지 묻는다
+    expect(await agent.doAction({ action: "create_duty", name: "아침 날씨", prompt: "날씨", schedule: "daily 07:00", web: true }, "app")).toMatch(/만들지 않았어요/);
+    expect((await listDuties(paths)).some((d) => d.name === "아침 날씨")).toBe(false);
+    const first = (await readChat(paths.chat)).find((l) => l.kind === "question")!;
+    expect(first.options).toEqual(["설치한 확장으로 켜기", "Exa로 켜기 (키 없이)", PERMISSION_OPTIONS[1]]);
+    expect(first.text).toContain("Brave·Tavily");
+    agent.submit({ text: PERMISSION_OPTIONS[1], source: "app", answerTo: first.id });
+    await agent.whenIdle();
+    expect((await loadConfig(paths)).chatGrants).toEqual([]);
+
+    agent.submit({ text: "오늘 서울 날씨 어때?", source: "app" });
+    await agent.whenIdle();
+    const question = (await readChat(paths.chat)).filter((l) => l.kind === "question").at(-1)!;
+    expect(question.permission?.choices?.map((c) => c.label)).toEqual(["설치한 확장으로 켜기", "Exa로 켜기 (키 없이)"]);
+    agent.submit({ text: "설치한 확장으로 켜기", source: "app", answerTo: question.id });
+    await agent.whenIdle();
+    const config = await loadConfig(paths);
+    // Exa는 넣지 않고, 확장의 웹 도구만 허용한다
+    expect(config.chatMcpServers).toEqual([]);
+    expect(config.chatGrants).toEqual(["ext__web_search", "ext__fetch_content"]);
+    expect(existsSync(paths.mcp)).toBe(false);
+    expect(calls.at(-1)!.duty).toMatchObject({ prompt: "오늘 서울 날씨 어때?", grants: ["ext__web_search", "ext__fetch_content"] });
+    expect(await agent.doAction({ action: "enable_web" }, "app")).toMatch(/이미 켜져/);
+
+    // 임무도 같은 웹 도구를 쓴다 (MCP 서버 없이)
+    expect(await agent.doAction({ action: "create_duty", name: "아침 날씨", prompt: "날씨", schedule: "daily 07:00", profile: "observe", web: true }, "app")).toMatch(/만들었어요/);
+    const duty = (await listDuties(paths)).find((d) => d.name === "아침 날씨")!;
+    expect(duty.mcpServers).toBeUndefined();
+    expect(duty.grants).toEqual(["ext__web_search", "ext__fetch_content"]);
+  });
+
   it("대화에서 막힌 MCP 도구를 허용하면 방금 요청에 다시 답한다", async () => {
     await saveConfig(paths, { chatMcpServers: ["github"] });
     agent.submit({ text: "열린 PR 알려 줘", source: "app" });

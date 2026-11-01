@@ -129,7 +129,14 @@ export interface ChatLine {
    * - mcpServers: 허용하면 함께 켤 MCP 서버 (대화가 "웹 검색 켜기"를 물을 때. 없으면 mcp.json에 넣는다)
    * - retry: 대화에서 물었으면, 허용한 뒤 다시 답할 사용자의 요청
    */
-  permission?: { dutyId: string; commands: string[]; mcpServers?: string[]; retry?: string };
+  permission?: {
+    dutyId: string;
+    commands: string[];
+    mcpServers?: string[];
+    retry?: string;
+    /** 고를 것이 여럿이면 (예: 웹 검색을 어떤 방법으로 켤지) 선택지마다 허용할 것. 질문의 options가 label과 "허용하지 않음"이다 */
+    choices?: Array<{ label: string; commands: string[]; mcpServers?: string[] }>;
+  };
   /** 사용자가 이 말과 함께 보낸 이미지 수 */
   images?: number;
 }
