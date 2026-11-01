@@ -22,6 +22,13 @@ import { join } from "node:path";
 /** 앱이 보내는 명령 이름 (/desktop:reload) */
 export const RELOAD_COMMAND = "desktop:reload";
 
+/**
+ * 확장 툴 켜기 명령 (/desktop:enable-tools).
+ * 이어 연 세션은 기록된 툴 목록을 지키므로, 나중에 설치한 확장의 툴은 Pi를 다시 띄우거나 다시 불러와도 꺼진 채로 있다.
+ * 앱은 다시 불러온 뒤 이 명령으로 켜져 있지 않은 확장 툴(내장 툴 제외)을 켠다. 켠 툴은 세션 기록에 남는다.
+ */
+export const ENABLE_TOOLS_COMMAND = "desktop:enable-tools";
+
 /** Windows bash 명령 앞에 붙여 콘솔 출력을 UTF-8로 바꾸는 줄. 실행에만 붙고, 대화에 남는 명령(툴 인자·!명령)은 원래 것이다 */
 export const UTF8_PREFIX = "chcp.com 65001 > /dev/null 2>&1";
 
@@ -59,6 +66,24 @@ export default function (pi: any) {
       }
       // reload 뒤에는 예전 확장 런타임의 ctx를 쓰면 안 되므로 여기서 끝낸다.
       await ctx.reload();
+    },
+  });
+
+  pi.registerCommand("${ENABLE_TOOLS_COMMAND}", {
+    description: "Pi Desktop: 설치한 확장의 툴 중 꺼져 있는 것을 이 세션에서 켭니다",
+    handler: async (_args: string, ctx: any) => {
+      if (!pi.getAllTools || !pi.getActiveTools || !pi.setActiveTools) return;
+      if (!ctx.isIdle()) {
+        ctx.ui.notify("작업 중에는 툴을 바꿀 수 없습니다. 끝난 뒤 다시 시도하세요", "warning");
+        return;
+      }
+      const active = new Set((pi.getActiveTools() as any[]).map((t: any) => (typeof t === "string" ? t : t.name)));
+      const added = (pi.getAllTools() as any[])
+        .filter((t: any) => t.sourceInfo?.source !== "builtin" && !active.has(t.name))
+        .map((t: any) => t.name);
+      if (added.length === 0) return;
+      pi.setActiveTools([...active, ...added]);
+      ctx.ui.notify("확장 툴을 켰습니다: " + added.join(", "), "info");
     },
   });
 }

@@ -3,9 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Methods, type SessionOpenResult, type SessionSummary } from "@pi-desktop/host-protocol";
-import { BRIDGE_SOURCE, ensureBridge, RELOAD_COMMAND } from "../src/bridge";
+import { BRIDGE_SOURCE, ENABLE_TOOLS_COMMAND, ensureBridge, RELOAD_COMMAND } from "../src/bridge";
 import { isolatedEnv, TestClient } from "./helpers/agent-client";
 import { MOCK_MODEL_ARGS, PI_CLI, setupRealPi, type RealPiFixture } from "./helpers/real-pi";
+
+async function waitUntil(check: () => boolean, timeoutMs = 20_000): Promise<void> {
+  const start = Date.now();
+  while (!check()) {
+    if (Date.now() - start > timeoutMs) throw new Error("대기 시간 초과");
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
 
 describe("ensureBridge", () => {
   it("내용 해시 이름으로 한 번만 쓴다", async () => {
@@ -15,6 +23,7 @@ describe("ensureBridge", () => {
     expect(existsSync(path)).toBe(true);
     expect(await ensureBridge(dir)).toBe(path);
     expect(BRIDGE_SOURCE).toContain(`"${RELOAD_COMMAND}"`);
+    expect(BRIDGE_SOURCE).toContain(`"${ENABLE_TOOLS_COMMAND}"`);
   });
 });
 
@@ -63,6 +72,51 @@ describe("bridge 확장 (실제 Pi)", () => {
     expect(response).toMatchObject({ success: true, data: { disposition: "handled" } });
     expect(await commandNames()).toContain("fresh");
     expect(fixture.llm.requests.length).toBe(requestsBefore);
+  });
+
+  it("확장을 넣기 전에 대화한 세션을 다시 열면 그 툴이 꺼져 있고, /desktop:enable-tools로 켠다", async () => {
+    const toolNames = () => {
+      const body = fixture.llm.requests.at(-1) as { tools?: Array<{ function?: { name?: string } }> } | undefined;
+      return (body?.tools ?? []).map((t) => t.function?.name);
+    };
+    const settledCount = () =>
+      client.events.filter((n) => n.sessionId === session.sessionId && (n.event as { type?: string }).type === "agent_settled").length;
+    const ask = async (message: string) => {
+      const before = settledCount();
+      await send({ type: "prompt", message });
+      await waitUntil(() => settledCount() > before);
+    };
+    await ask("확장 넣기 전");
+    expect(toolNames()).not.toContain("late_tool");
+    const state = await send<{ data: { sessionFile: string } }>({ type: "get_state" });
+
+    // 프로젝트 확장은 신뢰가 있어야 불러오므로 사용자 폴더에 둔다
+    const extensions = join(fixture.piEnv.PI_CODING_AGENT_DIR!, "extensions");
+    mkdirSync(extensions, { recursive: true });
+    writeFileSync(
+      join(extensions, "late-tool.ts"),
+      `export default function (pi: any) {
+  pi.registerTool({ name: "late_tool", label: "Late", description: "나중에 넣은 툴", parameters: { type: "object", properties: {} },
+    async execute() { return { content: [{ type: "text", text: "ok" }], details: {} }; } });
+}
+`,
+    );
+    // 세션을 닫고 같은 파일로 다시 연다: 기록된 툴 목록을 지켜 새 확장의 툴이 꺼져 있다
+    await client.request(Methods.sessionClose, { sessionId: session.sessionId });
+    ({ session } = await client.request<SessionOpenResult>(Methods.sessionOpen, {
+      cwd: fixture.projectDir,
+      sessionFile: state.data.sessionFile,
+      piArgs: MOCK_MODEL_ARGS,
+      env: fixture.piEnv,
+    }));
+    await client.request(Methods.sessionAttach, { sessionId: session.sessionId, lastSeq: 0 });
+    await ask("다시 연 뒤");
+    expect(toolNames()).not.toContain("late_tool");
+
+    const response = await send<{ success: boolean }>({ type: "prompt", message: `/${ENABLE_TOOLS_COMMAND}` });
+    expect(response.success).toBe(true);
+    await ask("툴 켠 뒤");
+    expect(toolNames()).toContain("late_tool");
   });
 
   // 한국어 Windows의 기본 명령은 CP949로 출력해 UTF-8로 읽으면 깨진다. bridge가 chcp 65001을 붙인다.

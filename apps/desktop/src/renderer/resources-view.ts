@@ -130,6 +130,9 @@ export function isDeletable(item: { path: string; fromPackage?: boolean; scope: 
 /** Pi Desktop bridge 확장의 다시 불러오기 명령 (데몬 bridge.ts와 같은 이름) */
 export const RELOAD_COMMAND = "desktop:reload";
 
+/** bridge 확장의 확장 툴 켜기 명령 (데몬 bridge.ts와 같은 이름). 이어 연 세션에서 나중에 설치한 확장의 툴을 켠다 */
+export const ENABLE_TOOLS_COMMAND = "desktop:enable-tools";
+
 /**
  * 세션에 bridge가 들어 있는지. 앱 업데이트 전에 연 세션에는 없다.
  * 없는 세션에 "/desktop:reload"를 보내면 Pi가 일반 질문으로 LLM에 보내므로, 보내기 전에 꼭 확인한다.
