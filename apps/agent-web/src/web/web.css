@@ -21,9 +21,24 @@
 }
 
 @media (max-width: 720px) {
+  /*
+   * 위쪽 띠 자리는 #root의 안쪽 여백으로 둔다. .agent-shell의 margin-top은 #root(높이 100vh) 밖으로 새어
+   * 문서가 띠 높이만큼 길어졌고, 그래서 화면 전체가 위로 밀려 스크롤됐다 (키보드를 열고 닫은 뒤 등)
+   */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100dvh;
+    padding-top: var(--ws-bar);
+    box-sizing: border-box;
+  }
+
   .agent-shell {
-    height: calc(100dvh - var(--ws-bar));
-    margin-top: var(--ws-bar);
+    height: 100%;
   }
 
   /* 옆 메뉴: 화면 밖에 두었다가 ☰로 꺼낸다. 열렸을 때 transform을 없애야 안의 폴더 메뉴(position: fixed)가 화면 기준으로 뜬다 */
