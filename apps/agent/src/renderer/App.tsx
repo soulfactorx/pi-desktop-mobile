@@ -146,7 +146,12 @@ export function App() {
     if (sessionId === session?.sessionId) return;
     const open = await window.piAgent.listSessions();
     const target = open.find((s) => s.sessionId === sessionId);
-    if (target) await agent.attachTo(target);
+    // 알림을 보낸 대화가 그 사이 닫혔으면 (앱·서버를 다시 띄운 경우 등) 지난 대화에서 고르게 한다
+    if (!target) {
+      openHistory("history");
+      throw new Error("알림을 보낸 대화가 이미 닫혔습니다. 지난 대화에서 다시 열 수 있습니다.");
+    }
+    await agent.attachTo(target);
   };
 
   const moveToPicked = async () => {
