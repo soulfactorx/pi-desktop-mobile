@@ -690,8 +690,9 @@ button.small {
 
 .composer textarea {
   flex: 1;
-  resize: vertical;
+  resize: none;
   min-height: 60px;
+  overflow-y: auto;
 }
 
 .actions {
@@ -4144,4 +4145,34 @@ details > summary.settings-section {
 
 .usage-table th {
   white-space: nowrap;
+}
+
+/* 입력창 높이: 글에 맞춰 늘어나고, 위 손잡이로 직접 조절한다 (composer-size.tsx) */
+.composer-grip {
+  align-self: center;
+  width: 44px;
+  height: 14px;
+  margin: -6px 0 -2px;
+  cursor: ns-resize;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composer-grip::before {
+  content: "";
+  width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.composer-grip:hover::before {
+  background: var(--muted);
+}
+
+/* 세로로 쌓인 칸 안에서는 flex가 높이를 정하지 않게 한다 (글에 맞춘 높이를 쓴다) */
+.composer-input textarea {
+  flex: none;
 }

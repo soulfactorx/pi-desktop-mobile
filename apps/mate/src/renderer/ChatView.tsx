@@ -8,6 +8,7 @@ import { costLabel, formatTokens, relativeTime } from "./mate-view";
 import { canReadClipboard, enterHint, isSendKey, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import { ChatNavigator } from "./ChatNavigator";
+import { ComposerGrip, useComposerSize } from "./composer-size";
 
 /** 한 번에 보낼 수 있는 이미지 (실행기와 같은 한도) */
 const MAX_IMAGES = 4;
@@ -37,6 +38,8 @@ type Entry = { kind: "line"; at: number; line: ChatLine } | { kind: "item"; at: 
 export function ChatView({ overview, now, act }: { overview: Overview; now: number; act: Act }) {
   const { chat } = overview;
   const [text, setText] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { gripProps } = useComposerSize(inputRef, text, "pi-mate:composer-height");
   const [answerTo, setAnswerTo] = useState<ChatLine>();
   const [sending, setSending] = useState(false);
   const [images, setImages] = useState<ChatImage[]>([]);
@@ -208,20 +211,24 @@ export function ChatView({ overview, now, act }: { overview: Overview; now: numb
           />
         )}
         <div className="chat-row">
-          <textarea
-            value={text}
-            rows={2}
-            placeholder={answerTo ? "답을 쓰세요" : enterHint("Mate에게 말하기 (Enter 보내기, Shift+Enter 줄바꿈, /로 명령)")}
-            onChange={(e) => setText(e.target.value)}
-            onPaste={onPaste}
-            onKeyDown={(e) => {
-              // PC는 Enter로 보내고, 휴대폰은 Enter가 줄바꿈이다 (보내기 버튼·Ctrl+Enter로 보낸다)
-              if (isSendKey(e.nativeEvent)) {
-                e.preventDefault();
-                void send(text, answerTo?.id, true);
-              }
-            }}
-          />
+          <div className="composer-field">
+            <ComposerGrip {...gripProps} />
+            <textarea
+              ref={inputRef}
+              value={text}
+              rows={2}
+              placeholder={answerTo ? "답을 쓰세요" : enterHint("Mate에게 말하기 (Enter 보내기, Shift+Enter 줄바꿈, /로 명령)")}
+              onChange={(e) => setText(e.target.value)}
+              onPaste={onPaste}
+              onKeyDown={(e) => {
+                // PC는 Enter로 보내고, 휴대폰은 Enter가 줄바꿈이다 (보내기 버튼·Ctrl+Enter로 보낸다)
+                if (isSendKey(e.nativeEvent)) {
+                  e.preventDefault();
+                  void send(text, answerTo?.id, true);
+                }
+              }}
+            />
+          </div>
           <div className="chat-buttons">
             <button className="primary" disabled={(!text.trim() && images.length === 0) || sending} onClick={() => void send(text, answerTo?.id, true)}>
               보내기

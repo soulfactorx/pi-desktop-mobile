@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type 
 import { formatBytes, parseDataUrl, rejectReason, toDataUrl, type ImageAttachment } from "./attachments";
 import { canReadClipboard, enterHint, isSendKey, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
+import { ComposerGrip, useComposerSize } from "./composer-size";
 import {
   atQuery,
   fileMention,
@@ -73,6 +74,7 @@ export function Composer(props: ComposerProps) {
   const [attachError, setAttachError] = useState<string | undefined>();
   const [dragging, setDragging] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const { gripProps } = useComposerSize(textarea, value, "pi-desktop:composer-height");
   const imageInput = useRef<HTMLInputElement>(null);
   const [pasteBox, setPasteBox] = useState(false);
   // 휴대폰 웹앱으로 공유한 이미지(스크린샷 등)는 지금 보이는 탭의 입력창에 붙인다
@@ -340,6 +342,7 @@ export function Composer(props: ComposerProps) {
           onClose={() => setPasteBox(false)}
         />
       )}
+      <ComposerGrip {...gripProps} />
       <textarea
         ref={textarea}
         placeholder={enterHint(placeholder)}
