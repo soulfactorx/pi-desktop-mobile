@@ -3873,9 +3873,9 @@ details > summary.settings-section {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* 터치 화면(마우스 오버가 없음): 세션 줄의 ✎·🗑·📦·✕와 트리의 분기 단추를 늘 보이고, 손가락으로 누르기 좋게 키운다.
+/* 터치 화면(마우스 오버가 없거나 손가락이 주 입력. S펜 기기는 hover가 있다고 알린다): 세션 줄의 ✎·🗑·📦·✕와 트리의 분기 단추를 늘 보이고, 손가락으로 누르기 좋게 키운다.
    단추가 이름·시각 글자를 가리지 않게 줄 오른쪽을 비운다 */
-@media (hover: none) {
+@media (hover: none), (pointer: coarse) {
   .rename-button,
   .close-session-button,
   .delete-session-button,

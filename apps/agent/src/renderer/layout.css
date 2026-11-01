@@ -1030,7 +1030,7 @@ button.danger {
 }
 
 /* 터치 화면(마우스 오버가 없음): 열린 대화의 아카이브·삭제를 늘 보인다 */
-@media (hover: none) {
+@media (hover: none), (pointer: coarse) {
   .nav-sessions li .nav-act {
     visibility: visible;
     padding: 4px 6px;
