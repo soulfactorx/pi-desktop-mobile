@@ -91,6 +91,8 @@ export const Methods = {
   archiveSet: "archive.set",
   /** 에이전트 앱의 데이터 함수(agent-kit app-api)를 이 호스트에서 부른다. 데몬 홈이 Agent 홈이다 (DESIGN-APPS.md §6 D4) */
   agentCall: "agent.call",
+  /** Pi 세션 폴더의 기간별 토큰·비용 (Pi Desktop 사용량 화면) */
+  usageSummary: "usage.summary",
   storedRead: "stored.read",
   storedWatch: "stored.watch",
   storedUnwatch: "stored.unwatch",
@@ -992,6 +994,11 @@ export interface TrashEmptyParams {
 
 export interface TrashEmptyResult {
   removed: number;
+}
+
+export interface UsageSummaryParams {
+  /** "today" | "7d" | "30d" | "12m" (agent-kit UsageRange) */
+  range: string;
 }
 
 export interface AgentCallParams {

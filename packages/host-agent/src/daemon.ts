@@ -89,6 +89,7 @@ import {
   type StoredReadResult,
   type StoredSession,
   type AgentCallParams,
+  type UsageSummaryParams,
   type ArchiveSetParams,
   type TrashEmptyParams,
   type TrashEmptyResult,
@@ -125,6 +126,7 @@ import { deleteResource, inspectImported, moveToBackup, readImported, type Delet
 import { emptyTrash, listTrash, moveToTrash, restoreFromTrash } from "./session-trash";
 import { loadArchive, setArchived } from "./session-archive";
 import { appApi } from "@pi-desktop/agent-kit/app-api";
+import { rangeBuckets, readSessionUsage, summarizeUsage, type UsageRange } from "@pi-desktop/agent-kit/usage";
 import { exportResource } from "./resource-export";
 import { FileIndex } from "./file-search";
 import { FileWatcher } from "./file-watcher";
@@ -647,6 +649,19 @@ export class AgentDaemon {
       const removed = await emptyTrash(agentHome(this.env), p.ids).catch(invalidParams);
       this.log(`휴지통 비움 ${removed}개`);
       return { removed };
+    });
+
+    // 사용량: 이 호스트의 Pi 세션 폴더(Pi Desktop·TUI 대화)에서 기간별 토큰·비용을 센다 (Agent 사용량 화면과 같은 집계)
+    peer.handle(Methods.usageSummary, async (params): Promise<unknown> => {
+      const range = (params as UsageSummaryParams | undefined)?.range;
+      if (range !== "today" && range !== "7d" && range !== "30d" && range !== "12m") {
+        throw new JsonRpcError(ErrorCodes.InvalidParams, "range는 today·7d·30d·12m 중 하나여야 합니다");
+      }
+      const now = new Date();
+      const { from } = rangeBuckets(range as UsageRange, now);
+      const agentDir = this.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+      const sessionsDir = this.env.PI_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
+      return summarizeUsage(await readSessionUsage(sessionsDir, from, "chat"), range as UsageRange, now);
     });
 
     // 에이전트 앱의 데이터 (설계 DESIGN-APPS.md §4 Agent ③). 데몬 홈이 Agent 홈이고 그 아래 data/가 agent-kit 상태 폴더다.

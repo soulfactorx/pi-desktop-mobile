@@ -139,6 +139,8 @@ export interface ChatLine {
   };
   /** 사용자가 이 말과 함께 보낸 이미지 수 */
   images?: number;
+  /** Mate 답이 이 차례에 쓴 토큰·비용 (모델을 부른 답만) */
+  usage?: { tokens: number; costUsd: number };
 }
 
 export type Severity = "info" | "warn" | "action";

@@ -64,6 +64,7 @@ export const WEB_MENU: WebMenuGroup[] = [
       command("pi-providers", "프로바이더·로그인"),
       command("pi-settings", "설정"),
       command("marketplace", "Marketplace"),
+      command("usage", "사용량"),
       command("terminal-pi", "터미널: pi 열기"),
       command("terminal-shell", "터미널: 셸 열기"),
     ],

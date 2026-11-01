@@ -21,6 +21,7 @@ const HANDLED = {
     "session-restart",
     "pi-manager",
     "marketplace",
+    "usage",
     "terminal-pi",
     "terminal-shell",
     "event-inspector",

@@ -3232,3 +3232,49 @@ details > summary.settings-section {
     visibility: visible;
   }
 }
+
+/* 컴팩션·갈래 요약: 눌러서 요약문을 펼친다 */
+.notice-detail > summary {
+  cursor: pointer;
+}
+
+.notice-detail[open] > summary {
+  margin-bottom: 6px;
+}
+
+.notice-detail-body {
+  white-space: normal;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+/* bash 툴: 실행한 명령 전체 */
+.shell-command {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2);
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.shell-prompt,
+.shell-timeout {
+  color: var(--muted);
+}
+
+/* 메시지 시각·토큰 사용량 (메시지 아래 작은 글씨) */
+.msg-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: normal;
+}
+
+.msg.user .msg-meta {
+  text-align: right;
+}

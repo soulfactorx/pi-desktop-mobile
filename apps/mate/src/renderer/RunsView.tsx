@@ -3,7 +3,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Overview, RunRecord, TranscriptItem } from "../shared/api";
 import type { Act } from "./App";
-import { costLabel, durationLabel, PROFILE_LABELS, REASON_LABELS, relativeTime, STATUS_LABELS } from "./mate-view";
+import { costLabel, durationLabel, formatTokens, PROFILE_LABELS, REASON_LABELS, relativeTime, STATUS_LABELS } from "./mate-view";
 
 /** 최근 실행 기록 (새것부터) */
 export function RunsView({ overview, now, act }: { overview: Overview; now: number; act: Act }) {
@@ -47,7 +47,7 @@ function RunRow({ run, now, onView, onDelete }: { run: RunRecord; now: number; o
           {relativeTime(run.startedAt, now)} · {REASON_LABELS[run.reason]} · {PROFILE_LABELS[run.profile].name}
         </span>
         <span className="muted right">
-          {[durationLabel(run), costLabel(run.costUsd), run.proposals ? `제안 ${run.proposals}건` : "", run.model].filter(Boolean).join(" · ")}
+          {[durationLabel(run), run.tokens ? `토큰 ${formatTokens(run.tokens)}` : "", costLabel(run.costUsd), run.proposals ? `제안 ${run.proposals}건` : "", run.model].filter(Boolean).join(" · ")}
         </span>
         {run.sessionId && run.status !== "running" && (
           <button className="small" onClick={onView}>

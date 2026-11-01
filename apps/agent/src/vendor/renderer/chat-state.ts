@@ -23,6 +23,8 @@ export type ChatItem =
       kind: "user";
       key: string;
       text: string;
+      /** 보낸 시각 (ms, Pi 메시지 timestamp) */
+      at?: number;
       /** 함께 보낸 이미지 (Pi ImageContent: base64와 MIME 형식) */
       images?: Array<{ mimeType: string; data: string }>;
     }
@@ -33,6 +35,10 @@ export type ChatItem =
       done: boolean;
       stopReason?: string;
       errorMessage?: string;
+      /** 응답이 끝난 시각 (ms) */
+      at?: number;
+      /** 이 응답 한 번에 쓴 토큰·비용 (Pi Usage) */
+      usage?: MessageUsage;
     }
   | {
       kind: "tool";
@@ -48,7 +54,47 @@ export type ChatItem =
       /** 툴별 부가 정보 (예: edit의 diff·patch). 툴 카드가 해석한다 */
       details?: unknown;
     }
-  | { kind: "notice"; key: string; level: "info" | "error"; text: string };
+  | {
+      kind: "notice";
+      key: string;
+      level: "info" | "error";
+      text: string;
+      /** 눌러서 펼쳐 보는 내용 (컴팩션·갈래 요약의 요약문, Markdown) */
+      detail?: string;
+    };
+
+/** 응답 하나의 토큰 사용량 (Pi Usage 중 화면에 쓰는 부분) */
+export interface MessageUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  /** 비용 합계 (달러). 모르면 없음 */
+  cost?: number;
+}
+
+/** Pi 메시지의 usage를 읽는다. 숫자가 아니면 0으로 본다 */
+export function messageUsage(value: unknown): MessageUsage | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const u = value as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const usage: MessageUsage = {
+    input: num(u.input),
+    output: num(u.output),
+    cacheRead: num(u.cacheRead),
+    cacheWrite: num(u.cacheWrite),
+    totalTokens: num(u.totalTokens),
+  };
+  if (!usage.totalTokens) usage.totalTokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
+  const cost = (u.cost as { total?: unknown } | undefined)?.total;
+  if (typeof cost === "number" && Number.isFinite(cost)) usage.cost = cost;
+  return usage.totalTokens > 0 ? usage : undefined;
+}
+
+function messageTime(message: AnyEvent): number | undefined {
+  return typeof message.timestamp === "number" && message.timestamp > 0 ? message.timestamp : undefined;
+}
 
 /** Steer·Follow-up으로 보내 두고 아직 Pi가 처리하지 않은 메시지 (queue_update) */
 export interface PendingQueue {
@@ -101,7 +147,8 @@ export function applyEvent(state: ChatState, seq: number, raw: unknown): ChatSta
     case "message_start": {
       const message = event.message as AnyEvent | undefined;
       if (message?.role === "user") {
-        return { ...next, items: [...next.items, { kind: "user", key: `u${seq}`, ...userContent(message.content) }] };
+        const at = messageTime(message);
+        return { ...next, items: [...next.items, { kind: "user", key: `u${seq}`, ...userContent(message.content), ...(at ? { at } : {}) }] };
       }
       if (message?.role === "assistant") {
         return { ...next, items: [...next.items, { kind: "assistant", key: `a${seq}`, blocks: [], done: false }] };
@@ -122,6 +169,10 @@ export function applyEvent(state: ChatState, seq: number, raw: unknown): ChatSta
         const updated = { ...item, blocks: blocksFromContent(message.content), done: true };
         if (typeof message.stopReason === "string") updated.stopReason = message.stopReason;
         if (typeof message.errorMessage === "string") updated.errorMessage = message.errorMessage;
+        const at = messageTime(message);
+        if (at) updated.at = at;
+        const usage = messageUsage(message.usage);
+        if (usage) updated.usage = usage;
         return updated;
       });
     }
@@ -205,13 +256,14 @@ export function applyEvent(state: ChatState, seq: number, raw: unknown): ChatSta
       return withNotice(next, `c${seq}`, "info", `컨텍스트를 요약(컴팩션)하는 중… (${COMPACTION_REASONS[String(event.reason)] ?? "요청"})`);
 
     case "compaction_end": {
-      const result = event.result as { tokensBefore?: number; estimatedTokensAfter?: number } | undefined;
+      const result = event.result as { tokensBefore?: number; estimatedTokensAfter?: number; summary?: unknown } | undefined;
       if (result) {
         return withNotice(
           next,
           `c${seq}`,
           "info",
           `요약 완료: ${formatTokens(result.tokensBefore)} → 약 ${formatTokens(result.estimatedTokensAfter)} 토큰`,
+          summaryText(result.summary),
         );
       }
       if (event.aborted === true) return withNotice(next, `c${seq}`, "info", "요약을 중단했습니다.");
@@ -279,8 +331,13 @@ const COMPACTION_REASONS: Record<string, string> = {
   overflow: "컨텍스트 초과",
 };
 
-function withNotice(state: ChatState, key: string, level: "info" | "error", text: string): ChatState {
-  return { ...state, items: [...state.items, { kind: "notice", key, level, text }] };
+function withNotice(state: ChatState, key: string, level: "info" | "error", text: string, detail?: string): ChatState {
+  return { ...state, items: [...state.items, { kind: "notice", key, level, text, ...(detail ? { detail } : {}) }] };
+}
+
+/** 요약문이 있으면 앞뒤 공백을 지워 돌려준다 */
+function summaryText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 /**
@@ -301,9 +358,11 @@ export function snapshotState(messages: unknown[], lastSeq: number, running: boo
     const message = raw as AnyEvent;
     const key = `s${index}`;
     switch (message.role) {
-      case "user":
-        items.push({ kind: "user", key, ...userContent(message.content) });
+      case "user": {
+        const at = messageTime(message);
+        items.push({ kind: "user", key, ...userContent(message.content), ...(at ? { at } : {}) });
         break;
+      }
       case "assistant": {
         const item: Extract<ChatItem, { kind: "assistant" }> = {
           kind: "assistant",
@@ -313,6 +372,10 @@ export function snapshotState(messages: unknown[], lastSeq: number, running: boo
         };
         if (typeof message.stopReason === "string") item.stopReason = message.stopReason;
         if (typeof message.errorMessage === "string") item.errorMessage = message.errorMessage;
+        const at = messageTime(message);
+        if (at) item.at = at;
+        const usage = messageUsage(message.usage);
+        if (usage) item.usage = usage;
         items.push(item);
         // 툴 호출은 결과가 올 때까지 실행 중으로 둔다.
         const calls = Array.isArray(message.content) ? (message.content as AnyEvent[]) : [];
@@ -356,11 +419,20 @@ export function snapshotState(messages: unknown[], lastSeq: number, running: boo
           ...(typeof message.exitCode === "number" ? { exitCode: message.exitCode } : {}),
         });
         break;
-      case "compactionSummary":
-        items.push({ kind: "notice", key, level: "info", text: "이전 대화가 요약(컴팩션)되었습니다." });
+      case "compactionSummary": {
+        const detail = summaryText(message.summary);
+        const before = typeof message.tokensBefore === "number" ? ` (${formatTokens(message.tokensBefore)} 토큰)` : "";
+        items.push({ kind: "notice", key, level: "info", text: `이전 대화가 요약(컴팩션)되었습니다${before}.`, ...(detail ? { detail } : {}) });
         break;
+      }
+      case "branchSummary": {
+        // 트리에서 다른 위치로 옮기며 떠난 갈래의 요약
+        const detail = summaryText(message.summary);
+        items.push({ kind: "notice", key, level: "info", text: "떠난 갈래의 요약", ...(detail ? { detail } : {}) });
+        break;
+      }
       default:
-        // custom, branchSummary 등은 M1 후반에 표시 방법을 정한다.
+        // custom 등은 화면에 그리지 않는다.
         break;
     }
   });

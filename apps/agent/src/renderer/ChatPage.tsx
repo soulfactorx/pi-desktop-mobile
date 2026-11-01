@@ -7,7 +7,8 @@ import { ImagePasteBox } from "./ImagePasteBox";
 import type { ImageAttachment } from "../shared/api";
 import { EXAMPLES } from "./examples";
 import { FolderMenu } from "./FolderMenu";
-import type { useAgentSession } from "./use-agent-session";
+import type { SessionStats, useAgentSession } from "./use-agent-session";
+import { formatCost, formatPercent, formatTokens } from "../vendor/renderer/format";
 
 type Session = ReturnType<typeof useAgentSession>;
 
@@ -50,7 +51,7 @@ export function ChatPage({
   prefill?: { text: string; tick: number };
   guard: (action: () => Promise<void>) => void;
 }) {
-  const { session, chat, ui, kit, model, models } = agent;
+  const { session, chat, ui, kit, model, models, stats } = agent;
   const [draft, setDraft] = useState("");
   const [renaming, setRenaming] = useState<string>();
   /** 메시지와 함께 보낼 이미지 (보내면 비운다) */
@@ -250,6 +251,7 @@ export function ChatPage({
               ))}
             </select>
             {kit === "missing" && <span className="badge bad">agent-kit 없음</span>}
+            <SessionUsage stats={stats} />
             <button className="small" onClick={() => guard(agent.close)} title="이 대화의 Pi를 끝냅니다 (기록은 Pi 세션 폴더에 남음)">
               대화 닫기
             </button>
@@ -359,5 +361,42 @@ export function ChatPage({
       <Widgets ui={ui} placement="belowEditor" />
       <StatusLine ui={ui} />
     </div>
+  );
+}
+
+/** 세션의 컨텍스트 사용량과 전체 토큰·비용 (Pi Desktop 상단 바와 같은 모양) */
+function SessionUsage({ stats }: { stats: SessionStats | undefined }) {
+  const usage = stats?.contextUsage;
+  const percent = usage?.percent ?? null;
+  const level = percent === null ? "unknown" : percent >= 85 ? "high" : percent >= 60 ? "mid" : "low";
+  return (
+    <span className="session-usage">
+      <span
+        className={`usage ${level}`}
+        title={
+          usage
+            ? `컨텍스트 ${formatTokens(usage.tokens)} / ${formatTokens(usage.contextWindow)} 토큰` +
+              (percent === null ? " (컴팩션 직후라 다음 응답 뒤에 갱신됩니다)" : "")
+            : "사용량 정보 없음"
+        }
+      >
+        <span className="usage-label">컨텍스트</span>
+        <span className="usage-track">
+          <span className="usage-fill" style={{ width: `${Math.min(100, percent ?? 0)}%` }} />
+        </span>
+        <span className="usage-value">{formatPercent(percent)}</span>
+      </span>
+      <span
+        className="cost"
+        title={
+          stats?.tokens
+            ? `입력 ${formatTokens(stats.tokens.input)} · 출력 ${formatTokens(stats.tokens.output)} · ` +
+              `캐시 읽기 ${formatTokens(stats.tokens.cacheRead)} · 캐시 쓰기 ${formatTokens(stats.tokens.cacheWrite)}`
+            : undefined
+        }
+      >
+        {formatTokens(stats?.tokens?.total)} 토큰 · {formatCost(stats?.cost)}
+      </span>
+    </span>
   );
 }

@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { ChatImage, ChatLine, InboxView, Overview } from "../shared/api";
 import type { Act } from "./App";
 import { InboxCard } from "./InboxPanel";
-import { relativeTime } from "./mate-view";
+import { costLabel, formatTokens, relativeTime } from "./mate-view";
 import { canReadClipboard, enterHint, isSendKey, readBase64, readClipboardImages, transferFiles, useDraftImages, useSharedImages } from "./clipboard-images";
 import { ImagePasteBox } from "./ImagePasteBox";
 import { ChatNavigator } from "./ChatNavigator";
@@ -320,6 +320,7 @@ function ChatBubble({
       <div className="bubble-meta muted">
         {line.cwd ? `${line.cwd} · ` : ""}
         {relativeTime(line.at, now)}
+        {line.usage ? ` · 토큰 ${formatTokens(line.usage.tokens)}${line.usage.costUsd > 0 ? ` · ${costLabel(line.usage.costUsd)}` : ""}` : ""}
         {phone}
       </div>
     </div>

@@ -24,6 +24,7 @@ const api: MateApi = {
   skillDelete: (name) => ipcRenderer.invoke(IpcChannels.skillDelete, name),
   skillOpenFolder: () => ipcRenderer.invoke(IpcChannels.skillOpenFolder),
   listMcp: () => ipcRenderer.invoke(IpcChannels.listMcp),
+  usageSummary: (range: string) => ipcRenderer.invoke(IpcChannels.usageSummary, range),
   addMcpPreset: (id, key) => ipcRenderer.invoke(IpcChannels.addMcpPreset, id, key),
   setMcpEnabled: (name, enabled) => ipcRenderer.invoke(IpcChannels.setMcpEnabled, name, enabled),
   removeMcp: (name) => ipcRenderer.invoke(IpcChannels.removeMcp, name),

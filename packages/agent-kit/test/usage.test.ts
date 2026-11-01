@@ -61,6 +61,9 @@ describe("세션 파일 읽기", () => {
     const records = await readSessionUsage(dir, Date.parse("2026-10-01T00:00:00Z"));
     expect(records.map((r) => `${r.source}:${r.input}`).sort()).toEqual(["chat:1", "chat:5", "schedule:3"]);
     expect(await readSessionUsage(join(dir, "없음"), 0)).toEqual([]);
+    // 쓰임새를 정하면 폴더와 상관없이 모두 그것으로 센다 (Mate 임무 실행 세션)
+    const forced = await readSessionUsage(dir, Date.parse("2026-10-01T00:00:00Z"), "schedule");
+    expect(forced.map((r) => r.source)).toEqual(["schedule", "schedule", "schedule"]);
   });
 });
 

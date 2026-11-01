@@ -10,11 +10,12 @@ import { PhoneView } from "./PhoneView";
 import { InboxPanel } from "./InboxPanel";
 import { splitInbox, STATUS_LABELS } from "./mate-view";
 import { RunsView } from "./RunsView";
+import { UsageView } from "./UsageView";
 import { SettingsView } from "./SettingsView";
 import { TrashView } from "./TrashView";
 import { SkillsMcpView } from "./SkillsMcpView";
 
-type Tab = "chat" | "inbox" | "duties" | "activity" | "runs" | "tools" | "trash" | "phone" | "settings";
+type Tab = "chat" | "inbox" | "duties" | "activity" | "runs" | "usage" | "tools" | "trash" | "phone" | "settings";
 
 /** 화면 전체. Mate 홈의 파일이 바뀔 때마다(실행기·확장이 쓴 것 포함) 다시 읽는다 */
 export function App() {
@@ -116,6 +117,9 @@ export function App() {
           <button className={tab === "runs" ? "active" : ""} onClick={() => setTab("runs")}>
             실행 기록
           </button>
+          <button className={tab === "usage" ? "active" : ""} onClick={() => setTab("usage")}>
+            사용량
+          </button>
           <button className={tab === "tools" ? "active" : ""} onClick={() => setTab("tools")}>
             스킬·MCP
           </button>
@@ -168,6 +172,16 @@ export function App() {
         {tab === "duties" && <DutiesView overview={overview} now={now} act={act} setup={setup} />}
         {tab === "activity" && <ActivityView overview={overview} now={now} act={act} />}
         {tab === "runs" && <RunsView overview={overview} now={now} act={act} />}
+        {tab === "usage" && (
+          <section className="usage-page">
+            <p className="muted small-text">Mate 대화와 임무 실행이 쓴 토큰과 비용입니다 (Mate 홈의 Pi 세션).</p>
+            <UsageView
+              load={(range) => window.mate.usageSummary(range)}
+              onError={(message) => void act(() => Promise.reject(new Error(message)))}
+              sourceLabels={{ chat: "대화", schedule: "임무 실행" }}
+            />
+          </section>
+        )}
         {tab === "tools" && <SkillsMcpView act={act} />}
         {tab === "trash" && <TrashView overview={overview} now={now} act={act} />}
         {tab === "phone" && (

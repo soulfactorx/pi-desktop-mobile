@@ -357,7 +357,7 @@ export class ChatAgent {
       );
       this.addCost(outcome.costUsd);
       const text = outcome.status === "done" ? (outcome.summary ?? "(답이 비었어요)") : `⚠️ 답하지 못했어요: ${outcome.error ?? outcome.status}`;
-      await this.say(request.source, text);
+      await this.say(request.source, text, "reply", outcome.tokens > 0 ? { usage: { tokens: outcome.tokens, costUsd: outcome.costUsd } } : {});
       this.options.log(`chat turn status=${outcome.status} cost=${outcome.costUsd.toFixed(4)}`);
       // 처음 쓰는 MCP 도구가 막혔으면 대화에서 허용할지 묻는다
       await askPermission(paths, duty, runId, blockedPath, this.now(), request.text).catch((error: Error) => this.options.log(`chat permission ask error ${error.message}`));

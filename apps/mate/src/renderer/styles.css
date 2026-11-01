@@ -865,3 +865,128 @@ code.copy {
   font: 12px/1.5 ui-monospace, Consolas, monospace;
   resize: vertical;
 }
+/* 사용량: 기간 버튼, 숫자 칸, 막대 차트(한 계열이라 범례 없음, 표가 같은 내용), 표 */
+.usage-ranges {
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.usage-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.usage-tile {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.usage-tile strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.3em;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-chart {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  /* 세로 flex 안에 있어 창이 낮으면 줄어들어 막대가 사라지므로 높이를 지킨다 */
+  flex-shrink: 0;
+  height: 160px;
+  padding: 8px 0 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.usage-bar-area {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+}
+
+.usage-col:hover .usage-bar-area {
+  background: var(--panel-2);
+}
+
+.usage-bar {
+  width: 100%;
+  max-width: 28px;
+  margin: 0 auto;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+}
+
+.usage-x {
+  height: 18px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.usage-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-table th:first-child,
+.usage-table td:first-child {
+  text-align: left;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-ranges {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.usage-note {
+  font-size: 12px;
+}
+
+.usage-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow-x: auto;
+}
+
+.usage-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.usage-table th {
+  white-space: nowrap;
+}

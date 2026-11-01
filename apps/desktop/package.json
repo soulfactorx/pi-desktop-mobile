@@ -22,6 +22,7 @@
     "dist:web": "npm run build -w @pi-desktop/host-agent && npm run build -w @pi-desktop/mate-runner && node scripts/build-web.mjs --pack"
   },
   "dependencies": {
+    "@pi-desktop/agent-kit": "*",
     "electron-updater": "^6.8.9",
     "node-pty": "^1.1.0"
   },

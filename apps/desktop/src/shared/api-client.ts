@@ -44,6 +44,7 @@ export function createPiDesktopApi(t: ApiTransport, shell: PiDesktopApi["shell"]
     unwatchStored: (hostId, path) => t.invoke(IpcChannels.unwatchStored, hostId, path),
     watchTree: (hostId, watchId, roots) => t.invoke(IpcChannels.watchTree, hostId, watchId, roots),
     playgroundRun: (hostId, params) => t.invoke(IpcChannels.playgroundRun, hostId, params),
+    usageSummary: (hostId, range) => t.invoke(IpcChannels.usageSummary, hostId, range),
     playgroundStop: (hostId, runId) => t.invoke(IpcChannels.playgroundStop, hostId, runId),
     unwatchTree: (hostId, watchId) => t.invoke(IpcChannels.unwatchTree, hostId, watchId),
     openSession: (hostId, request) => t.invoke(IpcChannels.openSession, hostId, request),

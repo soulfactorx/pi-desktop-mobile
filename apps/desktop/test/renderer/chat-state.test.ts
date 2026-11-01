@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEvent, initialChatState, type ChatState } from "../../src/renderer/chat-state";
+import { applyEvent, snapshotState, initialChatState, type ChatState } from "../../src/renderer/chat-state";
 
 /** 이벤트 목록을 seq 1부터 차례로 적용한다. */
 function run(events: unknown[], start: ChatState = initialChatState): ChatState {
@@ -128,6 +128,45 @@ describe("applyEvent", () => {
     const state = applyEvent(initialChatState, 5, { type: "brand_new_event_from_future_pi" });
     expect(state.items).toEqual([]);
     expect(state.lastSeq).toBe(5);
+  });
+});
+
+describe("메시지 시각·토큰 사용량", () => {
+  it("사용자 메시지의 시각과 응답의 시각·사용량을 담는다", () => {
+    const state = run([
+      { type: "message_start", message: { role: "user", content: "안녕", timestamp: 1000 } },
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      {
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "네" }],
+          timestamp: 2000,
+          usage: { input: 10, output: 5, cacheRead: 100, cacheWrite: 2, totalTokens: 117, cost: { total: 0.0012 } },
+        },
+      },
+    ]);
+    expect(state.items[0]).toMatchObject({ kind: "user", at: 1000 });
+    expect(state.items[1]).toMatchObject({
+      kind: "assistant",
+      at: 2000,
+      usage: { input: 10, output: 5, cacheRead: 100, cacheWrite: 2, totalTokens: 117, cost: 0.0012 },
+    });
+  });
+
+  it("스냅샷에서도 시각·사용량을 담고, 사용량이 없으면 두지 않는다", () => {
+    const items = snapshotState(
+      [
+        { role: "user", content: "q", timestamp: 5 },
+        { role: "assistant", content: [{ type: "text", text: "a" }], timestamp: 6, usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3 } },
+        { role: "assistant", content: [{ type: "text", text: "b" }], usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 } },
+      ],
+      1,
+      false,
+    ).items;
+    expect(items[0]).toMatchObject({ at: 5 });
+    expect(items[1]).toMatchObject({ at: 6, usage: { totalTokens: 3 } });
+    expect(items[2]).not.toHaveProperty("usage");
   });
 });
 

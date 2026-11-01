@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { AssistantBlock, ChatItem } from "./chat-state";
+import { formatMessageTime, formatUsageLine } from "./format";
 import { Markdown } from "./markdown/Markdown";
 import { resendCandidate } from "./run-status";
 import { ToolCard, type ToolCardActions } from "./ToolCards";
@@ -72,6 +73,7 @@ function Item({
             </div>
           )}
           {item.text}
+          {item.at !== undefined && <div className="msg-meta">{formatMessageTime(item.at)}</div>}
         </div>
       );
     case "assistant":
@@ -87,6 +89,18 @@ function Item({
             </div>
           )}
           {item.stopReason === "aborted" && <div className="muted">중단됨</div>}
+          {item.done && (item.at !== undefined || item.usage) && (
+            <div
+              className="msg-meta"
+              title={
+                item.usage
+                  ? `입력 ${item.usage.input} · 캐시 쓰기 ${item.usage.cacheWrite} · 캐시 읽기 ${item.usage.cacheRead} · 출력 ${item.usage.output} 토큰`
+                  : undefined
+              }
+            >
+              {[item.at !== undefined ? formatMessageTime(item.at) : "", item.usage ? formatUsageLine(item.usage) : ""].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </div>
       );
     case "tool":
@@ -94,7 +108,17 @@ function Item({
     case "notice":
       return (
         <div className={`notice ${item.level}`}>
-          {item.text}
+          {item.detail ? (
+            // TUI처럼 눌러서 요약 내용을 펼쳐 본다
+            <details className="notice-detail">
+              <summary>{item.text}</summary>
+              <div className="notice-detail-body">
+                <Markdown text={item.detail} />
+              </div>
+            </details>
+          ) : (
+            item.text
+          )}
           {onResend && <ResendButton onClick={onResend} />}
         </div>
       );
