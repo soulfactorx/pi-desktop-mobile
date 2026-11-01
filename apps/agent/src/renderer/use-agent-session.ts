@@ -23,6 +23,17 @@ export interface ModelRef {
   input?: string[];
 }
 
+/** get_session_stats 중 화면에 쓰는 부분 (Pi Desktop use-session-info와 같음) */
+export interface SessionStats {
+  tokens?: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+  cost?: number;
+  /** 컴팩션 직후에는 tokens·percent가 null이다 */
+  contextUsage?: { tokens: number | null; contextWindow: number; percent: number | null };
+}
+
+/** 이 이벤트가 오면 사용량이 바뀌었을 수 있으므로 다시 읽는다 */
+const STATS_REFRESH_ON = new Set(["agent_settled", "compaction_end", "message_end"]);
+
 /** agent-kit이 세션에 올라갔는지 (설계 DESIGN-AGENT.md §2.1) */
 export type KitState = "checking" | "ready" | "missing";
 
@@ -46,9 +57,14 @@ export function useAgentSession() {
   const [kit, setKit] = useState<KitState>();
   const [model, setModel] = useState<ModelRef>();
   const [models, setModels] = useState<ModelRef[]>([]);
+  /** 세션 전체 토큰·비용과 컨텍스트 사용량 */
+  const [stats, setStats] = useState<SessionStats>();
   const sessionRef = useRef<SessionSummary>(undefined);
   /** attach 중에 알림으로 온 이벤트. 결과를 적용한 뒤에 순번으로 걸러 적용한다 */
   const attachQueueRef = useRef<SessionEventNotification[]>(undefined);
+
+  /** 이벤트 리스너가 최신 refreshStats를 부르도록 (리스너는 처음 한 번만 단다) */
+  const statsRef = useRef<(sessionId: string) => void>(() => {});
 
   const applyNotification = useCallback((n: SessionEventNotification, replay: boolean) => {
     setChat((prev) => applyEvent(prev, n.seq, n.event));
@@ -66,6 +82,7 @@ export function useAgentSession() {
       if (n.sessionId !== sessionRef.current?.sessionId) return;
       if (attachQueueRef.current) attachQueueRef.current.push(n);
       else applyNotification(n, false);
+      if (STATS_REFRESH_ON.has(String((n.event as { type?: unknown } | null)?.type))) statsRef.current(n.sessionId);
     });
     const offExit = api().onSessionExit((n) => {
       if (n.sessionId !== sessionRef.current?.sessionId) return;
@@ -91,6 +108,17 @@ export function useAgentSession() {
     setKit(commands.some((c) => c.name === STATUS_COMMAND) ? "ready" : "missing");
   }, []);
 
+  /** 세션 전체 토큰·비용과 컨텍스트 사용량을 읽는다 (실패하면 그대로 둔다) */
+  const refreshStats = useCallback(async (sessionId: string) => {
+    try {
+      const response = await api().sendCommand(sessionId, { type: "get_session_stats" });
+      if (sessionRef.current?.sessionId !== sessionId || response.success !== true) return;
+      setStats(response.data as SessionStats | undefined);
+    } catch {
+      // 세션이 끝났거나 연결이 끊긴 경우. 다음 이벤트에 다시 읽는다
+    }
+  }, []);
+
   /** 세션의 지금 모델과 고를 수 있는 모델을 읽는다 */
   const refreshModel = useCallback(async (sessionId: string) => {
     const state = await api().sendCommand(sessionId, { type: "get_state" });
@@ -108,6 +136,7 @@ export function useAgentSession() {
       setUi(initialExtensionUiState);
       setKit(undefined);
       setModel(undefined);
+      setStats(undefined);
       // attach 이후의 실시간 이벤트가 걸러지지 않도록 대상 세션을 먼저 지정한다.
       sessionRef.current = target;
       setSession(target);
@@ -131,9 +160,9 @@ export function useAgentSession() {
       const messages = await api().sendCommand(target.sessionId, { type: "get_messages" });
       const list = (messages.data as { messages?: unknown[] } | undefined)?.messages ?? [];
       setChat((prev) => (truncated || (prev.items.length === 0 && list.length > 0) ? snapshotState(list, Math.max(prev.lastSeq, lastSeq), prev.running) : prev));
-      await Promise.all([checkKit(target.sessionId), refreshModel(target.sessionId).catch(() => undefined)]);
+      await Promise.all([checkKit(target.sessionId), refreshModel(target.sessionId).catch(() => undefined), refreshStats(target.sessionId)]);
     },
-    [applyNotification, checkKit, refreshModel],
+    [applyNotification, checkKit, refreshModel, refreshStats],
   );
 
   /**
@@ -202,6 +231,7 @@ export function useAgentSession() {
     await api().closeSession(current.sessionId);
     sessionRef.current = undefined;
     setSession(undefined);
+    setStats(undefined);
     setChat(initialChatState);
     setUi(initialExtensionUiState);
     setKit(undefined);
@@ -241,5 +271,6 @@ export function useAgentSession() {
 
   const dismiss = useCallback((key: string) => setUi((prev) => dismissToast(prev, key)), []);
 
-  return { connection, session, opening, chat, ui, kit, model, models, open, attachTo, moveTo, changeModel, close, send, abort, answer, dismiss, notice };
+  statsRef.current = (sessionId: string) => void refreshStats(sessionId);
+  return { connection, session, opening, chat, ui, kit, model, models, stats, open, attachTo, moveTo, changeModel, close, send, abort, answer, dismiss, notice };
 }

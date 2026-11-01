@@ -227,6 +227,10 @@ export function registerHandlers(router: Router, deps: HandlerDeps): void {
     await conn(hostId).request(Methods.storedWatch, { path });
   });
   // 스크립트가 끝날 때까지 기다린다 (제한 시간 + 여유).
+  handle(IpcChannels.usageSummary, (_event, hostId: string, range: string) =>
+    // 세션 파일을 모두 훑으므로 오래 걸릴 수 있다
+    conn(hostId).request(Methods.usageSummary, { range }, 5 * 60_000),
+  );
   handle(IpcChannels.playgroundRun, (_event, hostId: string, params: PlaygroundRunParams) =>
     conn(hostId).request<PlaygroundRunResult>(Methods.playgroundRun, params, (params.timeoutMs ?? 120_000) + 30_000),
   );

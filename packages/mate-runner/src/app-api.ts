@@ -2,6 +2,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { appendChat, readChat, readInbox } from "@pi-desktop/mate-kit";
 import { resourceHome } from "@pi-desktop/pi-resources";
+import { rangeBuckets, readSessionUsage, summarizeUsage, type UsageRange } from "@pi-desktop/agent-kit/usage";
 import { listDirectories, makeDirectory } from "../../host-agent/src/dir-list";
 import { addChatRequest, loadChatState } from "./chat/chat-agent";
 import { removeChatImages, saveChatImages } from "./chat/chat-images";
@@ -195,6 +196,14 @@ export function mateAppApi(ctx: MateAppContext): MateAppApi {
         await removeChatImages(files);
         throw error;
       }
+    },
+
+    // 사용량: Mate 대화와 임무 실행의 Pi 세션 (Agent 사용량 화면과 같은 집계)
+    usageSummary: async (range: UsageRange) => {
+      const now = new Date();
+      const { from } = rangeBuckets(range, now);
+      const [chat, runs] = await Promise.all([readSessionUsage(paths.chatSessions, from, "chat"), readSessionUsage(paths.sessions, from, "schedule")]);
+      return summarizeUsage([...chat, ...runs], range, now);
     },
 
     // 스킬·MCP (Mate 홈의 skills/·mcp.json, 지운 스킬은 Mate 휴지통으로). 관리 코드는 세 앱이 함께 쓴다 (pi-resources)

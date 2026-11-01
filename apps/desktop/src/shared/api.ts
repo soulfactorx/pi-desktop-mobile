@@ -4,6 +4,7 @@
  * 렌더러는 Node·Electron API에 직접 접근하지 않는다(contextIsolation + sandbox).
  * preload가 이 인터페이스만 `window.piDesktop`으로 노출한다 (설계 §5.8).
  */
+import type { UsageRange, UsageSummary } from "@pi-desktop/agent-kit/usage-types";
 import type {
   AuthCheckResult,
   DataBackupResult,
@@ -386,6 +387,8 @@ export interface PiDesktopApi {
   /** SDK Playground: 스크립트를 그 호스트의 Pi SDK로 실행한다. 끝날 때까지 기다리고 출력은 onPlaygroundOutput으로 */
   playgroundRun(hostId: string, params: PlaygroundRunParams): Promise<PlaygroundRunResult>;
   playgroundStop(hostId: string, runId: string): Promise<void>;
+  /** 이 호스트의 Pi 세션 폴더에서 기간별 토큰·비용을 센다 (사용량 화면) */
+  usageSummary(hostId: string, range: UsageRange): Promise<UsageSummary>;
   openSession(hostId: string, request: OpenSessionRequest): Promise<SessionSummary>;
   /**
    * 세션에 붙는다. 재생된 이벤트는 알림이 아니라 결과의 events로 함께 돌려준다.
@@ -594,6 +597,7 @@ export const IpcChannels = {
   unwatchTree: "pi:unwatch-tree",
   playgroundRun: "pi:playground-run",
   playgroundStop: "pi:playground-stop",
+  usageSummary: "pi:usage-summary",
   attachSession: "pi:attach-session",
   closeSession: "pi:close-session",
   clearExternalWrite: "pi:clear-external-write",

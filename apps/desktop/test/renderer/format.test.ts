@@ -4,7 +4,9 @@ import {
   htmlExportPath,
   formatCost,
   formatPercent,
+  formatMessageTime,
   formatRelative,
+  formatUsageLine,
   formatTokens,
   modelKey,
 } from "../../src/renderer/format";
@@ -76,5 +78,19 @@ describe("htmlExportPath", () => {
     expect(htmlExportPath("/home/me/.pi/agent/sessions/x/a.JSONL")).toBe("/home/me/.pi/agent/sessions/x/a.html");
     expect(htmlExportPath("/tmp/a")).toBe("/tmp/a.html");
     expect(htmlExportPath(undefined)).toBeUndefined();
+  });
+});
+
+describe("formatMessageTime·formatUsageLine", () => {
+  it("오늘은 시각만, 올해는 월/일, 그 밖에는 날짜까지", () => {
+    const now = new Date(2026, 10, 1, 18, 0).getTime();
+    expect(formatMessageTime(new Date(2026, 10, 1, 9, 5).getTime(), now)).toBe("09:05");
+    expect(formatMessageTime(new Date(2026, 9, 30, 21, 7).getTime(), now)).toBe("10/30 21:07");
+    expect(formatMessageTime(new Date(2025, 0, 2, 3, 4).getTime(), now)).toBe("2025-01-02 03:04");
+  });
+
+  it("입력(캐시 쓰기 포함)·캐시 읽기·출력·비용을 짧게, 없는 것은 뺀다", () => {
+    expect(formatUsageLine({ input: 1000, cacheWrite: 200, cacheRead: 5000, output: 320, cost: 0.0021 })).toBe("입력 1.2k · 캐시 5k · 출력 320 · $0.0021");
+    expect(formatUsageLine({ input: 10, cacheWrite: 0, cacheRead: 0, output: 5 })).toBe("입력 10 · 출력 5");
   });
 });

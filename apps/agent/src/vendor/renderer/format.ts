@@ -58,3 +58,28 @@ export function htmlExportPath(sessionFile: string | undefined): string | undefi
   if (!sessionFile) return undefined;
   return /\.jsonl$/i.test(sessionFile) ? sessionFile.replace(/\.jsonl$/i, ".html") : `${sessionFile}.html`;
 }
+
+/** 메시지 시각: 오늘이면 "15:04", 올해면 "11/1 15:04", 그 밖에는 "2025-11-01 15:04" */
+export function formatMessageTime(time: number, now: number = Date.now()): string {
+  const date = new Date(time);
+  const today = new Date(now);
+  const hm = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  if (date.toDateString() === today.toDateString()) return hm;
+  if (date.getFullYear() === today.getFullYear()) return `${date.getMonth() + 1}/${date.getDate()} ${hm}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${hm}`;
+}
+
+/** 응답 하나의 토큰 사용량을 짧게: "입력 1.2k · 캐시 5k · 출력 320 · $0.0021" (없는 항목은 뺀다) */
+export function formatUsageLine(usage: {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost?: number;
+}): string {
+  const parts = [`입력 ${formatTokens(usage.input + usage.cacheWrite)}`];
+  if (usage.cacheRead > 0) parts.push(`캐시 ${formatTokens(usage.cacheRead)}`);
+  parts.push(`출력 ${formatTokens(usage.output)}`);
+  if (usage.cost !== undefined && usage.cost > 0) parts.push(formatCost(usage.cost));
+  return parts.join(" · ");
+}

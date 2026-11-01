@@ -155,6 +155,8 @@ function ShellToolCard({ item }: { item: ToolItem }) {
   const [open, setOpen] = useState(true);
   const exitCode = shellExitCode(item.exitCode, item.output);
   const output = shellOutput(item.output);
+  const args = (typeof item.args === "object" && item.args !== null ? item.args : {}) as { command?: unknown; timeout?: unknown };
+  const command = typeof args.command === "string" ? args.command.trim() : "";
   return (
     <div className={`tool shell ${item.status}`}>
       <ToolHead
@@ -163,6 +165,14 @@ function ShellToolCard({ item }: { item: ToolItem }) {
         onToggle={() => setOpen(!open)}
         extra={exitCode !== undefined && item.status !== "running" ? <span className="tool-status">종료 코드 {exitCode}</span> : undefined}
       />
+      {/* 머리에는 첫 줄만 잘려 보이므로, 펼치면 실행한 명령 전체를 보여준다 */}
+      {open && command && (
+        <pre className="shell-command">
+          <span className="shell-prompt">$ </span>
+          {command}
+          {typeof args.timeout === "number" && <span className="shell-timeout">{`  (제한 ${args.timeout}초)`}</span>}
+        </pre>
+      )}
       {open && output.trim() && <pre className="shell-output">{output}</pre>}
     </div>
   );

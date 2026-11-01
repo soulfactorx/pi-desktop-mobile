@@ -324,3 +324,12 @@
   background: var(--panel-2);
   box-shadow: inset 3px 0 0 var(--accent);
 }
+
+/* 대화 머리: 컨텍스트 사용량과 세션 토큰·비용 */
+.session-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}

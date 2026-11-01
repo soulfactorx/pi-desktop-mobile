@@ -1,6 +1,6 @@
 # vendor — Pi Desktop에서 복사한 모듈
 
-`apps/desktop`(Pi Desktop)의 연결·채팅 모듈을 **복사**해 둔 것이다. 출처: `main` `1491e07`.
+`apps/desktop`(Pi Desktop)의 연결·채팅 모듈을 **복사**해 둔 것이다. 출처: `main` `1491e07`. chat-state·ChatView·ToolCards·format은 메시지 시각·토큰 표시 때 다시 가져왔다 (styles.css는 필요한 규칙만 덧붙임).
 
 처음(P0)에는 `@desktop` 별칭으로 Pi Desktop 소스를 직접 가져다 썼다. 그러면 Pi Desktop을 고칠 때
 에이전트 빌드가 깨지고, Pi Desktop PR의 CI까지 실패할 수 있다. Pi Desktop은 건드리지 않는다는 원칙(설계 DESIGN-AGENT.md §0)에 맞춰

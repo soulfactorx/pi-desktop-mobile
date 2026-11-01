@@ -269,6 +269,8 @@ GUI ──ssh──▶ host-agent connect ──unix socket──▶ host-agentd
   - **구현 메모 (M1, v0.14)**: 모델 선택은 검색창이 있는 선택기다. 최근 사용 5개(모든 탭 공통)를 맨 위에 두고 프로바이더별로 묶는다. 키보드(↑·↓·Enter·Esc)로 고를 수 있다. 목록에 없는 현재 모델(확장이 바꾼 모델)도 보인다. 자동 컴팩션 토글은 Compact 옆 "자동" 체크다(v0.18).
 - **세션 사이드바**: 워크스페이스별 세션 목록과 검색, 이름 변경, HTML export, **트리 뷰(`get_tree`)에서 노드를 골라 fork/clone**
   - **트리 이동 (같은 세션)**: Pi RPC에는 트리 이동 명령이 없어 bridge 확장의 `/desktop:tree {"target","summarize","instructions"}`가 `ctx.navigateTree`를 부른다. 트리 행의 "여기로"를 누르면 TUI `/tree`의 세 가지를 묻는다: 요약 없이(No summary), 요약하고(Summarize, 떠나는 갈래를 LLM이 요약해 `branchSummary`로 남김), 지시해서 요약하고(Summarize with custom prompt). 사용자 메시지로 옮기면 그 글이 입력창에 채워진다(`set_editor_text`). 요약은 오래 걸릴 수 있어 이 prompt만 응답 제한을 10분으로 둔다. bridge가 없는 세션(앱 업데이트 전에 연 세션)은 다시 시작하라고 안내한다.
+  - **메시지 시각·토큰**: 사용자 메시지에는 보낸 시각, 응답 아래에는 끝난 시각과 그 응답의 토큰(입력·캐시 읽기·출력)·비용을 작게 보인다. 실시간은 `message_start`(사용자)·`message_end`(응답)의 `timestamp`·`usage`, 다시 열면 `get_messages`에서 읽는다. Agent는 같은 코드(vendor)를 쓰고, 대화 머리에 컨텍스트 사용량과 세션 토큰·비용(`get_session_stats`)을 보인다.
+  - **사용량 화면**: Pi 메뉴 "사용량"(팔레트에도). 데몬 `usage.summary`가 이 호스트의 Pi 세션 폴더(Pi Desktop·TUI 대화)를 agent-kit `usage.ts`로 집계한다 (Agent 사용량 화면과 같은 모양·집계). Mate는 "사용량" 탭에서 Mate 대화·임무 실행 세션을 센다.
   - **요약 펼치기**: 컴팩션(`compaction_end`의 `result.summary`, 스냅샷의 `compactionSummary`)과 떠난 갈래 요약(`branchSummary`) 안내는 눌러서 요약문을 펼쳐 본다(TUI와 같음). bash 툴 카드는 펼치면 실행한 명령 전체를 보여준다.
   - **구현 메모 (M1, v0.13)**: 검색은 실행 중·기록 목록을 이름·첫 메시지·폴더·파일 경로로 거른다. 이름 변경은 보고 있는 실행 중 세션만 된다(`set_session_name`에 Pi 프로세스가 필요). 기록에서 고른 세션은 열어서 바꾼다. HTML export는 세션 파일 옆에 만든다. Pi 기본 위치는 작업 폴더(사용자 저장소)이고, Pi는 없는 폴더를 만들지 않기 때문이다. 만든 파일은 로컬·WSL이면 탐색기에서 보여준다.
 - **확장 UI**: select/confirm/input/editor는 모달로, timeout이 있으면 카운트다운을 보여준다. notify는 토스트, setStatus는 상태바, setWidget은 우측 패널, setTitle은 탭 제목으로.

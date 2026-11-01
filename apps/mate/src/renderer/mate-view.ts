@@ -248,3 +248,12 @@ export function toggleSkill(current: string[] | undefined, all: string[], name: 
   else picked.add(name);
   return all.filter((n) => picked.has(n));
 }
+
+/** 토큰 수를 짧게: 950 → "950", 12_300 → "12.3k", 1_500_000 → "1.5M" */
+export function formatTokens(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) return "–";
+  const trim = (v: number) => (v >= 100 ? v.toFixed(0) : v.toFixed(1).replace(/\.0$/, ""));
+  if (value < 1000) return String(Math.round(value));
+  if (value < 1_000_000) return `${trim(value / 1000)}k`;
+  return `${trim(value / 1_000_000)}M`;
+}

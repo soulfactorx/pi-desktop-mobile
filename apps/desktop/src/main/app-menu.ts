@@ -111,6 +111,7 @@ export function appMenuTemplate(platform: NodeJS.Platform, actions: MenuActions)
         item("pi-settings", "설정"),
         { type: "separator" },
         item("marketplace", "Marketplace"),
+        item("usage", "사용량"),
         { type: "separator" },
         item("terminal-pi", "터미널: pi 열기"),
         item("terminal-shell", "터미널: 셸 열기"),

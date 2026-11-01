@@ -329,6 +329,7 @@ function registerIpc(): void {
     if (error) throw new Error(error);
   });
   forward(IpcChannels.listMcp, "mcpList");
+  forward(IpcChannels.usageSummary, "usageSummary");
   forward(IpcChannels.addMcpPreset, "mcpAddPreset");
   forward(IpcChannels.setMcpEnabled, "mcpSetEnabled");
   forward(IpcChannels.removeMcp, "mcpRemove");

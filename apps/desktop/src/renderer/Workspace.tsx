@@ -25,6 +25,7 @@ import { EventInspector } from "./EventInspector";
 import { useExtensionDevMode } from "./use-dev-mode";
 import { parseAppSlash, splitModelArg, withAppCommands, type AppSlashCommand } from "./app-commands";
 import { PlaygroundPanel } from "./PlaygroundPanel";
+import { UsagePanel } from "./UsagePanel";
 import { baseName, formatRelative } from "./format";
 import { piSessionIdOf, tuiCommand } from "./tui-command";
 import { useSession } from "./use-session";
@@ -167,6 +168,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
   const [marketOpen, setMarketOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
+  const [usageOpen, setUsageOpen] = useState(false);
   /** 다른 호스트로 복사할 리소스 */
   const [copyItem, setCopyItem] = useState<CopyItem | undefined>();
   /** 다른 호스트로 복사할 사용자 범위 AGENTS.md 등 */
@@ -585,6 +587,14 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
         run: () => openTerminal({ hostId, kind: "shell", ...(session ? { cwd: session.cwd } : {}) }),
       },
     );
+    list.push({
+      id: "usage",
+      group: "Pi",
+      title: "사용량 (기간별 토큰·비용)",
+      keywords: "usage token cost 사용량 토큰 비용 통계",
+      disabled: !connected,
+      run: () => setUsageOpen(true),
+    });
     list.push({
       id: "sdk-playground",
       group: "개발자 도구",
@@ -1563,6 +1573,7 @@ export function Workspace({ tabId, active, onStatus, appCommands }: WorkspacePro
           onClose={() => setCopyPackage(undefined)}
         />
       )}
+      {active && usageOpen && <UsagePanel hostId={hostId} hostLabel={hostLabel} onClose={() => setUsageOpen(false)} />}
       {active && playgroundOpen && (
         <PlaygroundPanel
           hosts={hosts}

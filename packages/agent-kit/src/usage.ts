@@ -108,8 +108,9 @@ export function sessionUsage(text: string, source: UsageSource, since: number): 
  * Pi 세션 폴더(`<sessions>/<작업 폴더>/<세션>.jsonl`)에서 since 이후의 사용량을 읽는다. 세션 폴더를 직접 정한
  * 실행(--session-dir, PI_CODING_AGENT_SESSION_DIR)은 작업 폴더 없이 바로 아래에 두므로 그것도 읽는다.
  * since 전에 마지막으로 고친 파일은 열지 않는다. 앱의 스케줄러 세션 폴더는 "예약"으로 센다.
+ * source를 주면 이 폴더의 모든 사용량을 그 쓰임새로 센다 (예: Mate의 임무 실행 세션).
  */
-export async function readSessionUsage(sessionsDir: string, since: number): Promise<UsageRecord[]> {
+export async function readSessionUsage(sessionsDir: string, since: number, source?: UsageSource): Promise<UsageRecord[]> {
   let folders: string[];
   try {
     folders = await readdir(sessionsDir);
@@ -127,17 +128,17 @@ export async function readSessionUsage(sessionsDir: string, since: number): Prom
   };
   for (const folder of folders) {
     if (folder.endsWith(".jsonl")) {
-      await readSessionFile(join(sessionsDir, folder), "chat");
+      await readSessionFile(join(sessionsDir, folder), source ?? "chat");
       continue;
     }
-    const source: UsageSource = /pi-desktop-agent-scheduler/.test(folder) ? "schedule" : "chat";
+    const folderSource: UsageSource = source ?? (/pi-desktop-agent-scheduler/.test(folder) ? "schedule" : "chat");
     let files: string[];
     try {
       files = await readdir(join(sessionsDir, folder));
     } catch {
       continue;
     }
-    for (const name of files.filter((n) => n.endsWith(".jsonl"))) await readSessionFile(join(sessionsDir, folder, name), source);
+    for (const name of files.filter((n) => n.endsWith(".jsonl"))) await readSessionFile(join(sessionsDir, folder, name), folderSource);
   }
   return records;
 }
